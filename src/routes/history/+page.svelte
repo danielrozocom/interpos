@@ -87,7 +87,7 @@ $: userId, updateSuggestions();
     <label>
       Ingrese ID de usuario:
       <input 
-        type="text" 
+        type="tel" 
         bind:value={userId} 
         required 
         list="user-suggestions" 
