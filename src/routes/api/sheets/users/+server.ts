@@ -1,8 +1,5 @@
 import { google } from 'googleapis';
-import { GOOGLE_SHEETS_ID } from '$env/static/private';
 import type { RequestHandler } from '@sveltejs/kit';
-
-// Autenticación
 import { json } from '@sveltejs/kit';
 import { GOOGLE_SHEETS_ID, GOOGLE_PRIVATE_KEY, GOOGLE_PROJECT_ID, GOOGLE_CLIENT_EMAIL } from '$env/static/private';
 
