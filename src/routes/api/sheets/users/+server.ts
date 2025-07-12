@@ -32,7 +32,8 @@ export const GET: RequestHandler = async () => {
       headers: { 'Content-Type': 'application/json' }
     });
   } catch (error) {
-    return new Response(JSON.stringify({ error: String(error) }), {
+    // Devuelve array vacío en caso de error para evitar fallos en frontend
+    return new Response(JSON.stringify([]), {
       status: 500,
       headers: { 'Content-Type': 'application/json' }
     });
