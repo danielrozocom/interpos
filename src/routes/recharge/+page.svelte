@@ -17,6 +17,25 @@ let step = 1;
 let allUsers: Array<{id: string, name: string}> = [];
 let userSuggestions: Array<{id: string, name: string}> = [];
 
+// Función para validar que solo se ingresen números en el ID
+function validateNumericInput(event: KeyboardEvent) {
+  const allowedKeys = ['Backspace', 'Delete', 'Tab', 'Enter', 'ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown'];
+  if (allowedKeys.includes(event.key)) {
+    return; // Permitir teclas de navegación
+  }
+  if (!/^[0-9]$/.test(event.key)) {
+    event.preventDefault(); // Bloquear cualquier carácter que no sea número
+  }
+}
+
+// Función para limpiar caracteres no numéricos del valor pegado
+function cleanPastedValue(event: ClipboardEvent) {
+  event.preventDefault();
+  const pastedText = event.clipboardData?.getData('text') || '';
+  const numericOnly = pastedText.replace(/[^0-9]/g, '');
+  userId = numericOnly;
+}
+
 function formatCurrency(val: number): string {
   return `$${(isNaN(val) ? 0 : Math.round(val * 100) / 100).toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 }
@@ -108,17 +127,26 @@ async function handleSubmit() {
   }}>
     <label>
       Ingrese ID de usuario:
-      <input type="text" bind:value={userId} required list="user-suggestions" on:keydown={(e) => {
-        if (e.key === 'Enter') {
-          if (allUsers.some(u => u.id === userId)) {
-            step = 2;
-            e.preventDefault();
-          } else {
-            alert('No existe un usuario con ese ID');
-            e.preventDefault();
+      <input 
+        type="text" 
+        bind:value={userId} 
+        required 
+        list="user-suggestions" 
+        on:keydown={(e) => {
+          validateNumericInput(e);
+          if (e.key === 'Enter') {
+            if (allUsers.some(u => u.id === userId)) {
+              step = 2;
+              e.preventDefault();
+            } else {
+              alert('No existe un usuario con ese ID');
+              e.preventDefault();
+            }
           }
-        }
-      }} />
+        }}
+        on:paste={cleanPastedValue}
+        placeholder="Solo números"
+      />
       <datalist id="user-suggestions">
         {#each userSuggestions as u}
           <option value={u.id}>{u.name}</option>
@@ -127,7 +155,15 @@ async function handleSubmit() {
     </label>
     <ul>
       {#each userSuggestions as u}
-        <li on:click={() => { userId = u.id; step = 2; }}>{u.id} - {u.name}</li>
+        <li>
+          <button 
+            type="button"
+            on:click={() => { userId = u.id; step = 2; }}
+            style="background: none; border: none; padding: 0; text-align: left; cursor: pointer; text-decoration: underline; color: blue;"
+          >
+            {u.id} - {u.name}
+          </button>
+        </li>
       {/each}
     </ul>
     <button type="submit" disabled={!allUsers.some(u => u.id === userId)}>Siguiente</button>
