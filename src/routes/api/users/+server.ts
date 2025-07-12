@@ -1,6 +1,6 @@
 // src/routes/api/users/+server.ts
 import type { RequestHandler } from './$types';
-import { getUsers } from '$lib/sheets';
+import { getUsers } from '$lib/sheet';
 
 export const GET: RequestHandler = async () => {
   const users = await getUsers();
