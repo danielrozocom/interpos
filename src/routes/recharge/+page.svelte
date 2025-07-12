@@ -145,7 +145,7 @@ async function handleSubmit() {
           }
         }}
         on:paste={cleanPastedValue}
-        placeholder="Solo números"
+        placeholder="Ingrese ID"
       />
       <datalist id="user-suggestions">
         {#each userSuggestions as u}
