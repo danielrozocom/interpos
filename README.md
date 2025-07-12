@@ -1,38 +1,73 @@
-# sv
+# InterPOS
 
-Everything you need to build a Svelte project, powered by [`sv`](https://github.com/sveltejs/cli).
+Aplicación de punto de venta para colegio, desarrollada con SvelteKit y Google Sheets como base de datos.
 
-## Creating a project
+## Prerrequisitos
 
-If you're seeing this, you've probably already done this step. Congrats!
+* Node.js v16+ y npm
+* Cuenta de servicio de Google Cloud con credenciales JSON
+* Hoja de cálculo de Google Sheets con pestañas **Users**, **Products** y **Transactions**, compartida con el `client_email` de la cuenta de servicio
 
-```bash
-# create a new project in the current directory
-npx sv create
+## Instalación
 
-# create a new project in my-app
-npx sv create my-app
-```
+1. Clona el repositorio:
 
-## Developing
+   ```bash
+   git clone https://github.com/USER/InterPOS.git
+   cd InterPOS/interpos
+   ```
+2. Instala dependencias:
 
-Once you've created a project and installed dependencies with `npm install` (or `pnpm install` or `yarn`), start a development server:
+   ```bash
+   npm install
+   ```
+3. Crea un archivo `.env` en la raíz con:
+
+   ```dotenv
+   GOOGLE_SHEETS_ID=<tu_id_de_hoja>
+   ```
+4. Coloca tu `service-account.json` (credenciales) junto a `package.json`.
+5. Asegúrate de que `.gitignore` incluye:
+
+   ```gitignore
+   /node_modules
+   /service-account.json
+   /.svelte-kit
+   /build
+   .env
+   ```
+
+## Estructura básica
+
+* **src/lib/types.ts**: Interfaces `User`, `Product`, `Transaction`.
+* **src/lib/sheets.ts**: Funciones para leer/escribir en Google Sheets (`getUsers`, `addUser`, `getProducts`, ...).
+* **src/routes/api/**: Endpoints REST:
+
+  * `/api/users`
+  * `/api/products`
+  * `/api/transactions`
+* **src/routes/**: Páginas Svelte para listar y crear registros.
+* **svelte.config.js**: Configuración de Vite para exponer en LAN (`server.host: true`).
+
+## Uso
+
+Ejecuta en desarrollo:
 
 ```bash
 npm run dev
-
-# or start the server and open the app in a new browser tab
-npm run dev -- --open
 ```
 
-## Building
+* Local: [http://localhost:5173](http://localhost:5173)
+* LAN: http\://\<tu\_ip\_local>:5173
 
-To create a production version of your app:
+Para producción, despliega en Vercel o en tu VPS usando el adapter correspondiente.
 
-```bash
-npm run build
-```
+## Buenas prácticas
 
-You can preview the production build with `npm run preview`.
+* Nunca subas `service-account.json` ni `.env` al repositorio.
+* Valida tipos con TypeScript.
+* Controla errores con `try/catch` en tus endpoints.
 
-> To deploy your app, you may need to install an [adapter](https://svelte.dev/docs/kit/adapters) for your target environment.
+---
+
+*Tutorial y configuración básica generados por ChatGPT.*
