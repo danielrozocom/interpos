@@ -4,7 +4,14 @@ import type { RequestHandler } from '@sveltejs/kit';
 
 // Autenticación
 const auth = new google.auth.GoogleAuth({
-  keyFile: 'service-account.json',
+  // En desarrollo usa el archivo, en producción usa variables de entorno
+  credentials: process.env.NODE_ENV === 'production' ? {
+    type: 'service_account',
+    project_id: 'interpos-465317',
+    client_email: process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL,
+    private_key: process.env.GOOGLE_PRIVATE_KEY?.replace(/\\n/g, '\n'),
+  } : undefined,
+  keyFile: process.env.NODE_ENV === 'production' ? undefined : 'service-account.json',
   scopes: ['https://www.googleapis.com/auth/spreadsheets']
 });
 const sheets = google.sheets({ version: 'v4', auth });
