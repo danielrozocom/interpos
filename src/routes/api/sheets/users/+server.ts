@@ -3,9 +3,28 @@ import { GOOGLE_SHEETS_ID } from '$env/static/private';
 import type { RequestHandler } from '@sveltejs/kit';
 
 // Autenticación
+import { json } from '@sveltejs/kit';
+import { GOOGLE_SHEETS_ID, GOOGLE_PRIVATE_KEY, GOOGLE_PROJECT_ID, GOOGLE_CLIENT_EMAIL } from '$env/static/private';
+
+// Read credentials from environment variable
+// Build credentials object from separate env variables
+const credentials = {
+  type: 'service_account',
+  project_id: GOOGLE_PROJECT_ID,
+  private_key_id: '', // optional, not needed for auth
+  private_key: GOOGLE_PRIVATE_KEY,
+  client_email: GOOGLE_CLIENT_EMAIL,
+  client_id: '', // optional, not needed for auth
+  auth_uri: 'https://accounts.google.com/o/oauth2/auth',
+  token_uri: 'https://oauth2.googleapis.com/token',
+  auth_provider_x509_cert_url: 'https://www.googleapis.com/oauth2/v1/certs',
+  client_x509_cert_url: '', // optional
+  universe_domain: 'googleapis.com'
+};
+
 const auth = new google.auth.GoogleAuth({
-  keyFile: 'service-account.json',
-  scopes: ['https://www.googleapis.com/auth/spreadsheets']
+  credentials,
+  scopes: ['https://www.googleapis.com/auth/spreadsheets'],
 });
 const sheets = google.sheets({ version: 'v4', auth });
 const SPREADSHEET_ID = GOOGLE_SHEETS_ID;
