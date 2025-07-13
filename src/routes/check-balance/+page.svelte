@@ -77,7 +77,9 @@ $: if (!userId) name = '';
         </label>
         <div class="flex items-center gap-2">
           <input
-            type="text"
+            type="number"
+            inputmode="numeric"
+            pattern="[0-9]*"
             id="userId"
             bind:value={userId}
             class="mt-1 block w-full rounded-lg border-2 focus:border-[#35528C] focus:ring-2 focus:ring-[#35528C] border-[#35528C]/30 bg-white px-4 py-2 text-gray-900 placeholder-gray-400 transition-all duration-150 shadow-sm sm:text-base"
