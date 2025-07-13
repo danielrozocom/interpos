@@ -1,3 +1,7 @@
+<svelte:head>
+  <title>Consulta tu Saldo | InterPOS</title>
+  <meta name="description" content="Consulta el saldo y los últimos movimientos de tu cuenta en InterPOS ingresando tu ID de usuario." />
+</svelte:head>
 <script lang="ts">
 import { onMount } from 'svelte';
 let userId = '';
