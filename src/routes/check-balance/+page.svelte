@@ -4,6 +4,7 @@
 </svelte:head>
 <script lang="ts">
 import { onMount } from 'svelte';
+
 let userId = '';
 let userSuggestions: any[] = [];
 let transactions: any[] = [];
@@ -42,6 +43,7 @@ $: if (!userId) name = '';
       const balanceResponse = await fetch(`/api/sheets/users?userId=${encodeURIComponent(userId)}`);
       if (!balanceResponse.ok) throw new Error('Error al obtener el saldo');
       const balanceData = await balanceResponse.json();
+      console.log('balanceData:', balanceData); // Debug API response
       balance = balanceData.balance;
       name = balanceData.name || '';
 
@@ -61,9 +63,10 @@ $: if (!userId) name = '';
       .slice(0, 10); // Obtener solo las últimas 10
     } catch (err) {
       console.error('Error:', err);
-      error = 'Error al obtener los datos';
+      error = 'No existe un usuario con ese ID';
       balance = null;
       transactions = [];
+      name = '';
     } finally {
       loading = false;
     }
@@ -89,9 +92,6 @@ $: if (!userId) name = '';
             class="mt-1 block w-full rounded-lg border-2 focus:border-[#35528C] focus:ring-2 focus:ring-[#35528C] border-[#35528C]/30 bg-white px-4 py-2 text-gray-900 placeholder-gray-400 transition-all duration-150 shadow-sm sm:text-base"
             placeholder="Ingresa tu ID de usuario"
           />
-          {#if balance !== null && name}
-            <span class="text-base font-semibold text-[#35528C] bg-[#35528C]/10 rounded px-3 py-1">{name}</span>
-          {/if}
         </div>
 
         <!-- Sugerencias eliminadas para evitar sobrecarga -->
@@ -124,7 +124,7 @@ $: if (!userId) name = '';
   {#if balance !== null}
     <div class="bg-gradient-to-br from-[#35528C]/10 via-white to-blue-50 shadow-lg rounded-xl p-8 mb-8 border flex flex-col items-center" style="border-color:#35528C">
       <h2 class="text-2xl font-extrabold mb-2 text-center" style="color:#35528C">
-        Hola{#if name} <span class="text-[#35528C]">{name}</span>{/if}
+        Hola{#if name}&nbsp;<span class="text-[#35528C]">{name}</span>{/if}, tu saldo es
       </h2>
       <p class="text-4xl font-extrabold text-green-600 mb-2 text-center">{formatCurrency(balance)}</p>
       <span class="text-sm text-gray-500 mb-4 text-center">Actualizado al último movimiento</span>
@@ -145,8 +145,8 @@ $: if (!userId) name = '';
               <tbody class="bg-white divide-y" style="border-color:#35528C">
                 {#each transactions as transaction}
                   <tr class="hover:bg-[#35528C]/10 transition-colors duration-100">
-                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                      {new Date(transaction.timestamp).toLocaleDateString('es-MX')}
+                  <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                      {new Date(transaction.timestamp).toLocaleString('es-MX', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' })}
                     </td>
                     <td class="px-6 py-4 whitespace-nowrap text-sm">
                       <span class={transaction.amount >= 0 ? 'text-green-600 font-bold' : 'text-red-600 font-bold'}>

@@ -43,7 +43,7 @@ export const GET: RequestHandler = async ({ url }) => {
           headers: { 'Content-Type': 'application/json' }
         });
       }
-      return new Response(JSON.stringify({ balance: user.balance }), {
+      return new Response(JSON.stringify({ balance: user.balance, name: user.name }), {
         status: 200,
         headers: { 'Content-Type': 'application/json' }
       });
