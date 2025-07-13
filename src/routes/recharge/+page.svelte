@@ -35,7 +35,7 @@ function cleanPastedValue(event: ClipboardEvent) {
 }
 
 function formatCurrency(val: number): string {
-  return `$${(isNaN(val) ? 0 : Math.round(val * 100) / 100).toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+  return `$${isNaN(val) ? 0 : Math.round(val).toLocaleString('es-MX')}`;
 }
 
 async function fetchAllUsers() {

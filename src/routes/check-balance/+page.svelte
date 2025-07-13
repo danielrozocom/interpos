@@ -1,32 +1,28 @@
-<![CDATA[<script lang="ts">
-  let userId = '';
-  let userSuggestions: any[] = [];
-  let transactions: any[] = [];
-  let balance = null;
-  let error = '';
-  let loading = false;
+<script lang="ts">
+import { onMount } from 'svelte';
+let userId = '';
+let userSuggestions: any[] = [];
+let transactions: any[] = [];
+let balance = null;
+let error = '';
+let loading = false;
+let name = '';
 
-  async function searchUser() {
-    if (userId.length < 3) {
-      userSuggestions = [];
-      return;
-    }
+$: if (!userId) name = '';
 
-    try {
-      const response = await fetch(`/api/users?search=${encodeURIComponent(userId)}`);
-      if (!response.ok) throw new Error('Error al buscar usuarios');
-      userSuggestions = await response.json();
-    } catch (err) {
-      console.error('Error:', err);
-      error = 'Error al buscar usuarios';
-    }
+  function cleanNumber(str: string | number): number {
+    if (typeof str === 'number') return str;
+    if (!str) return 0;
+    // Elimina $ y comas, conserva el signo
+    return Number(String(str).replace(/[^\d.-]/g, ''));
   }
 
-  async function selectUser(suggestion: string) {
-    userId = suggestion;
-    userSuggestions = [];
-    await checkBalance();
+  function formatCurrency(val: number): string {
+    return `$${isNaN(val) ? 0 : Math.round(val).toLocaleString('es-MX')}`;
   }
+
+  // Eliminar búsqueda en cada input para evitar sobrecarga
+  // El nombre se obtiene al consultar saldo
 
   async function checkBalance() {
     if (!userId) {
@@ -43,6 +39,7 @@
       if (!balanceResponse.ok) throw new Error('Error al obtener el saldo');
       const balanceData = await balanceResponse.json();
       balance = balanceData.balance;
+      name = balanceData.name || '';
 
       // Obtener las últimas 10 transacciones
       const historyResponse = await fetch(`/api/sheets/history?userId=${encodeURIComponent(userId)}`);
@@ -52,7 +49,7 @@
       // Procesar las transacciones
       transactions = allTransactions.map(t => ({
         timestamp: t.Date,
-        amount: parseFloat(t.Quantity),
+        amount: cleanNumber(t.Quantity),
         method: t.Method,
         notes: t['Observation(s)']
       }))
@@ -70,105 +67,105 @@
 </script>
 
 <div class="max-w-4xl mx-auto">
-  <h1 class="text-2xl font-bold text-gray-900 mb-6">Consulta tu Saldo</h1>
+  <h1 class="text-3xl font-extrabold mb-8 tracking-tight" style="color:#35528C">Consulta tu Saldo</h1>
 
-  <div class="bg-white shadow rounded-lg p-6 mb-6">
+  <div class="bg-gradient-to-br from-[#35528C]/10 via-white to-blue-50 shadow-lg rounded-xl p-8 mb-8 border" style="border-color:#35528C">
     <form on:submit|preventDefault={checkBalance} class="space-y-6">
       <div class="relative">
-        <label for="userId" class="block text-sm font-medium text-gray-700 mb-2">
+        <label for="userId" class="block text-base font-semibold mb-2 tracking-wide" style="color:#35528C">
           ID de Usuario
         </label>
-        <input
-          type="text"
-          id="userId"
-          bind:value={userId}
-          on:input={searchUser}
-          class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
-          placeholder="Ingresa tu ID de usuario"
-        />
+        <div class="flex items-center gap-2">
+          <input
+            type="text"
+            id="userId"
+            bind:value={userId}
+            class="mt-1 block w-full rounded-lg border-2 focus:border-[#35528C] focus:ring-2 focus:ring-[#35528C] border-[#35528C]/30 bg-white px-4 py-2 text-gray-900 placeholder-gray-400 transition-all duration-150 shadow-sm sm:text-base"
+            placeholder="Ingresa tu ID de usuario"
+          />
+          {#if balance !== null && name}
+            <span class="text-base font-semibold text-[#35528C] bg-[#35528C]/10 rounded px-3 py-1">{name}</span>
+          {/if}
+        </div>
 
-        {#if userSuggestions.length > 0}
-          <div class="absolute z-10 mt-1 w-full bg-white rounded-md shadow-lg border border-gray-200">
-            <ul class="max-h-60 rounded-md py-1 text-base overflow-auto focus:outline-none sm:text-sm">
-              {#each userSuggestions as suggestion}
-                <li
-                  class="cursor-pointer select-none relative py-2 pl-3 pr-9 hover:bg-indigo-50"
-                  on:click={() => selectUser(suggestion)}
-                >
-                  {suggestion}
-                </li>
-              {/each}
-            </ul>
-          </div>
-        {/if}
+        <!-- Sugerencias eliminadas para evitar sobrecarga -->
       </div>
 
       <div class="flex justify-end">
         <button
           type="submit"
-          class="inline-flex justify-center rounded-md border border-transparent bg-indigo-600 py-2 px-4 text-sm font-medium text-white shadow-sm hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2"
+          class="inline-flex items-center justify-center gap-2 rounded-lg bg-[#35528C] py-2 px-6 text-base font-semibold text-white shadow hover:bg-[#27406B] focus:outline-none focus:ring-2 focus:ring-[#35528C] focus:ring-offset-2 transition-all duration-150 disabled:opacity-60 disabled:cursor-not-allowed"
           disabled={loading}
         >
-          {loading ? 'Consultando...' : 'Consultar Saldo'}
+          {#if loading}
+            <svg class="animate-spin h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"></path></svg>
+            Consultando...
+          {:else}
+            Consultar Saldo
+          {/if}
         </button>
       </div>
     </form>
 
     {#if error}
-      <div class="mt-4 p-4 bg-red-50 border border-red-200 rounded-md">
-        <p class="text-sm text-red-600">{error}</p>
+      <div class="mt-4 p-4 bg-red-50 border border-red-200 rounded-lg flex items-center gap-2">
+        <svg class="h-5 w-5 text-red-500" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" /></svg>
+        <p class="text-base text-red-700 font-medium">{error}</p>
       </div>
     {/if}
   </div>
 
   {#if balance !== null}
-    <div class="bg-white shadow rounded-lg p-6 mb-6">
-      <h2 class="text-lg font-medium text-gray-900 mb-4">Tu Saldo Actual</h2>
-      <p class="text-3xl font-bold text-indigo-600">${balance.toLocaleString('es-MX')}</p>
-    </div>
-
-    {#if transactions.length > 0}
-      <div class="bg-white shadow rounded-lg overflow-hidden">
-        <h2 class="text-lg font-medium text-gray-900 p-6 pb-0">Últimos Movimientos</h2>
-        <div class="mt-4 overflow-x-auto">
-          <table class="min-w-full divide-y divide-gray-200">
-            <thead class="bg-gray-50">
-              <tr>
-                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Fecha</th>
-                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Tipo</th>
-                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Cantidad</th>
-                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Método</th>
-                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Observaciones</th>
-              </tr>
-            </thead>
-            <tbody class="bg-white divide-y divide-gray-200">
-              {#each transactions as transaction}
+    <div class="bg-gradient-to-br from-[#35528C]/10 via-white to-blue-50 shadow-lg rounded-xl p-8 mb-8 border flex flex-col items-center" style="border-color:#35528C">
+      <h2 class="text-2xl font-extrabold mb-2 text-center" style="color:#35528C">
+        Hola{#if name} <span class="text-[#35528C]">{name}</span>{/if}
+      </h2>
+      <p class="text-4xl font-extrabold text-green-600 mb-2 text-center">{formatCurrency(balance)}</p>
+      <span class="text-sm text-gray-500 mb-4 text-center">Actualizado al último movimiento</span>
+      <h3 class="text-lg font-semibold mb-2 text-center" style="color:#35528C">Tus últimos 10 movimientos</h3>
+      {#if transactions.length > 0}
+        <div class="bg-white shadow-xl rounded-xl overflow-hidden border w-full" style="border-color:#35528C">
+          <div class="mt-2 overflow-x-auto">
+            <table class="min-w-full divide-y" style="border-color:#35528C">
+              <thead class="bg-[#35528C]/10">
                 <tr>
-                  <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                    {new Date(transaction.timestamp).toLocaleDateString('es-MX')}
-                  </td>
-                  <td class="px-6 py-4 whitespace-nowrap text-sm">
-                    <span class={transaction.amount >= 0 ? 'text-green-600' : 'text-red-600'}>
-                      {transaction.amount >= 0 ? 'Recarga' : 'Consumo'}
-                    </span>
-                  </td>
-                  <td class="px-6 py-4 whitespace-nowrap text-sm">
-                    <span class={transaction.amount >= 0 ? 'text-green-600' : 'text-red-600'}>
-                      ${Math.abs(transaction.amount).toLocaleString('es-MX')}
-                    </span>
-                  </td>
-                  <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                    {transaction.method || '-'}
-                  </td>
-                  <td class="px-6 py-4 text-sm text-gray-900">
-                    {transaction.notes || '-'}
-                  </td>
+                  <th class="px-6 py-3 text-left text-xs font-bold uppercase tracking-wider" style="color:#35528C">Fecha</th>
+                  <th class="px-6 py-3 text-left text-xs font-bold uppercase tracking-wider" style="color:#35528C">Tipo</th>
+                  <th class="px-6 py-3 text-left text-xs font-bold uppercase tracking-wider" style="color:#35528C">Cantidad</th>
+                  <th class="px-6 py-3 text-left text-xs font-bold uppercase tracking-wider" style="color:#35528C">Método</th>
+                  <th class="px-6 py-3 text-left text-xs font-bold uppercase tracking-wider" style="color:#35528C">Observaciones</th>
                 </tr>
-              {/each}
-            </tbody>
-          </table>
+              </thead>
+              <tbody class="bg-white divide-y" style="border-color:#35528C">
+                {#each transactions as transaction}
+                  <tr class="hover:bg-[#35528C]/10 transition-colors duration-100">
+                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                      {new Date(transaction.timestamp).toLocaleDateString('es-MX')}
+                    </td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm">
+                      <span class={transaction.amount >= 0 ? 'text-green-600 font-bold' : 'text-red-600 font-bold'}>
+                        {transaction.amount >= 0 ? 'Recarga' : 'Consumo'}
+                      </span>
+                    </td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm">
+                      <span class={transaction.amount >= 0 ? 'text-green-600 font-bold' : 'text-red-600 font-bold'}>
+                        {formatCurrency(Math.abs(cleanNumber(transaction.amount)))}
+                      </span>
+                    </td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm font-medium" style="color:#35528C">
+                      {transaction.method || '-'}
+                    </td>
+                    <td class="px-6 py-4 text-sm text-gray-700">
+                      {transaction.notes || '-'}
+                    </td>
+                  </tr>
+                {/each}
+              </tbody>
+            </table>
+          </div>
         </div>
-      </div>
-    {/if}
+      {/if}
+    </div>
   {/if}
-</div>]]>
+</div>
+ 
