@@ -49,7 +49,8 @@ export const GET: RequestHandler = async ({ url }) => {
       headers: { 'Content-Type': 'application/json' }
     });
   } catch (error) {
-    return new Response(JSON.stringify({ error: String(error) }), {
+    console.error('Error en el endpoint de historial:', error);
+    return new Response(JSON.stringify({ error: 'Error al consultar el historial. Detalles: ' + String(error) }), {
       status: 500,
       headers: { 'Content-Type': 'application/json' }
     });

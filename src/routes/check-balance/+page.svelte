@@ -8,7 +8,7 @@ import { onMount } from 'svelte';
 let userId = '';
 let userSuggestions: any[] = [];
 let transactions: any[] = [];
-let balance = null;
+let balance: number | null = null;
 let error = '';
 let loading = false;
 let name = '';
@@ -53,13 +53,13 @@ $: if (!userId) name = '';
       const allTransactions = await historyResponse.json();
       
       // Procesar las transacciones
-      transactions = allTransactions.map(t => ({
+      transactions = allTransactions.map((t: any) => ({
         timestamp: t.Date,
         amount: cleanNumber(t.Quantity),
         method: t.Method,
         notes: t['Observation(s)']
       }))
-      .sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime())
+      .sort((a: any, b: any) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime())
       .slice(0, 10); // Obtener solo las últimas 10
     } catch (err) {
       console.error('Error:', err);
@@ -74,9 +74,10 @@ $: if (!userId) name = '';
 </script>
 
 <div class="max-w-4xl mx-auto">
-  <h1 class="text-3xl font-extrabold mb-8 tracking-tight" style="color:#35528C">Consulta tu Saldo</h1>
+  <h1 class="text-3xl font-bold text-[#35528C] mb-2 text-center font-sans">Consulta tu Saldo</h1>
+  <p class="text-lg text-[#35528C]/80 text-center mb-8 font-sans">Revisa tu saldo actual y los últimos movimientos de tu cuenta ingresando tu ID de usuario.</p>
 
-  <div class="bg-gradient-to-br from-[#35528C]/10 via-white to-blue-50 shadow-lg rounded-xl p-8 mb-8 border" style="border-color:#35528C">
+  <div class="bg-white shadow-lg rounded-xl p-8 mb-8 border border-[#35528C]">
     <form on:submit|preventDefault={checkBalance} class="space-y-6">
       <div class="relative">
         <label for="userId" class="block text-base font-semibold mb-2 tracking-wide" style="color:#35528C">
@@ -92,7 +93,7 @@ $: if (!userId) name = '';
             class="mt-1 block w-full rounded-lg border-2 focus:border-[#35528C] focus:ring-2 focus:ring-[#35528C] border-[#35528C]/30 bg-white px-4 py-2 text-gray-900 placeholder-gray-400 transition-all duration-150 shadow-sm sm:text-base"
             placeholder="Ingresa tu ID de usuario"
           />
-        </div>
+        </div> <!-- Properly closed input wrapper div -->
 
         <!-- Sugerencias eliminadas para evitar sobrecarga -->
       </div>
@@ -101,7 +102,7 @@ $: if (!userId) name = '';
         <button
           type="submit"
           class="inline-flex items-center justify-center gap-2 rounded-lg bg-[#35528C] py-2 px-6 text-base font-semibold text-white shadow hover:bg-[#27406B] focus:outline-none focus:ring-2 focus:ring-[#35528C] focus:ring-offset-2 transition-all duration-150 disabled:opacity-60 disabled:cursor-not-allowed"
-          disabled={loading}
+          disabled={loading || !userId}
         >
           {#if loading}
             <svg class="animate-spin h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"></path></svg>
@@ -122,13 +123,11 @@ $: if (!userId) name = '';
   </div>
 
   {#if balance !== null}
-    <div class="bg-gradient-to-br from-[#35528C]/10 via-white to-blue-50 shadow-lg rounded-xl p-8 mb-8 border flex flex-col items-center" style="border-color:#35528C">
-      <h2 class="text-2xl font-extrabold mb-2 text-center" style="color:#35528C">
-        Hola{#if name}&nbsp;<span class="text-[#35528C]">{name}</span>{/if}, tu saldo es
-      </h2>
+    <div class="bg-white shadow-lg rounded-xl p-8 mb-8 border border-[#35528C] flex flex-col items-center">
+      <h2 class="text-xl font-semibold text-[#35528C] mb-2 text-center font-sans">Hola{#if name}&nbsp;<span class="text-[#35528C]">{name}</span>{/if}, tu saldo es</h2>
       <p class="text-4xl font-extrabold text-green-600 mb-2 text-center">{formatCurrency(balance)}</p>
       <span class="text-sm text-gray-500 mb-4 text-center">Actualizado al último movimiento</span>
-      <h3 class="text-lg font-semibold mb-2 text-center" style="color:#35528C">Tus últimos 10 movimientos</h3>
+      <h3 class="text-lg font-semibold text-[#35528C] mb-2 text-center font-sans">Tus últimos 10 movimientos</h3>
       {#if transactions.length > 0}
         <div class="bg-white shadow-xl rounded-xl overflow-hidden border w-full" style="border-color:#35528C">
           <div class="mt-2 overflow-x-auto">
@@ -173,5 +172,7 @@ $: if (!userId) name = '';
       {/if}
     </div>
   {/if}
+  <!-- Removed extra closing {/if} tag to fix Svelte error -->
+<!-- Closing main container div to fix Svelte error -->
 </div>
  

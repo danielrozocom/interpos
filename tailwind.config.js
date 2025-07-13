@@ -14,6 +14,9 @@ export default {
           600: '#2563eb',
           700: '#35528C',
         }
+      },
+      fontFamily: {
+        sans: ['Nunito', 'ui-sans-serif', 'system-ui'],
       }
     },
   },

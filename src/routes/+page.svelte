@@ -1,5 +1,6 @@
 <script lang="ts">
   import { onMount } from 'svelte';
+ import { siteName } from '../lib/config';
   
   let users: Array<{id: string, name: string, balance: number}> = [];
   let loading = true;
@@ -25,15 +26,15 @@
 </script>
 
 <svelte:head>
-  <title>InterPOS - Dashboard</title>
+  <title>{siteName}</title>
+
 </svelte:head>
 
 
 <div class="space-y-8">
   <!-- Header -->
   <div class="text-center">
-    <h1 class="text-4xl font-bold text-gray-900 mb-2">Bienvenido a InterPOS</h1>
-    <p class="text-xl text-gray-600">Sistema de gestión de puntos de venta</p>
+    <h1 class="text-5xl font-extrabold text-[#35528C] mb-4 text-center font-sans">Bienvenido a InterPOS</h1>
   </div>
 
   <!-- Stats Cards -->
@@ -47,7 +48,13 @@
         </div>
         <div class="ml-4">
           <p class="text-sm font-medium text-gray-600">Total Usuarios</p>
-          <p class="text-2xl font-bold text-gray-900">{users.length}</p>
+          <p class="text-2xl font-bold text-gray-900">
+            {#if loading}
+              <span class="inline-block h-6 w-20 bg-gray-200 rounded animate-pulse"></span>
+            {:else}
+              {users.length}
+            {/if}
+          </p>
         </div>
       </div>
     </div>
@@ -61,7 +68,13 @@
         </div>
         <div class="ml-4">
           <p class="text-sm font-medium text-gray-600">Balance Total</p>
-          <p class="text-2xl font-bold text-gray-900">{formatCurrency(totalBalance)}</p>
+          <p class="text-2xl font-bold text-gray-900">
+            {#if loading}
+              <span class="inline-block h-6 w-24 bg-gray-200 rounded animate-pulse"></span>
+            {:else}
+              {formatCurrency(totalBalance)}
+            {/if}
+          </p>
         </div>
       </div>
     </div>
@@ -76,7 +89,11 @@
         <div class="ml-4">
           <p class="text-sm font-medium text-gray-600">Promedio por Usuario</p>
           <p class="text-2xl font-bold text-gray-900">
-            {users.length > 0 ? formatCurrency(totalBalance / users.length) : formatCurrency(0)}
+            {#if loading}
+              <span class="inline-block h-6 w-24 bg-gray-200 rounded animate-pulse"></span>
+            {:else}
+              {users.length > 0 ? formatCurrency(totalBalance / users.length) : formatCurrency(0)}
+            {/if}
           </p>
         </div>
       </div>
@@ -87,29 +104,57 @@
   <div class="card">
     <h2 class="text-2xl font-bold text-gray-900 mb-6">Acciones Rápidas</h2>
     <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-      <a href="/recharge" class="group block">
-        <div class="bg-blue-50 hover:bg-blue-100 border border-blue-200 rounded-lg p-6 transition-colors duration-200">
-          <div class="flex items-center">
-            <span class="text-3xl mr-4">💰</span>
-            <div>
-              <h3 class="text-lg font-semibold text-blue-900">Recargar Saldo</h3>
-              <p class="text-sm text-blue-700">Añadir fondos a cuentas de usuarios</p>
+      {#if users.length > 0}
+        <a href="/recharge" class="group block">
+          <div class="bg-blue-50 hover:bg-blue-100 border border-blue-200 rounded-lg p-6 transition-colors duration-200">
+            <div class="flex items-center">
+              <span class="text-3xl mr-4">💰</span>
+              <div>
+                <h3 class="text-lg font-semibold text-blue-900">Recargar Saldo</h3>
+                <p class="text-sm text-blue-700">Añadir fondos a cuentas de usuarios</p>
+              </div>
             </div>
           </div>
-        </div>
-      </a>
+        </a>
+      {:else}
+        <button class="group block w-full cursor-not-allowed opacity-50" disabled>
+          <div class="bg-blue-50 border border-blue-200 rounded-lg p-6">
+            <div class="flex items-center">
+              <span class="text-3xl mr-4">💰</span>
+              <div>
+                <h3 class="text-lg font-semibold text-blue-900">Recargar Saldo</h3>
+                <p class="text-sm text-blue-700">Añadir fondos a cuentas de usuarios</p>
+              </div>
+            </div>
+          </div>
+        </button>
+      {/if}
 
-      <a href="/history" class="group block">
-        <div class="bg-green-50 hover:bg-green-100 border border-green-200 rounded-lg p-6 transition-colors duration-200">
-          <div class="flex items-center">
-            <span class="text-3xl mr-4">📋</span>
-            <div>
-              <h3 class="text-lg font-semibold text-green-900">Ver Historial</h3>
-              <p class="text-sm text-green-700">Consultar transacciones de usuarios</p>
+      {#if users.length > 0}
+        <a href="/history" class="group block">
+          <div class="bg-green-50 hover:bg-green-100 border border-green-200 rounded-lg p-6 transition-colors duration-200">
+            <div class="flex items-center">
+              <span class="text-3xl mr-4">📋</span>
+              <div>
+                <h3 class="text-lg font-semibold text-green-900">Ver Historial</h3>
+                <p class="text-sm text-green-700">Consultar transacciones de usuarios</p>
+              </div>
             </div>
           </div>
-        </div>
-      </a>
+        </a>
+      {:else}
+        <button class="group block w-full cursor-not-allowed opacity-50" disabled>
+          <div class="bg-green-50 border border-green-200 rounded-lg p-6">
+            <div class="flex items-center">
+              <span class="text-3xl mr-4">📋</span>
+              <div>
+                <h3 class="text-lg font-semibold text-green-900">Ver Historial</h3>
+                <p class="text-sm text-green-700">Consultar transacciones de usuarios</p>
+              </div>
+            </div>
+          </div>
+        </button>
+      {/if}
     </div>
   </div>
 

@@ -50,7 +50,8 @@ export const POST: RequestHandler = async ({ request }) => {
       headers: { 'Content-Type': 'application/json' }
     });
   } catch (error) {
-    return new Response(JSON.stringify({ error: String(error) }), {
+    console.error('Error en el endpoint de recarga:', error);
+    return new Response(JSON.stringify({ error: 'Error al registrar la recarga. Detalles: ' + String(error) }), {
       status: 500,
       headers: { 'Content-Type': 'application/json' }
     });

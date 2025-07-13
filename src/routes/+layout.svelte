@@ -13,10 +13,10 @@
         </div>
         <!-- Desktop menu -->
         <div class="hidden md:flex items-center space-x-4">
-          <a href="/" class="px-3 py-2 rounded-md text-sm font-medium text-white hover:bg-[#27406B] border-b-2 transition-all duration-150 { $page.url.pathname === '/' ? 'border-white' : 'border-transparent' }">Inicio</a>
-          <a href="/recharge" class="px-3 py-2 rounded-md text-sm font-medium text-white hover:bg-[#27406B] border-b-2 transition-all duration-150 { $page.url.pathname === '/recharge' ? 'border-white' : 'border-transparent' }">Recargar</a>
-          <a href="/history" class="px-3 py-2 rounded-md text-sm font-medium text-white hover:bg-[#27406B] border-b-2 transition-all duration-150 { $page.url.pathname === '/history' ? 'border-white' : 'border-transparent' }">Historial</a>
-          <a href="/check-balance" class="px-3 py-2 rounded-md text-sm font-medium text-white hover:bg-[#27406B] border-b-2 transition-all duration-150 { $page.url.pathname === '/check-balance' ? 'border-white' : 'border-transparent' }">Consultar Saldo</a>
+          <a href="/" class="px-3 py-3 rounded-md text-base font-semibold text-white uppercase hover:bg-[#27406B] border-b-2 transition-all duration-150 { $page.url.pathname === '/' ? 'border-white' : 'border-transparent' }">INICIO</a>
+          <a href="/recharge" class="px-3 py-3 rounded-md text-base font-semibold text-white uppercase hover:bg-[#27406B] border-b-2 transition-all duration-150 { $page.url.pathname === '/recharge' ? 'border-white' : 'border-transparent' }">RECARGAR</a>
+          <a href="/history" class="px-3 py-3 rounded-md text-base font-semibold text-white uppercase hover:bg-[#27406B] border-b-2 transition-all duration-150 { $page.url.pathname === '/history' ? 'border-white' : 'border-transparent' }">HISTORIAL</a>
+          <a href="/check-balance" class="px-3 py-3 rounded-md text-base font-semibold text-white uppercase hover:bg-[#27406B] border-b-2 transition-all duration-150 { $page.url.pathname === '/check-balance' ? 'border-white' : 'border-transparent' }">CONSULTAR SALDO</a>
         </div>
         <!-- Mobile hamburger -->
         <div class="md:hidden flex items-center">
@@ -31,10 +31,10 @@
       <!-- Mobile menu -->
       {#if menuOpen}
         <div class="md:hidden bg-[#35528C] border-b shadow-sm rounded-b-lg mt-2">
-          <a href="/" class="block text-white px-4 py-2 text-base font-medium border-b-2 transition-all duration-150 { $page.url.pathname === '/' ? 'border-white' : 'border-transparent' }" on:click={() => menuOpen = false}>Inicio</a>
-          <a href="/recharge" class="block text-white px-4 py-2 text-base font-medium border-b-2 transition-all duration-150 { $page.url.pathname === '/recharge' ? 'border-white' : 'border-transparent' }" on:click={() => menuOpen = false}>Recargar</a>
-          <a href="/history" class="block text-white px-4 py-2 text-base font-medium border-b-2 transition-all duration-150 { $page.url.pathname === '/history' ? 'border-white' : 'border-transparent' }" on:click={() => menuOpen = false}>Historial</a>
-          <a href="/check-balance" class="block text-white px-4 py-2 text-base font-medium border-b-2 transition-all duration-150 { $page.url.pathname === '/check-balance' ? 'border-white' : 'border-transparent' }" on:click={() => menuOpen = false}>Consultar Saldo</a>
+          <a href="/" class="block text-white px-4 py-3 text-lg font-semibold uppercase border-b-2 transition-all duration-150 { $page.url.pathname === '/' ? 'border-white' : 'border-transparent' }" on:click={() => menuOpen = false}>INICIO</a>
+          <a href="/recharge" class="block text-white px-4 py-3 text-lg font-semibold uppercase border-b-2 transition-all duration-150 { $page.url.pathname === '/recharge' ? 'border-white' : 'border-transparent' }" on:click={() => menuOpen = false}>RECARGAR</a>
+          <a href="/history" class="block text-white px-4 py-3 text-lg font-semibold uppercase border-b-2 transition-all duration-150 { $page.url.pathname === '/history' ? 'border-white' : 'border-transparent' }" on:click={() => menuOpen = false}>HISTORIAL</a>
+          <a href="/check-balance" class="block text-white px-4 py-3 text-lg font-semibold uppercase border-b-2 transition-all duration-150 { $page.url.pathname === '/check-balance' ? 'border-white' : 'border-transparent' }" on:click={() => menuOpen = false}>CONSULTAR SALDO</a>
         </div>
       {/if}
     </div>

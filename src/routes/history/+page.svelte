@@ -1,5 +1,6 @@
 <script lang="ts">
 import { onMount } from 'svelte';
+import { siteName } from '../../lib/config';
 
 let userId = '';
 let userName = '';
@@ -71,7 +72,8 @@ function updateSuggestions() {
     userSuggestions = [];
     return;
   }
-  userSuggestions = allUsers.filter(u => u.id.includes(userId));
+  // Mostrar solo usuarios cuyo ID empieza exactamente con el texto ingresado
+  userSuggestions = allUsers.filter(u => u.id.startsWith(userId));
 }
 
 async function fetchTransactions() {
@@ -81,7 +83,9 @@ async function fetchTransactions() {
   try {
     const res = await fetch(`/api/sheets/history?userId=${userId}`);
     if (!res.ok) throw new Error('No se pudo obtener el historial');
-    transactions = await res.json();
+    let data = await res.json();
+    // Ordenar por fecha descendente (más reciente primero)
+    transactions = data.sort((a: any, b: any) => new Date(b.Date).getTime() - new Date(a.Date).getTime());
     const user = allUsers.find(u => u.id === userId);
     userName = user ? user.name : '';
     step = 2;
@@ -96,30 +100,45 @@ $: userId, updateSuggestions();
 </script>
 
 <svelte:head>
-  <title>Historial - InterPOS</title>
+  <title>Historial de Transacciones | {siteName}</title>
+  <meta name="description" content="Consultar el historial de movimientos de un usuario" />
 </svelte:head>
+
+<style>
+  .btn-primary {
+    background-color: #35528C !important;
+    color: white !important;
+    border: 1px solid #35528C !important;
+    box-shadow: none !important;
+  }
+  .btn-secondary {
+    background-color: #35528C !important;
+    color: white !important;
+    border: 1px solid #35528C !important;
+    box-shadow: none !important;
+    opacity: 0.7;
+  }
+</style>
 
 <div class="max-w-4xl mx-auto">
   <!-- Header -->
   <div class="text-center mb-8">
-    <h1 class="text-3xl font-bold text-gray-900 mb-2">Historial de Transacciones</h1>
-    <p class="text-gray-600">Consultar el historial de movimientos de un usuario</p>
+    <h1 class="text-3xl font-bold text-[#35528C] mb-2 text-center">Historial de Transacciones</h1>
+    <p class="text-[#35528C]/80 text-center">Consultar el historial de movimientos de un usuario</p>
   </div>
 
-  <div class="card">
-    {#if step === 1}
-      <h2 class="text-xl font-semibold text-gray-900 mb-6">Seleccionar Usuario</h2>
+  {#if step === 1}
+    <div class="max-w-4xl mx-auto bg-white shadow-lg rounded-xl p-8 mb-8 border border-[#35528C]">
+      <h2 class="text-xl font-semibold text-[#35528C] mb-6 text-left font-sans">Seleccionar Usuario</h2>
       <form on:submit|preventDefault={fetchTransactions} class="space-y-6">
         <div>
-          <label class="block text-sm font-medium text-gray-700 mb-2">
-            ID de Usuario
-          </label>
+          <label for="userId" class="block text-sm font-medium text-gray-700 mb-2">ID de Usuario</label>
           <input 
-            type="tel" 
-            bind:value={userId} 
-            required 
-            list="user-suggestions" 
-            class="input-field"
+            id="userId"
+            type="tel"
+            bind:value={userId}
+            required
+            class="mt-1 block w-full rounded-lg border-2 focus:border-[#35528C] focus:ring-2 focus:ring-[#35528C] border-[#35528C]/30 bg-white px-4 py-2 text-gray-900 placeholder-[#35528C]/60 font-sans transition-all duration-150 shadow-sm sm:text-base"
             on:keydown={(e) => {
               validateNumericInput(e);
               if (e.key === 'Enter') {
@@ -135,24 +154,17 @@ $: userId, updateSuggestions();
             on:paste={cleanPastedValue}
             placeholder="Ingrese ID del usuario"
           />
-          <datalist id="user-suggestions">
-            {#each userSuggestions as u}
-              <option value={u.id}>{u.name}</option>
-            {/each}
-          </datalist>
-        </div>
+        </div> <!-- Properly closed input wrapper div -->
 
         {#if userSuggestions.length > 0}
           <div>
-            <label class="block text-sm font-medium text-gray-700 mb-2">
-              Sugerencias:
-            </label>
+            <label for="suggestions" class="block text-sm font-medium text-gray-700 mb-2">Sugerencias:</label>
             <div class="space-y-2">
               {#each userSuggestions as u}
                 <button 
                   type="button"
                   on:click={() => { userId = u.id; fetchTransactions(); }}
-                  class="w-full text-left p-3 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors duration-200"
+                  class="w-full text-left p-3 border border-[#35528C]/30 rounded-lg hover:bg-[#35528C]/10 transition-colors duration-200 font-sans placeholder-[#35528C]/60"
                 >
                   <span class="font-medium text-gray-900">ID: {u.id}</span>
                   <span class="text-gray-600 ml-2">- {u.name}</span>
@@ -163,9 +175,9 @@ $: userId, updateSuggestions();
         {/if}
 
         <button 
-          type="submit" 
-          disabled={loading || !allUsers.some(u => u.id === userId)} 
-          class="btn-primary w-full"
+          type="submit"
+          disabled={loading || !allUsers.some(u => u.id === userId)}
+          class="inline-flex items-center justify-center gap-2 rounded-lg bg-[#35528C] py-2 px-6 text-base font-semibold text-white shadow hover:bg-[#27406B] focus:outline-none focus:ring-2 focus:ring-[#35528C] focus:ring-offset-2 transition-all duration-150 disabled:opacity-60 disabled:cursor-not-allowed w-full font-sans tracking-wide"
         >
           {#if loading}
             <div class="flex items-center justify-center">
@@ -177,86 +189,89 @@ $: userId, updateSuggestions();
           {/if}
         </button>
       </form>
-    {/if}
+    </div>
+  {/if}
 
-    {#if step === 2}
-      <div class="space-y-6">
-        <!-- User Info Header -->
-        <div class="flex items-center justify-between">
-          <div>
-            <h2 class="text-xl font-semibold text-gray-900">Historial de {userName}</h2>
-            <p class="text-gray-600">ID: {userId}</p>
+  {#if step === 2}
+    <div class="space-y-6">
+      <!-- User Info Header -->
+      <div class="flex items-center justify-between">
+        <div class="text-left">
+          <h2 class="text-xl font-semibold text-[#35528C]">Historial de {userName}</h2>
+          <p class="text-[#35528C]/80">ID: {userId}</p>
+        </div>
+        <button 
+          on:click={() => { step = 1; userId = ''; userName = ''; transactions = []; }} 
+          class="btn-secondary px-4 py-2 rounded-lg text-white font-medium hover:opacity-80 transition-opacity"
+        >
+          Nueva consulta
+        </button>
+      </div>
+
+      {#if error}
+        <div class="bg-red-50 border border-red-200 rounded-lg p-4">
+          <div class="flex">
+            <span class="text-red-600 text-xl mr-3">❌</span>
+            <p class="text-red-800">{error}</p>
           </div>
-          <button on:click={() => { step = 1; userId = ''; userName = ''; transactions = []; }} class="btn-secondary">
-            Nuevo Usuario
-          </button>
+        </div>
+      {:else if transactions.length === 0}
+        <div class="text-center py-12">
+          <span class="text-6xl">📋</span>
+          <h3 class="text-lg font-medium text-gray-900 mt-4">Sin transacciones</h3>
+          <p class="text-gray-500 mt-2">Este usuario no tiene transacciones registradas.</p>
+        </div>
+      {:else}
+        <!-- Transactions Table -->
+        <div class="bg-white shadow-xl rounded-xl overflow-hidden border w-full mb-8" style="border-color:#35528C">
+          <div class="mt-2 overflow-x-auto">
+            <table class="min-w-full divide-y" style="border-color:#35528C">
+              <thead class="bg-[#35528C]/10">
+                <tr>
+                  <th class="px-6 py-3 text-left text-xs font-bold uppercase tracking-wider" style="color:#35528C">Fecha</th>
+                  <th class="px-6 py-3 text-left text-xs font-bold uppercase tracking-wider" style="color:#35528C">Cantidad</th>
+                  <th class="px-6 py-3 text-left text-xs font-bold uppercase tracking-wider" style="color:#35528C">Saldo Anterior</th>
+                  <th class="px-6 py-3 text-left text-xs font-bold uppercase tracking-wider" style="color:#35528C">Nuevo Saldo</th>
+                  <th class="px-6 py-3 text-left text-xs font-bold uppercase tracking-wider" style="color:#35528C">Método</th>
+                  <th class="px-6 py-3 text-left text-xs font-bold uppercase tracking-wider" style="color:#35528C">Observaciones</th>
+                </tr>
+              </thead>
+              <tbody class="bg-white divide-y" style="border-color:#35528C">
+                {#each transactions as transaction}
+                  <tr class="hover:bg-[#35528C]/10 transition-colors duration-100">
+                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                      {formatDate(transaction.Date)}
+                    </td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                      <span class="{cleanNumber(transaction.Quantity) >= 0 ? 'text-green-600 font-bold' : 'text-red-600 font-bold'}">
+                        {formatCurrency(cleanNumber(transaction.Quantity))}
+                      </span>
+                    </td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                      {formatCurrency(cleanNumber(transaction.PrevBalance))}
+                    </td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-blue-600">
+                      {formatCurrency(cleanNumber(transaction.NewBalance))}
+                    </td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm font-medium" style="color:#35528C">
+                      {transaction.Method || '-'}
+                    </td>
+                    <td class="px-6 py-4 text-sm text-gray-700 max-w-xs truncate" title={transaction["Observation(s)"]}>
+                      {transaction["Observation(s)"] || '-'}
+                    </td>
+                  </tr>
+                {/each}
+              </tbody>
+            </table>
+          </div>
         </div>
 
-        {#if error}
-          <div class="bg-red-50 border border-red-200 rounded-lg p-4">
-            <div class="flex">
-              <span class="text-red-600 text-xl mr-3">❌</span>
-              <p class="text-red-800">{error}</p>
-            </div>
-          </div>
-        {:else if transactions.length === 0}
-          <div class="text-center py-12">
-            <span class="text-6xl">📋</span>
-            <h3 class="text-lg font-medium text-gray-900 mt-4">Sin transacciones</h3>
-            <p class="text-gray-500 mt-2">Este usuario no tiene transacciones registradas.</p>
-          </div>
-        {:else}
-          <!-- Transactions Table -->
-          <div class="overflow-hidden border border-gray-200 rounded-lg">
-            <div class="overflow-x-auto">
-              <table class="min-w-full divide-y divide-gray-200">
-                <thead class="bg-gray-50">
-                  <tr>
-                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Fecha</th>
-                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Cantidad</th>
-                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Saldo Anterior</th>
-                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Nuevo Saldo</th>
-                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Método</th>
-                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Observaciones</th>
-                  </tr>
-                </thead>
-                <tbody class="bg-white divide-y divide-gray-200">
-                  {#each transactions as transaction}
-                    <tr class="hover:bg-gray-50">
-                      <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                        {formatDate(transaction.Date)}
-                      </td>
-                      <td class="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                        <span class="{cleanNumber(transaction.Quantity) >= 0 ? 'text-green-600' : 'text-red-600'}">
-                          {formatCurrency(cleanNumber(transaction.Quantity))}
-                        </span>
-                      </td>
-                      <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                        {formatCurrency(cleanNumber(transaction.PrevBalance))}
-                      </td>
-                      <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-blue-600">
-                        {formatCurrency(cleanNumber(transaction.NewBalance))}
-                      </td>
-                      <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                        {transaction.Method || '-'}
-                      </td>
-                      <td class="px-6 py-4 text-sm text-gray-900 max-w-xs truncate" title={transaction["Observation(s)"]}>
-                        {transaction["Observation(s)"] || '-'}
-                      </td>
-                    </tr>
-                  {/each}
-                </tbody>
-              </table>
-            </div>
-          </div>
-
-          <!-- Summary -->
-          <div class="bg-blue-50 border border-blue-200 rounded-lg p-4">
-            <h3 class="text-lg font-medium text-blue-900 mb-2">Resumen</h3>
-            <p class="text-blue-800">Total de transacciones: <strong>{transactions.length}</strong></p>
-          </div>
-        {/if}
-      </div>
-    {/if}
-  </div>
+        <!-- Summary -->
+        <div class="bg-blue-50 border border-blue-200 rounded-lg p-4">
+          <h3 class="text-lg font-medium text-blue-900 mb-2">Resumen</h3>
+          <p class="text-blue-800">Total de transacciones: <strong>{transactions.length}</strong></p>
+        </div>
+      {/if}
+    </div>
+  {/if}
 </div>
