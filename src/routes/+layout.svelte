@@ -13,6 +13,7 @@
           <a href="/" class="text-gray-600 hover:text-gray-900 px-3 py-2 rounded-md text-sm font-medium">Inicio</a>
           <a href="/recharge" class="text-gray-600 hover:text-gray-900 px-3 py-2 rounded-md text-sm font-medium">Recargar</a>
           <a href="/history" class="text-gray-600 hover:text-gray-900 px-3 py-2 rounded-md text-sm font-medium">Historial</a>
+          <a href="/check-balance" class="text-gray-600 hover:text-gray-900 px-3 py-2 rounded-md text-sm font-medium">Consultar Saldo</a>
         </div>
       </div>
     </div>

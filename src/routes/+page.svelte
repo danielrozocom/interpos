@@ -28,6 +28,7 @@
   <title>InterPOS - Dashboard</title>
 </svelte:head>
 
+
 <div class="space-y-8">
   <!-- Header -->
   <div class="text-center">

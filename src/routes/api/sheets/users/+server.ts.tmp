@@ -8,7 +8,7 @@ const auth = new google.auth.GoogleAuth({
     type: 'service_account',
     project_id: 'interpos-465317',
     client_email: process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL,
-    private_key: process.env.GOOGLE_PRIVATE_KEY?.replace(/\n/g, '\n'),
+    private_key: process.env.GOOGLE_PRIVATE_KEY?.replace(/\\n/g, '\n'),
   } : undefined,
   keyFile: process.env.NODE_ENV === 'production' ? undefined : 'service-account.json',
   scopes: ['https://www.googleapis.com/auth/spreadsheets']
@@ -24,11 +24,8 @@ export const GET: RequestHandler = async ({ url }) => {
       spreadsheetId: SPREADSHEET_ID,
       range: 'Users!A2:C'
     });
-    console.log('Google Sheets response:', res.data); // <-- LOG IMPORTANTE
+    
     const rows = res.data.values || [];
-    if (rows.length === 0) {
-      console.warn('No se encontraron datos en la hoja Users!A2:C');
-    }
     const users = rows.map(([id, name, balance]) => ({
       id: id ?? '',
       name: name ?? '',
@@ -48,6 +45,7 @@ export const GET: RequestHandler = async ({ url }) => {
         headers: { 'Content-Type': 'application/json' }
       });
     }
+    
     return new Response(JSON.stringify(users), {
       status: 200,
       headers: { 'Content-Type': 'application/json' }
