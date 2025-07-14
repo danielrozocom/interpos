@@ -17,6 +17,7 @@
           <a href="/recharge" class="px-3 py-3 rounded-md text-base font-semibold text-white uppercase hover:bg-[#27406B] border-b-2 transition-all duration-150 { $page.url.pathname === '/recharge' ? 'border-white' : 'border-transparent' }">RECARGAR</a>
           <a href="/history" class="px-3 py-3 rounded-md text-base font-semibold text-white uppercase hover:bg-[#27406B] border-b-2 transition-all duration-150 { $page.url.pathname === '/history' ? 'border-white' : 'border-transparent' }">HISTORIAL</a>
           <a href="/check-balance" class="px-3 py-3 rounded-md text-base font-semibold text-white uppercase hover:bg-[#27406B] border-b-2 transition-all duration-150 { $page.url.pathname === '/check-balance' ? 'border-white' : 'border-transparent' }">CONSULTAR SALDO</a>
+          <a href="/sell" class="px-3 py-3 rounded-md text-base font-semibold text-white uppercase hover:bg-[#27406B] border-b-2 transition-all duration-150 { $page.url.pathname === '/sell' ? 'border-white' : 'border-transparent' }">VENDER</a>
         </div>
         <!-- Mobile hamburger -->
         <div class="md:hidden flex items-center">
@@ -35,6 +36,7 @@
           <a href="/recharge" class="block text-white px-4 py-3 text-lg font-semibold uppercase border-b-2 transition-all duration-150 { $page.url.pathname === '/recharge' ? 'border-white' : 'border-transparent' }" on:click={() => menuOpen = false}>RECARGAR</a>
           <a href="/history" class="block text-white px-4 py-3 text-lg font-semibold uppercase border-b-2 transition-all duration-150 { $page.url.pathname === '/history' ? 'border-white' : 'border-transparent' }" on:click={() => menuOpen = false}>HISTORIAL</a>
           <a href="/check-balance" class="block text-white px-4 py-3 text-lg font-semibold uppercase border-b-2 transition-all duration-150 { $page.url.pathname === '/check-balance' ? 'border-white' : 'border-transparent' }" on:click={() => menuOpen = false}>CONSULTAR SALDO</a>
+        <a href="/sell" class="block text-white px-4 py-3 text-lg font-semibold uppercase border-b-2 transition-all duration-150 { $page.url.pathname === '/sell' ? 'border-white' : 'border-transparent' }" on:click={() => menuOpen = false}>VENDER</a>
         </div>
       {/if}
     </div>
