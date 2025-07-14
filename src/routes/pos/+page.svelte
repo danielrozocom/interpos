@@ -1,15 +1,15 @@
-&lt;script lang="ts">
+<script lang="ts">
   import { onMount } from 'svelte';
   import { writable } from 'svelte/store';
 
   // Stores
-  const selectedCategory = writable&lt;string | null>(null);
-  const selectedProduct = writable&lt;any>(null);
+  const selectedCategory = writable<string | null>(null);
+  const selectedProduct = writable<any>(null);
   const quantity = writable(1);
   const userBalance = writable(0);
 
   let categories: string[] = [];
-  let products: Record&lt;string, any[]> = {};
+  let products: Record<string, any[]> = {};
   let loading = false;
   let error = '';
   let userId = '123'; // TODO: Replace with actual user ID
@@ -25,7 +25,7 @@
       const data = await response.json();
       if (data.success) {
         // Group products by category
-        const productsByCategory = data.products.reduce((acc: Record&lt;string, any[]>, product: any) => {
+        const productsByCategory = data.products.reduce((acc: Record<string, any[]>, product: any) => {
           if (!acc[product.category]) {
             acc[product.category] = [];
           }

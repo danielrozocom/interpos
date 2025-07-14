@@ -32,6 +32,6 @@
 		"dotenv": "^17.2.0",
 		"google-spreadsheet": "^4.1.5",
 		"googleapis": "^152.0.0",
-		"lottie-web": "^5.13.0"
+		"lottie": "^0.0.1"
 	}
 }

@@ -45,6 +45,15 @@
 </svelte:head>
 
 <div class="max-w-7xl mx-auto px-4 py-8">
+  {#if error}
+    <div class="mb-6 p-4 rounded-lg message-error shadow-sm">
+      <div class="flex items-center">
+        <span class="text-2xl mr-3">❌</span>
+        <p class="text-lg font-medium">{error}</p>
+      </div>
+    </div>
+  {/if}
+
   <div class="text-center mb-12">
     <h1 class="text-4xl font-bold text-[#35528C] mb-2">Bienvenido a {siteName}</h1>
     <p class="text-[#35528C]/80">Panel de Administración</p>
