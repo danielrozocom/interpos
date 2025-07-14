@@ -2,12 +2,13 @@
   import { rechargeBalance } from '$lib/recharge';
   import { onMount } from 'svelte';
   import { siteName } from '../../lib/config';
-  import MoneyAnimation from '$lib/components/MoneyAnimation.svelte';
+  // MoneyAnimation removed per request
 
   let userId = '';
   let userName = '';
   let quantity: number = 0;
   let method = '';
+  let customMethod = '';
   let observations = '';
   let message = '';
   let loading = false;
@@ -133,41 +134,40 @@
     try {
       const oldBalance = currentBalance ?? 0;
       const newBalance = oldBalance + Number(quantity);
-      
+      let methodToSend = method;
+      if (method === 'Otro') {
+        methodToSend = customMethod.trim();
+      }
       // Realizar las operaciones en orden con mejor manejo de errores
       try {
-        await rechargeBalance({ userId, quantity, newBalance, method, observations });
-      } catch (error) {
+        await rechargeBalance({ userId, quantity, newBalance, method: methodToSend, observations });
+      } catch (error: any) {
         throw new Error('Error al registrar la recarga: ' + (error.message || 'Error desconocido'));
       }
-      
       try {
         await updateUserBalance(userId, newBalance);
-      } catch (error) {
+      } catch (error: any) {
         throw new Error('Error al actualizar el saldo: ' + (error.message || 'Error desconocido'));
       }
-
       // Mostrar mensaje de éxito y limpiar el formulario
       const successMessage = 'Transacción completada con éxito';
-      
       // Primero limpiar todos los campos
       userId = '';
       userName = '';
       quantity = 0;
       method = '';
+      customMethod = '';
       observations = '';
       currentBalance = null;
       userExists = false;
       userSuggestions = [];
-      
       // Mostrar el mensaje después de limpiar todo
       message = successMessage;
-      
       // Esperar un momento antes de limpiar el mensaje
       setTimeout(() => {
         message = '';
       }, 3000);
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error en la transacción:', error);
       message = '❌ ' + (error.message || 'Error al registrar la transacción. Por favor, intente nuevamente.');
     }
@@ -189,10 +189,7 @@
 <div class="max-w-2xl mx-auto">
   <!-- Header -->
   <div class="text-center header-space">
-    <div class="inline-block">
-      <MoneyAnimation />
-      <h1 class="section-title-center">Recargar Saldo</h1>
-    </div>
+    <h1 class="section-title-center">Recargar Saldo</h1>
   </div>
 
   <!-- Step Content -->
@@ -208,8 +205,11 @@
       </div>
     {/if}
     <form on:submit|preventDefault={() => {
-      if (allUsers.some(u => u.id === userId) && userExists) {
+      const exactMatch = allUsers.find(u => u.id === userId);
+      if (exactMatch && userExists) {
         handleSubmit();
+      } else if (userSuggestions.length > 1) {
+        alert('Hay más de un usuario que coincide, selecciona uno de la lista de sugerencias.');
       } else {
         alert('No existe un usuario con ese ID');
       }
@@ -224,9 +224,18 @@
           bind:value={userId} 
           required 
           class="input-field"
+          autofocus
           on:keydown={(e) => {
+            // Permitir Ctrl+C, Ctrl+V, Ctrl+A
+            if ((e.ctrlKey || e.metaKey) && ['c', 'v', 'a'].includes(e.key.toLowerCase())) {
+              return;
+            }
             if (e.key === 'Enter') {
-              if (allUsers.some(u => u.id === userId)) {
+              const exactMatch = allUsers.find(u => u.id === userId);
+              if (exactMatch && userExists) {
+                handleSubmit();
+              } else if (userSuggestions.length > 1) {
+                alert('Hay más de un usuario que coincide, selecciona uno de la lista de sugerencias.');
                 e.preventDefault();
               } else {
                 alert('No existe un usuario con ese ID');
@@ -247,7 +256,15 @@
             {#each userSuggestions as u}
               <button 
                 type="button"
-                on:click={() => { userId = u.id; }}
+                on:click={() => {
+                  userId = u.id;
+                  // Si el usuario existe, auto-submit
+                  const found = allUsers.find(x => x.id === u.id);
+                  if (found) {
+                    userExists = true;
+                    handleSubmit();
+                  }
+                }}
                 class="w-full text-left p-3 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors duration-200"
               >
                 <span class="font-medium text-gray-900">ID: {u.id}</span>
@@ -286,7 +303,15 @@
               <label for="method" class="block text-sm font-medium text-gray-700 mb-2">
                 Método de pago <span class="text-red-500">*</span>
               </label>
-              <input id="method" type="text" bind:value={method} required class="input-field" placeholder="Efectivo, Transferencia, Tarjeta, etc." />
+              <select id="method" bind:value={method} required class="input-field">
+                <option value="">Selecciona método</option>
+                <option value="Efectivo">Efectivo</option>
+                <option value="QR Redeban">QR Redeban</option>
+                <option value="Otro">Otro</option>
+              </select>
+              {#if method === 'Otro'}
+                <input type="text" bind:value={customMethod} required class="input-field mt-2" placeholder="Especifica el método de pago" />
+              {/if}
             </div>
           {/if}
           
@@ -331,7 +356,7 @@
 
           <button 
             type="submit" 
-            disabled={Number(quantity) > 0 ? !method.trim() : Number(quantity) < 0 ? !observations.trim() : false} 
+            disabled={Number(quantity) > 0 ? (method === 'Otro' ? !customMethod.trim() : !method.trim()) : Number(quantity) < 0 ? !observations.trim() : false} 
             class="btn-primary w-full"
           >
             {#if loading}
@@ -420,7 +445,6 @@
   }
   
   .btn-primary:disabled,
-  .btn-secondary:disabled,
   button:disabled {
     background: #e2e5e9 !important;
     color: #a0a6b0 !important;
