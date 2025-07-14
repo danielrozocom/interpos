@@ -21,7 +21,7 @@
         </div>
         <!-- Mobile hamburger -->
         <div class="md:hidden flex items-center">
-          <button on:click={() => menuOpen = !menuOpen} class="inline-flex items-center justify-center p-2 rounded-md text-white hover:text-white focus:outline-none focus:ring-2 focus:ring-inset focus:ring-white">
+          <button aria-label="Abrir menú" on:click={() => menuOpen = !menuOpen} class="inline-flex items-center justify-center p-2 rounded-md text-white hover:text-white focus:outline-none focus:ring-2 focus:ring-inset focus:ring-white">
             <svg class="h-6 w-6" stroke="currentColor" fill="none" viewBox="0 0 24 24">
               <path class={menuOpen ? 'hidden' : 'block'} stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16" />
               <path class={menuOpen ? 'block' : 'hidden'} stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
@@ -35,9 +35,10 @@
           <a href="/recharge" class="block text-white px-4 py-3 text-lg font-semibold uppercase border-b-2 transition-all duration-150 { $page.url.pathname === '/recharge' ? 'border-white' : 'border-transparent' }" on:click={() => menuOpen = false}>RECARGAR</a>
           <a href="/history" class="block text-white px-4 py-3 text-lg font-semibold uppercase border-b-2 transition-all duration-150 { $page.url.pathname === '/history' ? 'border-white' : 'border-transparent' }" on:click={() => menuOpen = false}>HISTORIAL</a>
           <a href="/check-balance" class="block text-white px-4 py-3 text-lg font-semibold uppercase border-b-2 transition-all duration-150 { $page.url.pathname === '/check-balance' ? 'border-white' : 'border-transparent' }" on:click={() => menuOpen = false}>CONSULTAR SALDO</a>
-        <a href="/sell" class="block text-white px-4 py-3 text-lg font-semibold uppercase border-b-2 transition-all duration-150 { $page.url.pathname === '/sell' ? 'border-white' : 'border-transparent' }" on:click={() => menuOpen = false}>VENDER</a>
+          <a href="/sell" class="block text-white px-4 py-3 text-lg font-semibold uppercase border-b-2 transition-all duration-150 { $page.url.pathname === '/sell' ? 'border-white' : 'border-transparent' }" on:click={() => menuOpen = false}>VENDER</a>
         </div>
       {/if}
+      </div> <!-- Explicitly close the inner div before nav ends -->
     </div>
   </nav>
   
