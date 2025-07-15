@@ -62,5 +62,23 @@ export async function getUserBalance(userId: string): Promise<number> {
 	return parseFloat(userRow.get('balance'));
 }
 
+// Obtener todos los usuarios
+export async function getUsers(): Promise<any[]> {
+	const doc = await getDoc();
+	if (!doc) {
+		throw new Error('Google Sheets document is not initialized');
+	}
+	const sheet = doc.sheetsByTitle[SHEET_NAMES.users];
+	if (!sheet) {
+		throw new Error(`Sheet with title ${SHEET_NAMES.users} not found`);
+	}
+	const rows = await sheet.getRows();
+	return rows.map(row => ({
+		id: row.get('id'),
+		name: row.get('name'),
+		balance: parseFloat(row.get('balance')) || 0
+	}));
+}
+
 // Export sheet names for use in API routes
 export { SHEET_NAMES };
