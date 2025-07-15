@@ -91,6 +91,7 @@ export const GET: RequestHandler = async ({ url }) => {
     const orderID = url.searchParams.get('orderID');
     const startDate = url.searchParams.get('startDate');
     const endDate = url.searchParams.get('endDate');
+    const date = url.searchParams.get('date');
 
     console.log('GOOGLE_SHEETS_ID value:', GOOGLE_SHEETS_ID);
 
@@ -110,15 +111,38 @@ export const GET: RequestHandler = async ({ url }) => {
       });
     }
 
-    // Parse the data (skip header row)
-    const transactions = rows.slice(1).map((row, index) => ({
-      rowIndex: index + 2, // +2 because we skipped header and arrays are 0-indexed
-      date: row[0] || '',
-      orderID: row[1] || '',
-      userID: row[2] || '',
-      quantity: parseFloat(row[3]) || 0, // Valor de la compra
-      products: row[4] || ''
-    }));
+    console.log('Raw sheet data:', {
+      totalRows: rows.length,
+      headers: rows[0],
+      sampleData: rows.slice(1, 4)
+    });
+    
+    const transactions = rows.slice(1).map((row, index) => {
+      // Parse quantity/amount - could be in different formats
+      let amount = 0;
+      if (row[3]) {
+        // Remove any currency symbols and parse
+        const cleanAmount = String(row[3]).replace(/[$,\s]/g, '');
+        amount = parseFloat(cleanAmount) || 0;
+      }
+      
+      const transaction = {
+        rowIndex: index + 2,
+        date: row[0] || '',
+        orderID: row[1] || '',
+        userID: row[2] || '',
+        quantity: amount,
+        products: row[4] || ''
+      };
+      
+      if (index < 3) {
+        console.log(`Transaction ${index + 1}:`, transaction);
+      }
+      
+      return transaction;
+    });
+
+    console.log('Total parsed transactions:', transactions.length);
 
     // Apply filters if provided
     let filteredTransactions = transactions;
@@ -139,10 +163,73 @@ export const GET: RequestHandler = async ({ url }) => {
       filteredTransactions = filteredTransactions.filter(t => t.date <= endDate);
     }
 
+    if (date === 'today') {
+      // Obtener fecha actual en zona horaria de Colombia
+      const colombiaTime = new Date().toLocaleString("en-CA", {timeZone: "America/Bogota"}).split(' ')[0]; // YYYY-MM-DD
+      const colombiaDate = new Date(colombiaTime + 'T00:00:00');
+      const todayDay = colombiaDate.getDate();
+      const todayMonth = colombiaDate.getMonth() + 1;
+      const todayYear = colombiaDate.getFullYear();
+      
+      console.log('Colombia today:', { 
+        colombiaTime,
+        todayDay, 
+        todayMonth, 
+        todayYear,
+        formatted14: `14/${todayMonth}/${todayYear}`,
+        formatted14_2: `14/7/2025`,
+        formatted14_3: `14/07/2025`
+      });
+      console.log('Total transactions before filter:', filteredTransactions.length);
+      console.log('All transactions dates:', filteredTransactions.map(t => ({
+        date: t.date,
+        amount: t.quantity,
+        orderID: t.orderID
+      })));
+      
+      filteredTransactions = filteredTransactions.filter(t => {
+        const dateStr = t.date.toString().toLowerCase();
+        
+        // Buscar específicamente por 14/7/2025 o 14/07/2025
+        const isToday = dateStr.includes('14/7/2025') || 
+                       dateStr.includes('14/07/2025') ||
+                       dateStr.includes('2025-07-14') ||
+                       (dateStr.includes('14') && dateStr.includes('7') && dateStr.includes('2025'));
+        
+        if (isToday) {
+          console.log('✓ Found today transaction:', { 
+            date: t.date, 
+            amount: t.quantity, 
+            orderID: t.orderID 
+          });
+        }
+        
+        return isToday;
+      });
+      
+      console.log('Transactions after today filter:', filteredTransactions.length);
+    }
+
+    const totalSalesCount = filteredTransactions.length;
+    const totalSalesAmount = filteredTransactions.reduce((sum, t) => {
+      const amount = t.quantity || 0;
+      console.log(`Adding transaction: OrderID=${t.orderID}, Amount=${amount}, Running Sum=${sum + amount}`);
+      return sum + amount;
+    }, 0);
+
+    console.log('FINAL CALCULATION:');
+    console.log('- Total Count:', totalSalesCount);
+    console.log('- Total Amount:', totalSalesAmount);
+    console.log('- Individual amounts:', filteredTransactions.map(t => ({ orderID: t.orderID, amount: t.quantity })));
+
     return json({ 
       success: true, 
       transactions: filteredTransactions,
-      total: filteredTransactions.length
+      total: filteredTransactions.length,
+      totalSalesCount,
+      totalSalesAmount,
+      count: totalSalesCount,
+      amount: totalSalesAmount
     });
 
   } catch (error: any) {

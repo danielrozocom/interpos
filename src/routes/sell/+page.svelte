@@ -273,9 +273,11 @@ let showAddedNotification = false;
         orderID = fallbackId;
       }
       
-      // Preparar datos de la transacción
+      // Preparar datos de la transacción usando zona horaria de Colombia
+      const colombiaDate = new Date().toLocaleString("en-CA", {timeZone: "America/Bogota"}).split(' ')[0]; // YYYY-MM-DD
+      
       const transactionData = {
-        date: new Date().toISOString().split('T')[0], // Formato YYYY-MM-DD
+        date: colombiaDate,
         orderID: orderID,
         userID: userId,
         quantity: cartTotal, // Valor total de la compra

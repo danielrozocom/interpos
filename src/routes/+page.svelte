@@ -5,6 +5,8 @@
   let users: Array<{id: string, name: string, balance: number}> = [];
   let loading = true;
   let error = '';
+  let totalSalesCount = 0;
+  let totalSalesAmount = 0;
 
   async function fetchUsers() {
     try {
@@ -30,13 +32,34 @@
     }
   }
 
+  async function fetchSalesMetrics() {
+    try {
+      const res = await fetch('/api/sheets/transactions?date=today');
+      if (!res.ok) {
+        throw new Error('Error al obtener métricas de ventas');
+      }
+      const data = await res.json();
+      console.log('Sales data received:', data); // Debug log
+      totalSalesCount = data.totalSalesCount || 0;
+      totalSalesAmount = data.totalSalesAmount || 0;
+    } catch (err: any) {
+      console.error('Error fetching sales metrics:', err);
+      error = err.message || 'Error al cargar las métricas de ventas';
+    } finally {
+      loading = false;
+    }
+  }
+
   function formatCurrency(val: number): string {
     return `$${isNaN(val) ? 0 : Math.round(val).toLocaleString('es-MX')}`;
   }
 
   $: totalBalance = users.reduce((sum, user) => sum + user.balance, 0);
 
-  onMount(fetchUsers);
+  onMount(() => {
+    fetchUsers();
+    fetchSalesMetrics();
+  });
 </script>
 
 <svelte:head>
@@ -122,6 +145,49 @@
     </div>
   </div>
 
+  <!-- Totales de Ventas en una línea -->
+  <div class="grid grid-cols-1 sm:grid-cols-2 gap-6 mb-12">
+    <div class="bg-white p-6 rounded-lg shadow-lg">
+      <div class="flex items-center">
+        <div class="flex-shrink-0">
+          <div class="w-12 h-12 bg-red-100 text-red-500 rounded-lg flex items-center justify-center">
+            <span class="text-xl">🛒</span>
+          </div>
+        </div>
+        <div class="ml-4">
+          <p class="text-sm font-medium text-gray-600">Total de Ventas - Hoy</p>
+          <p class="text-2xl font-bold text-gray-900">
+            {#if loading}
+              <span class="inline-block h-6 w-20 bg-gray-200 rounded animate-pulse"></span>
+            {:else}
+              {totalSalesCount}
+            {/if}
+          </p>
+        </div>
+      </div>
+    </div>
+
+    <div class="bg-white p-6 rounded-lg shadow-lg">
+      <div class="flex items-center">
+        <div class="flex-shrink-0">
+          <div class="w-12 h-12 bg-yellow-100 text-yellow-500 rounded-lg flex items-center justify-center">
+            <span class="text-xl">💵</span>
+          </div>
+        </div>
+        <div class="ml-4">
+          <p class="text-sm font-medium text-gray-600">Total de Ingresos - Hoy</p>
+          <p class="text-2xl font-bold text-gray-900">
+            {#if loading}
+              <span class="inline-block h-6 w-24 bg-gray-200 rounded animate-pulse"></span>
+            {:else}
+              {formatCurrency(totalSalesAmount)}
+            {/if}
+          </p>
+        </div>
+      </div>
+    </div>
+  </div>
+
   <!-- Action Cards -->
   <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
     <!-- Tarjeta de Venta -->
@@ -151,39 +217,6 @@
       <p class="text-gray-600">Consulta el historial de transacciones.</p>
     </a>
   </div>
-
-  <!-- User List -->
-  {#if !loading && users.length > 0}
-    <div class="bg-white rounded-lg shadow-lg overflow-hidden mt-12">
-      <div class="px-4 py-5 border-b border-gray-200 sm:px-6">
-        <h3 class="text-lg leading-6 font-medium text-gray-900">
-          Lista de Usuarios
-        </h3>
-      </div>
-      <div class="bg-white">
-        <ul class="divide-y divide-gray-200">
-          {#each users as user}
-            <li class="px-4 py-4 sm:px-6 hover:bg-gray-50">
-              <div class="flex items-center justify-between">
-                <div class="flex items-center">
-                  <div class="w-8 h-8 bg-[#35528C] rounded-full flex items-center justify-center text-white">
-                    {user.name[0].toUpperCase()}
-                  </div>
-                  <div class="ml-3">
-                    <p class="text-sm font-medium text-gray-900">{user.name}</p>
-                    <p class="text-sm text-gray-500">ID: {user.id}</p>
-                  </div>
-                </div>
-                <div class="text-right">
-                  <p class="text-sm font-medium text-gray-900">{formatCurrency(user.balance)}</p>
-                </div>
-              </div>
-            </li>
-          {/each}
-        </ul>
-      </div>
-    </div>
-  {/if}
 </div>
 
 <style>
