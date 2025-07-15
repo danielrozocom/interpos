@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { onMount } from 'svelte';
+  import { onMount, tick } from 'svelte';
   import { page } from '$app/stores';
   
   let categories: string[] = [];
@@ -12,26 +12,111 @@
   let loading = false;
   let error = '';
   let siteName = 'InterPOS';
+  let cart: any[] = [];
+  let cartTotal = 0;
+  let posType = '';
+  let quickAddId = '';
+  let quickAddQuantity = '1';
+  let suggestions: any[] = [];
+
+  let searchResults: any[] = [];
+  let searchTerm = '';
+
+  let userName = '';
+
+let userSuggestions: any[] = [];
+let successMsg = '';
+let mobileView = 'products'; // 'products' or 'cart' for mobile view switching
+let showAddedNotification = false;
 
   // Load user balance
-  async function loadUserBalance() {
-    if (!userId) return;
-    error = '';
+  async function loadUserBalance(showErrors = false) {
+    if (!userId) {
+      userBalance = 0;
+      userName = '';
+      return;
+    }
+    if (!showErrors) {
+      error = '';
+    }
     try {
-      const response = await fetch(`/api/sheets/users/balance?userId=${userId}`);
-      if (!response.ok) {
-        throw new Error('Error en la respuesta del servidor');
+      const response = await fetch(`/api/sheets/users?userId=${encodeURIComponent(userId)}`);
+      let data;
+      try {
+        data = await response.json();
+      } catch (jsonErr) {
+        userBalance = 0;
+        userName = '';
+        if (showErrors) {
+          throw new Error('La respuesta del servidor no es válida (no es JSON).');
+        }
+        return;
       }
-      const data = await response.json();
-      if (data.success) {
-        userBalance = data.balance;
+      if (!response.ok) {
+        userBalance = 0;
+        userName = '';
+        if (showErrors) {
+          const errorMessage = data?.message || data?.error || 'Error al cargar el usuario';
+          throw new Error(errorMessage);
+        }
+        return;
+      }
+      
+      if (data.balance !== undefined && data.name !== undefined) {
+        userBalance = parseFloat(data.balance) || 0;
+        userName = data.name;
       } else {
-        throw new Error(data.error || 'Error al cargar el saldo');
+        userBalance = 0;
+        userName = '';
+        if (showErrors) {
+          throw new Error('Usuario no encontrado');
+        }
       }
     } catch (err: any) {
       error = err.message || 'Error al cargar el saldo';
       console.error('Error loading balance:', err);
+      userBalance = 0;
     }
+  }
+
+  // Search products by ID or name
+  async function searchProducts() {
+    if (!searchTerm.trim()) {
+      searchResults = [];
+      return;
+    }
+    try {
+      const response = await fetch(`/api/sheets/products?search=${encodeURIComponent(searchTerm)}`);
+      let data;
+      try {
+        data = await response.json();
+      } catch (jsonErr) {
+        throw new Error('La respuesta del servidor de productos no es válida (no es JSON).');
+      }
+      if (!response.ok) {
+        const errorMessage = data?.message || data?.error || 'Error al buscar productos';
+        throw new Error(errorMessage);
+      }
+      let productsArr = [];
+      if (data.success && data.products && Array.isArray(data.products)) {
+        productsArr = data.products;
+      } else if (Array.isArray(data)) {
+        productsArr = data;
+      }
+      // Filtrar productos válidos
+      searchResults = productsArr.filter(p => p?.id && p?.name && typeof p?.price === 'number');
+    } catch (err: any) {
+      error = err.message || 'Error al buscar productos';
+      console.error('Error searching products:', err);
+      searchResults = [];
+    }
+  }
+
+  // Watch for search term changes
+  $: if (searchTerm) {
+    searchProducts();
+  } else {
+    searchResults = [];
   }
 
   // Load categories and products
@@ -39,24 +124,36 @@
     error = '';
     try {
       const response = await fetch('/api/sheets/products');
+      let data;
+      try {
+        data = await response.json();
+      } catch (jsonErr) {
+        throw new Error('La respuesta del servidor de productos no es válida (no es JSON).');
+      }
       if (!response.ok) {
-        throw new Error('Error en la respuesta del servidor');
+        const errorMessage = data?.message || data?.error || 'Error al cargar los productos';
+        throw new Error(errorMessage);
       }
-      const data = await response.json();
-      if (data.success && Array.isArray(data.products)) {
-        // Group products by category
-        const productsByCategory = data.products.reduce((acc: Record<string, any[]>, product: any) => {
-          if (!acc[product.category]) {
-            acc[product.category] = [];
+
+      let productsArray = [];
+      if (data.success && data.products && Array.isArray(data.products)) {
+        productsArray = data.products;
+      } else if (Array.isArray(data)) {
+        productsArray = data;
+      }
+
+      // Group products by category
+      const productsByCategory: Record<string, any[]> = {};
+      productsArray.forEach((product: any) => {
+        if (product.category) {
+          if (!productsByCategory[product.category]) {
+            productsByCategory[product.category] = [];
           }
-          acc[product.category].push(product);
-          return acc;
-        }, {});
-        categories = Object.keys(productsByCategory);
-        products = productsByCategory;
-      } else {
-        throw new Error(data.error || 'Error al cargar los productos');
-      }
+          productsByCategory[product.category].push(product);
+        }
+      });
+      categories = Object.keys(productsByCategory);
+      products = productsByCategory;
     } catch (err: any) {
       error = err.message || 'Error al cargar los productos';
       console.error('Error loading products:', err);
@@ -65,7 +162,7 @@
 
   // Handle category selection
   function selectCategory(category: string) {
-    selectedCategory = category.trim();
+    selectedCategory = category;
     selectedProduct = null;
     quantity = 1;
   }
@@ -79,68 +176,173 @@
   // Calculate subtotal
   $: subtotal = selectedProduct ? selectedProduct.price * quantity : 0;
 
-  // Check if user can pay
-  $: canPay = userBalance >= subtotal && subtotal > 0 && userId;
-
-let posType = '';
-
-  // Carrito de compras
-  let cart: any[] = [];
-
   function addToCart(product: any) {
+    // Validar que el producto tenga todos los datos requeridos y que el precio sea número
+    if (!product?.id || !product?.name || typeof product?.price !== 'number') {
+      error = 'Error: El producto no tiene todos los datos requeridos o el precio no es válido';
+      return;
+    }
+    if (!quantity || quantity < 1 || isNaN(quantity)) {
+      error = 'La cantidad debe ser mayor a 0';
+      return;
+    }
+
     const existing = cart.find(item => item.id === product.id);
     if (existing) {
-      existing.quantity += quantity;
+      existing.quantity = (existing.quantity || 0) + quantity;
+      cart = cart; // Trigger reactivity
     } else {
-      cart.push({ ...product, quantity });
+      cart.push({
+        id: product.id,
+        name: product.name,
+        price: product.price,
+        quantity: quantity
+      });
+      cart = cart; // Trigger reactivity
     }
-    selectedProduct = null;
-    quantity = 1;
-  }
-
-  function removeFromCart(productId: string) {
-    cart = cart.filter(item => item.id !== productId);
+    // Recalculate cart total
+    cartTotal = cart.reduce((sum, item) => sum + (item.price * (item.quantity || 0)), 0);
+    error = ''; // Limpiar cualquier error previo
   }
 
   function clearCart() {
     cart = [];
+    cartTotal = 0;
   }
 
-  $: cartTotal = cart.reduce((sum, item) => sum + item.price * item.quantity, 0);
-
-  // Handle payment
   async function handlePayment() {
-    if (!canPay || loading || !userId || cart.length === 0) return;
-    posType = prompt('Ingresa el tipo de POS para facturar (ejemplo: físico, virtual, etc.):') || '';
-    if (!posType) {
-      error = 'Debes ingresar el tipo de POS para facturar.';
+    error = '';
+
+    // Validar que haya productos en el carrito
+    if (!cart.length) {
+      error = 'El carrito está vacío';
       return;
     }
+
+    // Validar ID de usuario
+    if (!userId?.trim()) {
+      const userIdInput = document.getElementById('userId');
+      userIdInput?.focus();
+      userIdInput?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      return;
+    }
+
+    // Validar que el usuario existe y tiene nombre
+    if (!userName) {
+      error = 'Usuario no válido. Por favor verifica el ID del usuario';
+      return;
+    }
+
+    // Verificar que todas las cantidades sean válidas y los productos tengan datos completos
+    for (const item of cart) {
+      // Validar que id y name sean string/number y price sea un número válido
+      if (typeof item.id === 'undefined' || item.id === null || String(item.id).trim() === '' || typeof item.name !== 'string' || item.name.trim() === '' || typeof item.price !== 'number' || isNaN(item.price)) {
+        error = `El producto "${item.name || item.id || 'Sin nombre'}" tiene datos incompletos. Verifica ID, nombre y precio.`;
+        return;
+      }
+      if (typeof item.quantity !== 'number' || item.quantity < 1 || isNaN(item.quantity)) {
+        error = `Por favor verifica la cantidad del producto: ${item.name || item.id || 'Sin nombre'}`;
+        return;
+      }
+    }
+
+    // Si el saldo quedará negativo, mostrar advertencia
+    if (userBalance < cartTotal) {
+      if (!confirm(`ADVERTENCIA: El saldo quedará negativo.\n\nSaldo actual: $${userBalance.toLocaleString('es-CO')}\nTotal a pagar: $${cartTotal.toLocaleString('es-CO')}\nSaldo final: $${(userBalance - cartTotal).toLocaleString('es-CO')}\n\n¿El usuario acepta asumir esta deuda?`)) {
+        return;
+      }
+    }
+    
     loading = true;
-    error = '';
     try {
-      const response = await fetch('/api/sheets/sell', {
+      // Calcular el nuevo saldo
+      const newBalance = userBalance - cartTotal;
+      
+      // Obtener el próximo OrderID numérico
+      let orderID = '000000'; // Valor por defecto en caso de error
+      try {
+        const orderResponse = await fetch('/api/sheets/orders');
+        const orderData = await orderResponse.json();
+        if (orderData.success) {
+          orderID = orderData.nextOrderId;
+        }
+      } catch (orderError) {
+        console.error('Error obteniendo OrderID:', orderError);
+        // Usar timestamp como fallback pero formateado a 6 dígitos
+        const fallbackId = (Date.now() % 1000000).toString().padStart(6, '0');
+        orderID = fallbackId;
+      }
+      
+      // Preparar datos de la transacción
+      const transactionData = {
+        date: new Date().toISOString().split('T')[0], // Formato YYYY-MM-DD
+        orderID: orderID,
+        userID: userId,
+        quantity: cartTotal, // Valor total de la compra
+        products: cart.map(item => `${item.name} (ID: ${item.id}) x${item.quantity} - $${(item.price * item.quantity).toLocaleString('es-CO')}`).join('; '),
+        total: cartTotal
+      };
+      
+      // Actualizar el saldo del usuario
+      const updateResponse = await fetch('/api/sheets/users/update', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json'
         },
         body: JSON.stringify({
           userId,
-          posType,
-          products: cart.map(item => ({ id: item.id, quantity: item.quantity })),
-          total: cartTotal
+          newBalance: newBalance,
+          cartTotal: cartTotal,
+          orderID: orderID
         })
       });
-      if (!response.ok) {
-        throw new Error('Error en la respuesta del servidor');
+      
+      const updateData = await updateResponse.json();
+      console.log('Respuesta del servidor:', updateData);
+      
+      if (!updateResponse.ok) {
+        throw new Error(updateData.error || updateData.message || 'Error al procesar el pago');
       }
-      const data = await response.json();
-      if (data.success) {
-        userBalance = data.newBalance;
+      
+      if (updateData.success) {
+        // Registrar la transacción en la hoja "Transactions - Orders"
+        try {
+          const transactionResponse = await fetch('/api/sheets/transactions', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json'
+            },
+            body: JSON.stringify(transactionData)
+          });
+          
+          const transactionResult = await transactionResponse.json();
+          console.log('Transacción registrada:', transactionResult);
+          
+          if (!transactionResponse.ok) {
+            console.error('Error al registrar transacción:', transactionResult);
+            // No detenemos el proceso si falla el registro de transacción
+          }
+        } catch (transactionError) {
+          console.error('Error al registrar transacción:', transactionError);
+          // No detenemos el proceso si falla el registro de transacción
+        }
+        
+        // Clear data for new transaction using tick to ensure reactive context
+        await tick();
         clearCart();
+        userId = ''; // Clear userId for new transaction
+        userName = ''; // Clear userName as well
+        userBalance = 0; // Reset balance display
         posType = '';
+        error = '';
+        successMsg = 'Venta exitosa';
+        
+        // Scroll to top of the page
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+        
+        setTimeout(() => { successMsg = ''; }, 2000);
       } else {
-        throw new Error(data.error || 'Error al procesar el pago');
+        throw new Error(updateData.error || updateData.message || 'Error al procesar el pago');
       }
     } catch (err: any) {
       error = err.message || 'Error al procesar el pago';
@@ -150,140 +352,675 @@ let posType = '';
     }
   }
 
-  // Watch for userId changes
-  $: if (userId) {
-    loadUserBalance();
-  }
-
+  // Load products on mount
   onMount(() => {
     loadProducts();
   });
+
+  // Combine search results and all products for display
+  $: displayProducts = searchTerm ? searchResults : Object.values(products).flat();
+
+  // Buscar sugerencias de usuario por ID o nombre, priorizando coincidencias exactas y luego parciales
+  async function fetchUserSuggestions(term: string) {
+    if (!term.trim()) {
+      userSuggestions = [];
+      return;
+    }
+    try {
+      const response = await fetch(`/api/sheets/users?search=${encodeURIComponent(term)}`);
+      let data = await response.json();
+      let usersArr = [];
+      if (response.ok && Array.isArray(data.users)) {
+        usersArr = data.users;
+      } else if (Array.isArray(data)) {
+        usersArr = data;
+      }
+      // Prioridad: coincidencia exacta por ID, luego por nombre, luego comienza con, luego incluye
+      const exactId = usersArr.filter(u => u.id && u.id.toString() === term);
+      const exactName = usersArr.filter(u => u.name && u.name.toLowerCase() === term.toLowerCase() && !exactId.includes(u));
+      const startWithId = usersArr.filter(u => u.id && u.id.toString().startsWith(term) && !exactId.includes(u));
+      const startWithName = usersArr.filter(u => u.name && u.name.toLowerCase().startsWith(term.toLowerCase()) && !exactName.includes(u) && !startWithId.includes(u));
+      const partialName = usersArr.filter(u => u.name && u.name.toLowerCase().includes(term.toLowerCase()) && !exactId.includes(u) && !exactName.includes(u) && !startWithId.includes(u) && !startWithName.includes(u));
+      userSuggestions = [...exactId, ...exactName, ...startWithId, ...startWithName, ...partialName].slice(0, 5);
+    } catch {
+      userSuggestions = [];
+    }
+  }
+
+  $: if (userId.length > 0 && !userName && !error) {
+    fetchUserSuggestions(userId);
+  }
 </script>
 
 <svelte:head>
-  <title>Venta | {siteName}</title>
-  <meta name="description" content="Realiza una venta y descuenta productos del saldo del usuario" />
+  <title>{siteName}</title>
 </svelte:head>
 
-
-  <!-- User Input Section -->
-  <div class="w-full md:w-[70%] mx-auto mb-8">
-    <div class="bg-white rounded-lg shadow p-6">
-      <label class="block text-sm font-medium text-gray-700 mb-2" for="userId">
-        ID de Usuario
-      </label>
-      <div class="flex gap-4">
-        <input
-          type="text"
-          id="userId"
-          bind:value={userId}
-          class="flex-1 rounded-md border-gray-300 shadow-sm focus:border-[#35528C] focus:ring-[#35528C]"
-          placeholder="Ingresa el ID de usuario"
-        />
-        {#if userBalance > 0}
-          <div class="bg-[#35528C] text-white px-4 py-2 rounded-md flex items-center">
-            <span class="font-medium">Saldo: ${userBalance.toFixed(2)}</span>
-          </div>
-        {/if}
-      </div>
-    </div>
+<div class="w-full h-screen flex flex-col md:flex-row overflow-hidden">
+  <!-- Mobile Navigation Tabs -->
+  <div class="md:hidden bg-white border-b border-gray-200 flex">
+    <button
+      class="flex-1 py-3 px-4 text-center font-medium transition-colors duration-200"
+      class:bg-primary={mobileView === 'products'}
+      class:text-white={mobileView === 'products'}
+      class:text-primary={mobileView !== 'products'}
+      on:click={() => mobileView = 'products'}
+    >
+      Productos
+      <span class="ml-1 text-xs bg-gray-200 text-gray-700 px-2 py-1 rounded-full">
+        {Object.values(products).flat().length}
+      </span>
+    </button>
+    <button
+      class="flex-1 py-3 px-4 text-center font-medium transition-colors duration-200 relative"
+      class:bg-primary={mobileView === 'cart'}
+      class:text-white={mobileView === 'cart'}
+      class:text-primary={mobileView !== 'cart'}
+      on:click={() => mobileView = 'cart'}
+    >
+      Carrito
+      {#if cart.length > 0}
+        <span class="ml-1 text-xs bg-red-500 text-white px-2 py-1 rounded-full">
+          {cart.length}
+        </span>
+      {:else}
+        <span class="ml-1 text-xs bg-gray-200 text-gray-700 px-2 py-1 rounded-full">
+          0
+        </span>
+      {/if}
+    </button>
   </div>
 
-  {#if error}
-    <div class="w-full md:w-[70%] mx-auto mb-8">
-      <div class="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg">
-        {error}
-      </div>
-    </div>
-  {/if}
-
-  <!-- Categories and Products -->
-  <div class="flex flex-col md:flex-row gap-6">
-    <!-- Panel izquierdo: categorías y productos -->
-    <div class="w-full md:w-[70%] space-y-6">
-      <!-- Categorías -->
-      <div class="bg-white rounded-lg shadow p-6">
-        <h2 class="text-xl font-semibold mb-4">Categorías</h2>
-        <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-          {#each categories as category}
+  <div class="flex-1 flex flex-col md:flex-row overflow-hidden w-full" style="margin:0; padding:0;">
+    <!-- Grid de productos -->
+    <div class="flex-1 p-1 sm:p-2 overflow-auto" class:hidden={mobileView !== 'products'} class:md:block={true}>
+      <!-- Filtro por categorías -->
+      <div class="mb-2 px-1 sm:px-2">
+        <div class="flex flex-wrap gap-1 sm:gap-2">
+          <button
+            class="px-2 sm:px-4 py-2 rounded-lg border font-semibold shadow-sm focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 transition-all duration-150 text-sm sm:text-base"
+            style="background-color: {selectedCategory === null ? '#35528C' : '#f3f4f6'}; color: {selectedCategory === null ? 'white' : '#35528C'}; border-color: {selectedCategory === null ? '#35528C' : '#d1d5db'};"
+            on:click={() => selectedCategory = null}
+          >
+            Todos
+          </button>
+          {#each categories as cat}
             <button
-              class="p-4 rounded-lg text-center transition-colors duration-200 {selectedCategory === category ? 'bg-[#35528C] text-white' : 'bg-gray-100 hover:bg-gray-200 text-gray-800'}"
-              on:click={() => selectCategory(category)}
+            class="px-2 sm:px-4 py-2 rounded-lg border font-semibold shadow-sm focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 transition-all duration-150 text-sm sm:text-base"
+            style="background-color: {selectedCategory === cat ? '#35528C' : '#f3f4f6'}; color: {selectedCategory === cat ? 'white' : '#35528C'}; border-color: {selectedCategory === cat ? '#35528C' : '#d1d5db'};"
+              on:click={() => selectCategory(cat)}
             >
-              {category}
+              {cat}
             </button>
           {/each}
         </div>
       </div>
-      <!-- Productos -->
-      {#if selectedCategory && products[selectedCategory]}
-        <div class="bg-white rounded-lg shadow p-6">
-          <h2 class="text-xl font-semibold mb-4">Productos - {selectedCategory}</h2>
-          <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {#each products[selectedCategory] as product}
-              <button
-                class="p-4 rounded-lg border transition-all duration-200 text-left {selectedProduct?.id === product.id ? 'border-[#35528C] ring-2 ring-[#35528C] bg-blue-50' : 'border-gray-200 hover:border-[#35528C]'}"
-                on:click={() => selectProduct(product)}
-              >
-                <h3 class="font-semibold">{product.name}</h3>
-                <p class="text-gray-600">${product.price.toFixed(2)}</p>
-              </button>
-            {/each}
-          </div>
-        </div>
-      {/if}
-      <!-- Detalle y añadir al carrito -->
-      {#if selectedProduct}
-        <div class="bg-white rounded-lg shadow p-6 mt-4">
-          <h2 class="text-xl font-semibold mb-4">Añadir al carrito</h2>
-          <div class="space-y-2">
-            <label class="block text-sm font-medium text-gray-700">Cantidad</label>
-            <input type="number" bind:value={quantity} min="1" class="block w-full rounded-md border-gray-300 shadow-sm focus:border-[#35528C] focus:ring-[#35528C]" />
-            <button class="w-full py-2 px-4 rounded-md font-semibold text-white bg-[#35528C] hover:bg-[#2A4170] mt-2" on:click={addToCart}>Añadir al carrito</button>
-          </div>
-        </div>
-      {/if}
-    </div>
-    <!-- Panel derecho: carrito -->
-    <div class="w-full md:w-[30%]">
-      <div class="bg-white rounded-lg shadow p-6 sticky top-4">
-        <h2 class="text-xl font-semibold mb-4">Carrito</h2>
-        <div class="mb-4">
-          <label class="block text-sm font-medium text-gray-700 mb-2" for="userId">ID de Usuario</label>
-          <input type="text" id="userId" bind:value={userId} class="block w-full rounded-md border-gray-300 shadow-sm focus:border-[#35528C] focus:ring-[#35528C]" placeholder="Ingresa el ID de usuario" />
-          {#if userBalance > 0}
-            <div class="bg-[#35528C] text-white px-4 py-2 rounded-md flex items-center mt-2">
-              <span class="font-medium">Saldo: ${userBalance.toFixed(2)}</span>
+      <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 2xl:grid-cols-7 gap-2 sm:gap-3 w-full" style="margin:0;">
+        {#if (selectedCategory ? products[selectedCategory] : Object.values(products).flat()).length > 0}
+          {#each (selectedCategory ? products[selectedCategory] : Object.values(products).flat()).sort((a, b) => {
+            const numA = parseInt(a.id);
+            const numB = parseInt(b.id);
+            if (!isNaN(numA) && !isNaN(numB)) {
+              return numA - numB;
+            }
+            return String(a.id).localeCompare(String(b.id));
+          }) as product}
+            <div
+              class="bg-white rounded-lg shadow-sm hover:shadow-md transition-all duration-200 cursor-pointer p-2 sm:p-3 relative group border border-primary"
+              on:click={() => {
+                const newProduct = {
+                  id: product.id,
+                  name: product.name,
+                  price: product.price,
+                  quantity: 1
+                };
+                const existing = cart.find(item => item.id === product.id);
+                if (existing) {
+                  existing.quantity++;
+                  cart = cart;
+                } else {
+                  cart = [...cart, newProduct];
+                }
+                cartTotal = cart.reduce((sum, item) => sum + (item.price * item.quantity), 0);
+                
+                // Show mobile notification
+                if (window.innerWidth < 768) {
+                  showAddedNotification = true;
+                  setTimeout(() => showAddedNotification = false, 1500);
+                }
+              }}
+            >
+              <div class="text-xs sm:text-sm text-primary mb-1 sm:mb-2 font-medium">ID: {product.id}</div>
+              <div class="overflow-hidden w-full">
+                <span class="font-semibold text-sm sm:text-lg mb-1 sm:mb-2 block truncate product-name-hover" style="color:#35528C;">
+                  <span class="marquee-on-hover" style="display:block; width:calc(100% - 8px); margin:0 4px;">{product.name}</span>
+                </span>
+              </div>
+              <p class="text-base sm:text-xl font-bold truncate product-price-hover" style="color:#35528C">
+                <span class="marquee-on-hover" style="display:block; width:calc(100% - 8px); margin:0 4px;">${product.price.toLocaleString('es-CO')}</span>
+              </p>
+              <div class="absolute inset-0 bg-white bg-opacity-0 group-hover:bg-opacity-10 transition-all duration-200 rounded-lg">
+                <!-- Removed quick add indicator -->
+              </div>
             </div>
-          {/if}
-        </div>
-        {#if cart.length === 0}
-          <div class="text-gray-500">El carrito está vacío.</div>
+          {/each}
         {:else}
-          <ul class="divide-y divide-gray-200 mb-4">
-            {#each cart as item}
-              <li class="py-2 flex justify-between items-center">
-                <div>
-                  <span class="font-semibold">{item.name}</span> x {item.quantity}
-                  <span class="ml-2 text-gray-600">${(item.price * item.quantity).toFixed(2)}</span>
-                </div>
-                <button class="text-red-500 hover:underline ml-2" on:click={() => removeFromCart(item.id)}>Eliminar</button>
-              </li>
-            {/each}
-          </ul>
-          <div class="flex justify-between text-sm mb-2">
-            <span>Total:</span>
-            <span class="font-semibold">${cartTotal.toFixed(2)}</span>
+          <div class="col-span-full flex flex-col items-center justify-center py-8 md:py-12 text-gray-500">
+            <p class="text-lg md:text-xl">No hay productos disponibles</p>
           </div>
-          <button class="w-full py-3 px-4 rounded-md font-semibold text-white transition-colors duration-200 {canPay ? 'bg-[#35528C] hover:bg-[#2A4170]' : 'bg-gray-400 cursor-not-allowed'}" disabled={!canPay || loading} on:click={handlePayment}>
-            {loading ? 'Procesando...' : 'Pagar'}
-          </button>
-        {/if}
-        {#if error}
-          <div class="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg mt-4">{error}</div>
         {/if}
       </div>
     </div>
+
+    <!-- Floating Cart Button for Mobile (only visible in products view) -->
+    <div class="md:hidden fixed bottom-4 right-4 z-40" class:hidden={mobileView !== 'products' || cart.length === 0}>
+      <button
+        on:click={() => mobileView = 'cart'}
+        class="bg-primary text-white p-4 rounded-full shadow-lg hover:shadow-xl transition-all duration-200 flex items-center gap-2"
+      >
+        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13l-1.35 2.7A1 1 0 007.5 17h9a1 1 0 00.9-1.45L17 13M7 13V6h13" />
+          <circle cx="9" cy="21" r="1" />
+          <circle cx="20" cy="21" r="1" />
+        </svg>
+        <span class="font-bold">{cart.length}</span>
+      </button>
+    </div>
+
+    <!-- Panel derecho - Cliente y Carrito -->
+    <div class="w-full md:w-[380px] lg:w-[420px] bg-white shadow-lg flex flex-col h-full md:h-screen sticky top-0" class:hidden={mobileView !== 'cart'} class:md:flex={true} style="margin:0; padding:0; max-height: 100vh;">
+      <!-- Cliente -->
+      <div class="p-3 md:p-4 border-b bg-blue-50/40">
+        <div class="flex items-center gap-2">
+          <div class="p-2 rounded-full bg-[#e6eaf2] border border-primary shadow-sm">
+            <svg class="w-5 h-5 md:w-6 md:h-6 text-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+            </svg>
+          </div>
+          <input
+            id="userId"
+            type="text"
+            bind:value={userId}
+            on:keydown={(e) => {
+              if (e.key === 'Enter') {
+                loadUserBalance(true);
+              }
+            }}
+            on:input={() => {
+              error = '';
+              userSuggestions = [];
+              fetchUserSuggestions(userId);
+            }}
+            class="flex-1 px-3 py-2 border border-primary rounded-lg text-base focus:ring-2 focus:ring-primary focus:border-primary bg-white placeholder-[#35528C] transition-all duration-150 shadow-sm"
+            placeholder="ID de Cliente"
+            autocomplete="off"
+            spellcheck="false"
+            aria-label="ID de Cliente"
+          />
+        </div>
+        {#if userName}
+          <div class="mt-2 flex flex-col gap-1">
+            <p class="text-sm md:text-base text-gray-600">Cliente: <span class="font-medium text-gray-900">{userName}</span></p>
+            <p class="text-sm md:text-base text-gray-600">Saldo: <span class="font-medium text-primary">${userBalance.toLocaleString('es-CO')}</span></p>
+            {#if cartTotal > 0}
+              <p class="text-sm text-primary mt-1">Saldo tras la compra: <span class="font-bold text-primary">${(userBalance - cartTotal).toLocaleString('es-CO')}</span></p>
+            {/if}
+          </div>
+        {/if}
+        <!-- Sugerencias de usuario, error y éxito debajo del input -->
+        {#if userId.length > 0 && !userName}
+          <div class="mt-2 text-sm">
+            {#if userSuggestions.length > 0}
+              <div class="rounded-lg border border-gray-200 bg-white shadow-sm overflow-hidden">
+                {#each userSuggestions as suggestion}
+                  <button type="button" class="w-full text-left px-4 py-2 hover:bg-[#e6eaf2] flex items-center gap-2"
+                    on:click={() => {
+                      userId = suggestion.id;
+                      loadUserBalance(true);
+                      userSuggestions = [];
+                    }}
+                  >
+                    <span class="text-primary font-medium">ID: {suggestion.id}</span>
+                    <span class="text-gray-400">|</span>
+                    <span>{suggestion.name}</span>
+                  </button>
+                {/each}
+              </div>
+            {:else}
+              {#if error && error.includes('usuario')}
+                <div class="text-red-600 animate-fade-in">{error}</div>
+                {#key error}
+                  {#await new Promise(resolve => setTimeout(resolve, 2000))}
+                  {:then}
+                    {error = ''}
+                  {/await}
+                {/key}
+              {:else}
+                <span class="text-gray-500">No se encontraron usuarios</span>
+              {/if}
+            {/if}
+          </div>
+        {/if}
+        {#if successMsg}
+          <div class="mt-2 text-lg font-bold text-green-600 animate-fade-in bg-green-50 border border-green-200 rounded-lg px-3 py-2 shadow-sm">{successMsg}</div>
+        {/if}
+      </div>
+
+      <!-- Carrito -->
+      <div class="flex-1 overflow-y-auto" style="height: calc(100vh - 200px);">
+        <!-- Quick Add Form -->
+        <div class="p-2 sm:p-4 border-b">
+          <form class="flex space-x-2 relative"
+            on:submit|preventDefault={() => {
+              const searchInput = quickAddId.trim();
+              if (!searchInput) return;
+              
+              // Verificar si el input tiene el formato ID*cantidad
+              const match = searchInput.match(/^(\d+)\s*[\*x]\s*(\d+)$/);
+              let searchId = searchInput;
+              let quantity = 1;
+              
+              if (match) {
+                searchId = match[1];
+                quantity = parseInt(match[2]);
+                if (quantity < 1) quantity = 1;
+              }
+              
+              // Buscar por ID exacto primero
+              let product = displayProducts.find(p => 
+                p.id.toString() === searchId
+              );
+              
+              // Si no se encuentra por ID exacto, buscar por nombre exacto
+              if (!product) {
+                product = displayProducts.find(p => 
+                  p.name.toLowerCase() === searchId.toLowerCase()
+                );
+              }
+              
+              // Si aún no se encuentra, buscar el primer producto que contenga el texto en el nombre
+              if (!product && suggestions.length > 0) {
+                product = suggestions[0];
+              }
+              
+              if (product) {
+                const newProduct = {
+                  id: product.id,
+                  name: product.name,
+                  price: product.price,
+                  quantity: quantity
+                };
+                
+                const existing = cart.find(item => item.id === product.id);
+                if (existing) {
+                  existing.quantity += quantity;
+                  cart = cart;
+                } else {
+                  cart = [...cart, newProduct];
+                }
+                cartTotal = cart.reduce((sum, item) => sum + (item.price * item.quantity), 0);
+                quickAddId = '';
+                suggestions = [];
+              } else {
+                error = 'Producto no encontrado';
+                setTimeout(() => error = '', 2000);
+              }
+            }}>
+            <div class="flex-1 relative">
+              <input
+                type="text"
+                bind:value={quickAddId}
+                placeholder="Buscar por ID o nombre..."
+                class="w-full px-3 sm:px-4 py-2 text-sm sm:text-base rounded-lg border border-gray-300 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                autofocus
+                on:input={() => {
+                  if (!quickAddId.trim()) {
+                    suggestions = [];
+                    return;
+                  }
+                  const searchTerm = quickAddId.toLowerCase().trim();
+                  
+                  // 1. Coincidencia exacta por ID
+                  const exactIdMatches = displayProducts.filter(p => 
+                    p.id.toString() === quickAddId
+                  );
+                  
+                  // 2. Coincidencia exacta por nombre (ignorando mayúsculas)
+                  const exactNameMatches = displayProducts.filter(p => 
+                    p.name.toLowerCase() === searchTerm &&
+                    !exactIdMatches.includes(p)
+                  );
+                  
+                  // 3. ID comienza con el término de búsqueda
+                  const startWithIdMatches = displayProducts.filter(p => 
+                    p.id.toString().startsWith(quickAddId) &&
+                    !exactIdMatches.includes(p)
+                  );
+                  
+                  // 4. Nombre comienza con el término de búsqueda
+                  const startWithNameMatches = displayProducts.filter(p => 
+                    p.name.toLowerCase().startsWith(searchTerm) &&
+                    !exactNameMatches.includes(p) &&
+                    !startWithIdMatches.includes(p)
+                  );
+                  
+                  // 5. Coincidencias parciales en nombre (solo si no hay coincidencias más exactas)
+                  const partialMatches = displayProducts.filter(p => 
+                    p.name.toLowerCase().includes(searchTerm) &&
+                    !exactIdMatches.includes(p) &&
+                    !exactNameMatches.includes(p) &&
+                    !startWithIdMatches.includes(p) &&
+                    !startWithNameMatches.includes(p)
+                  );
+                  
+                  // Combinar resultados en orden de prioridad
+                  suggestions = [
+                    ...exactIdMatches,
+                    ...exactNameMatches,
+                    ...startWithIdMatches,
+                    ...startWithNameMatches,
+                    ...partialMatches
+                  ].slice(0, 5); // Limitar a 5 resultados
+                }}
+                on:blur={() => {
+                  // Dar tiempo para que se procese el clic en una sugerencia
+                  setTimeout(() => {
+                    suggestions = [];
+                  }, 200);
+                }}
+              />
+              
+              {#if suggestions.length > 0}
+                <div class="absolute w-full mt-1 bg-white border border-gray-200 rounded-lg shadow-lg z-50 max-h-60 overflow-auto">
+                  {#each suggestions as suggestion}
+                    <button
+                      type="button"
+                      class="w-full text-left px-4 py-2 hover:bg-blue-50 flex justify-between items-center group"
+                      on:mousedown={() => {
+                        const newProduct = {
+                          id: suggestion.id,
+                          name: suggestion.name,
+                          price: suggestion.price,
+                          quantity: 1
+                        };
+                        
+                        const existing = cart.find(item => item.id === suggestion.id);
+                        if (existing) {
+                          existing.quantity++;
+                          cart = cart;
+                        } else {
+                          cart = [...cart, newProduct];
+                        }
+                        cartTotal = cart.reduce((sum, item) => sum + (item.price * item.quantity), 0);
+                        quickAddId = '';
+                        suggestions = [];
+                      }}
+                    >
+                      <div class="flex-1">
+                        <div class="font-medium text-gray-900 flex items-center gap-2">
+                          <span class="text-blue-600">ID: {suggestion.id}</span>
+                          <span class="text-gray-400">|</span>
+                          <span>{suggestion.name}</span>
+                        </div>
+                      </div>
+                      <span class="text-primary font-medium ml-4">
+                        ${suggestion.price.toLocaleString('es-CO')}
+                      </span>
+                    </button>
+                  {/each}
+                </div>
+              {/if}
+            </div>
+          </form>
+        </div>
+
+        {#if cart.length > 0}
+          <div class="p-2 sm:p-4 space-y-2 sm:space-y-3">
+            {#each cart as item}
+              <div class="flex items-center bg-white rounded-xl shadow group hover:shadow-lg transition-all duration-200 p-2 sm:p-3 md:p-4 relative">
+                <!-- Quitar ícono de bolsa aquí -->
+                <!-- <div class="flex-shrink-0 w-14 h-14 bg-blue-100 rounded-lg flex items-center justify-center mr-3">
+                  <svg class="w-8 h-8 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 7h18M3 7l1.5 12.5A2 2 0 006.5 21h11a2 2 0 002-1.5L21 7M16 7V5a4 4 0 00-8 0v2" />
+                  </svg>
+                </div> -->
+                <div class="flex-1 min-w-0">
+                  <p class="font-semibold text-gray-900 text-sm sm:text-base truncate">{item.name}</p>
+                  <div class="flex items-center mt-1 space-x-1 sm:space-x-2">
+                    <button 
+                      on:click|stopPropagation={() => {
+                        if (item.quantity > 1) {
+                          item.quantity--;
+                        } else {
+                          cart = cart.filter(i => i !== item);
+                        }
+                        cart = cart;
+                        cartTotal = cart.reduce((sum, i) => sum + (i.price * i.quantity), 0);
+                      }}
+                      class="w-8 h-8 flex items-center justify-center rounded-full bg-[#e6eaf2] text-primary hover:bg-[#d1d9e6] transition-colors duration-200"
+                    >
+                      -
+                    </button>
+                    <input 
+                      type="number" 
+                      bind:value={item.quantity}
+                      min="1"
+                      class="w-12 sm:w-16 text-center font-bold text-sm sm:text-lg border border-gray-300 rounded-md py-1 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                      on:input={() => {
+                        if (item.quantity < 1 || isNaN(item.quantity)) {
+                          item.quantity = 1;
+                        }
+                        cart = cart;
+                        cartTotal = cart.reduce((sum, i) => sum + (i.price * i.quantity), 0);
+                      }}
+                      on:blur={() => {
+                        if (!item.quantity || item.quantity < 1) {
+                          item.quantity = 1;
+                          cart = cart;
+                          cartTotal = cart.reduce((sum, i) => sum + (i.price * i.quantity), 0);
+                        }
+                      }}
+                    />
+                    <button 
+                      on:click|stopPropagation={() => {
+                        item.quantity++;
+                        cart = cart;
+                        cartTotal = cart.reduce((sum, i) => sum + (i.price * i.quantity), 0);
+                      }}
+                      class="w-8 h-8 flex items-center justify-center rounded-full bg-[#e6eaf2] text-primary hover:bg-[#d1d9e6] transition-colors duration-200"
+                    >
+                      +
+                    </button>
+                  </div>
+                  <p class="text-xs text-gray-500 mt-1">ID: {item.id} | ${item.price.toLocaleString('es-CO')} c/u</p>
+                </div>
+                <div class="text-right ml-1 sm:ml-2">
+                  <p class="font-bold text-primary text-sm sm:text-lg">
+                    ${(item.quantity * item.price).toLocaleString('es-CO')}
+                  </p>
+                </div>
+                <!-- Botón de eliminar -->
+                <button 
+                  on:click|stopPropagation={() => {
+                    cart = cart.filter(i => i !== item);
+                    cartTotal = cart.reduce((sum, i) => sum + (i.price * i.quantity), 0);
+                  }}
+                  class="absolute top-2 right-2 w-6 h-6 flex items-center justify-center rounded-full bg-red-500 text-white hover:bg-red-600 opacity-80 group-hover:opacity-100 transition-all duration-200 transform hover:scale-110 shadow-sm border border-white"
+                  title="Eliminar"
+                  aria-label="Eliminar"
+                >
+                  <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+              </div>
+            {/each}
+          </div>
+        {:else}
+          <div class="h-full flex flex-col items-center justify-center text-gray-500">
+            <!-- Shopping cart icon -->
+            <svg class="w-16 h-16 text-gray-400 mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13l-1.35 2.7A1 1 0 007.5 17h9a1 1 0 00.9-1.45L17 13M7 13V6h13" />
+              <circle cx="9" cy="21" r="1" />
+              <circle cx="20" cy="21" r="1" />
+            </svg>
+            <p class="text-lg">Carrito vacío</p>
+            <p class="text-sm text-gray-400">Haz clic en los productos para agregarlos</p>
+          </div>
+        {/if}
+      </div>
+
+      <!-- Total y botones -->
+      {#if cart.length > 0}
+        <div class="border-t p-2 sm:p-4">
+          <div class="flex justify-between items-center mb-3 sm:mb-4">
+            <span class="text-gray-600 text-base sm:text-lg">Total</span>
+            <span class="text-xl sm:text-2xl font-bold text-primary">${cartTotal.toLocaleString('es-CO')}</span>
+          </div>
+          <div class="flex space-x-2">
+            <button
+              on:click={handlePayment}
+              disabled={loading}
+              class="flex-1 bg-primary text-white px-3 sm:px-4 py-2 sm:py-3 rounded-lg hover:bg-[#27406a] focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 disabled:opacity-50 text-base sm:text-lg font-medium"
+            >
+              {loading ? 'Procesando...' : 'FACTURAR'}
+            </button>
+            <button
+              on:click={clearCart}
+              class="p-2 sm:p-3 text-red-600 hover:bg-red-50 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-2"
+            >
+              <svg class="w-5 h-5 sm:w-6 sm:h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+              </svg>
+            </button>
+          </div>
+        </div>
+      {/if}
+    </div>
   </div>
+</div>
+
+{#if error && !error.includes('usuario')}
+  <!-- Eliminada la alerta roja flotante -->
+{/if}
+
+{#if selectedProduct}
+  <div class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50" on:click|self={() => selectedProduct = null}>
+    <div class="bg-white rounded-xl shadow-xl max-w-md w-full p-6">
+          <h3 class="text-xl font-bold text-primary">{selectedProduct.name}</h3>
+          <p class="mt-2 text-2xl font-bold text-primary">${selectedProduct.price.toLocaleString('es-CO')}</p>
+      <div class="mt-4">
+        <label class="block text-sm font-medium text-gray-700">Cantidad</label>
+          <input
+            type="number"
+            bind:value={quantity}
+            min="1"
+            class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-primary focus:ring-primary sm:text-sm"
+          />
+      </div>
+      <div class="mt-6 flex space-x-3">
+        <button
+          on:click={() => {
+            addToCart(selectedProduct);
+            selectedProduct = null;
+          }}
+          class="flex-1 bg-primary text-white px-4 py-2 rounded-lg hover:bg-[#27406a] focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2"
+        >
+          Agregar al carrito
+        </button>
+        <button
+          on:click={() => selectedProduct = null}
+          class="px-4 py-2 text-gray-700 hover:bg-gray-100 rounded-lg focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2"
+        >
+          Cancelar      </button>
+    </div>
+
+    <!-- Mobile Added to Cart Notification -->
+    {#if showAddedNotification}
+      <div class="md:hidden fixed top-20 left-1/2 transform -translate-x-1/2 bg-green-500 text-white px-4 py-2 rounded-lg shadow-lg z-50 animate-bounce">
+        ✓ Producto agregado al carrito
+      </div>
+    {/if}
+  </div>
+  </div>
+{/if}
+
+<style>
+  /* Animación marquee para texto largo en tarjetas */
+  .marquee {
+    display: inline-block;
+    min-width: 100%;
+    animation: marquee 6s linear infinite;
+  }
+  @keyframes marquee {
+    0% { transform: translateX(0); }
+    100% { transform: translateX(-100%); }
+  }
+  :global(body) {
+    background-color: #f3f4f6;
+    margin: 0;
+    padding: 0;
+    font-family: 'Nunito', sans-serif;
+  }
+  
+  input[type="number"] {
+    -moz-appearance: textfield;
+  }
+  
+  input[type="number"]::-webkit-outer-spin-button,
+  input[type="number"]::-webkit-inner-spin-button {
+    -webkit-appearance: none;
+    margin: 0;
+  }
+
+  .hover\:scale-102:hover {
+    transform: scale(1.02);
+  }
+
+  .truncate {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .product-name-hover:hover .marquee-on-hover,
+  .product-price-hover:hover .marquee-on-hover {
+    display: block;
+    min-width: 100%;
+    white-space: nowrap;
+    animation: marquee-hover 5s linear infinite;
+    background: none;
+    position: static;
+    overflow: visible;
+    text-overflow: unset;
+    width: calc(100% - 8px);
+    margin: 0 4px;
+  }
+  @keyframes marquee-hover {
+    0% { transform: translateX(0); }
+    100% { transform: translateX(-100%); }
+  }
+
+  /* Animación suave para cambios de texto */
+  .transition-all {
+    transition-property: all;
+    transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+    transition-duration: 200ms;
+  }
+
+  /* Color principal */
+  .text-primary {
+    color: #35528C;
+  }
+  .bg-primary {
+    background-color: #35528C;
+  }
+  .border-primary {
+    border-color: #35528C;
+  }
+</style>
+
+
+
+
 
 

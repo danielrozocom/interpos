@@ -10,6 +10,51 @@ let transactions: Array<any> = [];
 let loading = false;
 let error = '';
 let step = 1;
+let dateFrom = '';
+let dateTo = '';
+let transactionType = 'all'; // 'all', 'positive', 'negative'
+let currentPage = 1;
+let itemsPerPage = 15; // Valor por defecto
+
+// Filtros computados
+$: filteredTransactions = transactions
+  .filter(t => {
+    // Filtro por tipo de transacción
+    if (transactionType === 'positive') return cleanNumber(t.Quantity) > 0;
+    if (transactionType === 'negative') return cleanNumber(t.Quantity) < 0;
+    return true;
+  })
+  .filter(t => {
+    // Filtro por fecha
+    const date = new Date(t.Date);
+    if (dateFrom || dateTo) {
+      const from = dateFrom ? new Date(dateFrom) : null;
+      const to = dateTo ? new Date(dateTo) : null;
+      
+      // Ajustar la fecha "hasta" al final del día
+      if (to) {
+        to.setHours(23, 59, 59, 999);
+      }
+      
+      if (from && to) {
+        return date >= from && date <= to;
+      }
+      if (from) return date >= from;
+      if (to) return date <= to;
+    }
+    return true;
+  });
+
+$: totalPages = Math.ceil(filteredTransactions.length / itemsPerPage);
+
+$: if (currentPage > totalPages) {
+  currentPage = totalPages > 0 ? totalPages : 1;
+}
+
+$: paginatedTransactions = filteredTransactions.slice(
+  (currentPage - 1) * itemsPerPage,
+  currentPage * itemsPerPage
+);
 
 // Función para validar que solo se ingresen números en el ID
 function validateNumericInput(event: KeyboardEvent) {
@@ -79,23 +124,33 @@ function updateSuggestions() {
 async function fetchTransactions() {
   loading = true;
   error = '';
-  transactions = [];
+  // No limpiar transactions aquí para evitar el flash
   try {
     const res = await fetch(`/api/sheets/history?userId=${userId}`);
     if (!res.ok) throw new Error('No se pudo obtener el historial');
     let data = await res.json();
     // Ordenar por fecha descendente (más reciente primero)
-    transactions = data.sort((a: any, b: any) => new Date(b.Date).getTime() - new Date(a.Date).getTime());
+    transactions = data
+      .sort((a: any, b: any) => new Date(b.Date).getTime() - new Date(a.Date).getTime());
     const user = allUsers.find(u => u.id === userId);
     userName = user ? user.name : '';
     step = 2;
   } catch (e) {
     error = 'Error al consultar el historial.';
+    // Solo limpiar transacciones si hay error
+    transactions = [];
   }
   loading = false;
 }
 
 $: userId, updateSuggestions();
+
+// Manual refresh function
+async function refreshTransactions() {
+  if (step === 2 && userId) {
+    await fetchTransactions();
+  }
+}
 
 </script>
 
@@ -145,7 +200,7 @@ $: userId, updateSuggestions();
 <div class="min-h-screen bg-gray-50 p-4">
   <div class="max-w-4xl mx-auto">
     <div class="text-center mb-8 animate-fadeIn">
-      <h1 class="text-4xl font-bold text-[#35528C] mb-3 font-sans">Historial de Transacciones</h1>
+      <h1 class="text-4xl font-bold text-[#35528C] mb-3 font-sans s-xNGq_AHMpqrL">Historial de Transacciones</h1>
       <p class="text-lg text-[#35528C]/80 font-sans max-w-2xl mx-auto">Consulta el historial de movimientos de un usuario</p>
     </div>
 
@@ -175,6 +230,7 @@ $: userId, updateSuggestions();
               }}
               on:paste={cleanPastedValue}
               placeholder="Ingrese ID del usuario"
+              autofocus
             />
           </div>
 
@@ -224,12 +280,31 @@ $: userId, updateSuggestions();
             <h2 class="text-xl font-semibold text-[#35528C]">Historial de {userName}</h2>
             <p class="text-[#35528C]/80">ID: {userId}</p>
           </div>
-          <button 
-            on:click={() => { step = 1; userId = ''; userName = ''; transactions = []; }} 
-            class="btn-primary px-4 py-2 rounded-xl text-white font-medium hover:bg-[#2A4170] transition-opacity"
-          >
-            Nueva consulta
-          </button>
+          <div class="flex items-center gap-3">
+            <button 
+              on:click={refreshTransactions}
+              disabled={loading}
+              class="btn-primary px-4 py-2 rounded-xl text-white font-medium hover:bg-[#2A4170] transition-all duration-200 flex items-center gap-2 disabled:opacity-50"
+            >
+              <svg class="w-4 h-4" class:animate-spin={loading} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+              </svg>
+              {loading ? 'Actualizando...' : 'Actualizar'}
+            </button>
+            <button 
+              on:click={() => { 
+                step = 1; 
+                userId = ''; 
+                userName = ''; 
+                transactions = []; 
+                error = '';
+                currentPage = 1;
+              }} 
+              class="btn-primary px-4 py-2 rounded-xl text-white font-medium hover:bg-[#2A4170] transition-opacity"
+            >
+              Nueva consulta
+            </button>
+          </div>
         </div>
 
         {#if error}
@@ -250,7 +325,38 @@ $: userId, updateSuggestions();
         {:else}
           <div class="bg-white rounded-2xl shadow-lg border border-[#35528C]/10 overflow-hidden">
             <div class="p-6 border-b border-gray-100">
-              <h3 class="text-xl font-semibold text-[#35528C]">Últimos Movimientos</h3>
+              <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <!-- Filtro por fecha -->
+                <div>
+                  <label class="block text-sm font-medium text-gray-700 mb-1">Fecha desde:</label>
+                  <input 
+                    type="date" 
+                    bind:value={dateFrom}
+                    class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
+                  />
+                </div>
+                <div>
+                  <label class="block text-sm font-medium text-gray-700 mb-1">Fecha hasta:</label>
+                  <input 
+                    type="date" 
+                    bind:value={dateTo}
+                    class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
+                  />
+                </div>
+                <!-- Filtro por tipo -->
+                <div>
+                  <label class="block text-sm font-medium text-gray-700 mb-1">Tipo de transacción:</label>
+                  <select 
+                    bind:value={transactionType}
+                    class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
+                  >
+                    <option value="all">Todas</option>
+                    <option value="positive">Recargas</option>
+                    <option value="negative">Consumos</option>
+                  </select>
+                </div>
+
+              </div>
             </div>
             <div class="overflow-x-auto">
               <table class="w-full">
@@ -265,7 +371,7 @@ $: userId, updateSuggestions();
                   </tr>
                 </thead>
                 <tbody class="divide-y divide-gray-100">
-                  {#each transactions as transaction}
+                  {#each paginatedTransactions as transaction}
                     <tr class="hover:bg-[#35528C]/5 transition-colors duration-150">
                       <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-700">
                         {formatDate(transaction.Date)}
@@ -292,11 +398,57 @@ $: userId, updateSuggestions();
                 </tbody>
               </table>
             </div>
-          </div>
-
-          <div class="bg-blue-50 border border-blue-200 rounded-lg p-4 mt-6">
-            <h3 class="text-lg font-medium text-blue-900 mb-2">Resumen</h3>
-            <p class="text-blue-800">Total de transacciones: <strong>{transactions.length}</strong></p>
+          </div>            <div class="bg-blue-50 border border-blue-200 rounded-lg p-4 mt-6">
+              <h3 class="text-lg font-medium text-blue-900 mb-2">Resumen</h3>
+            <div class="flex items-center justify-between mb-4">
+              <p class="text-blue-800">
+                Mostrando página {currentPage} de {totalPages} 
+                ({filteredTransactions.length} transacciones encontradas)
+              </p>
+              
+              <div class="flex items-center gap-2">
+                <label class="text-sm font-medium text-gray-700">Mostrar:</label>
+                <select 
+                  bind:value={itemsPerPage}
+                  class="rounded-lg border border-gray-300 px-3 py-1 text-sm min-w-[100px]"
+                >
+                  <option value={15}>15 items</option>
+                  <option value={25}>25 items</option>
+                  <option value={50}>50 items</option>
+                  <option value={100}>100 items</option>
+                </select>
+              </div>
+            </div>
+            
+            <!-- Paginación -->
+            {#if totalPages > 1}
+              <div class="flex justify-center mt-4 gap-2">
+                <button 
+                  class="px-3 py-1 rounded border {currentPage === 1 ? 'bg-gray-100 text-gray-400' : 'bg-white hover:bg-gray-50 text-[#35528C]'}"
+                  on:click={() => currentPage = Math.max(1, currentPage - 1)}
+                  disabled={currentPage === 1}
+                >
+                  Anterior
+                </button>
+                
+                {#each Array(totalPages) as _, i}
+                  <button 
+                    class="px-3 py-1 rounded border {currentPage === i + 1 ? 'bg-[#35528C] text-white' : 'bg-white hover:bg-gray-50 text-[#35528C]'}"
+                    on:click={() => currentPage = i + 1}
+                  >
+                    {i + 1}
+                  </button>
+                {/each}
+                
+                <button 
+                  class="px-3 py-1 rounded border {currentPage === totalPages ? 'bg-gray-100 text-gray-400' : 'bg-white hover:bg-gray-50 text-[#35528C]'}"
+                  on:click={() => currentPage = Math.min(totalPages, currentPage + 1)}
+                  disabled={currentPage === totalPages}
+                >
+                  Siguiente
+                </button>
+              </div>
+            {/if}
           </div>
         {/if}
       </div>

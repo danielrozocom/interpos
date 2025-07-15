@@ -18,6 +18,19 @@ export default {
       fontFamily: {
         sans: ['Nunito', 'ui-sans-serif', 'system-ui'],
       }
+      ,
+      container: {
+        center: true,
+        padding: '1rem',
+        screens: {
+          DEFAULT: '1200px',
+          sm: '100%',
+          md: '100%',
+          lg: '1200px',
+          xl: '1200px',
+          '2xl': '1200px',
+        }
+      }
     },
   },
   plugins: []

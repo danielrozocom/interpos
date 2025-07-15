@@ -1,8 +1,7 @@
 <script lang="ts">
-  import { rechargeBalance } from '$lib/recharge';
   import { onMount } from 'svelte';
   import { siteName } from '../../lib/config';
-  // MoneyAnimation removed per request
+  // MoneyA  async function fetchBalance() {per request
 
   let userId = '';
   let userName = '';
@@ -36,9 +35,12 @@
     userId = numericOnly;
   }
 
-  function formatCurrency(val: number): string {
-    return `$${isNaN(val) ? 0 : Math.round(val).toLocaleString('es-MX')}`;
-  }
+function formatCurrency(val: number): string {
+  return `$${isNaN(val) ? 0 : Math.floor(val).toLocaleString('es-CO', {
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 0
+  })}`;
+}
 
   async function fetchAllUsers() {
     try {
@@ -138,17 +140,25 @@
       if (method === 'Otro') {
         methodToSend = customMethod.trim();
       }
-      // Realizar las operaciones en orden con mejor manejo de errores
-      try {
-        await rechargeBalance({ userId, quantity, newBalance, method: methodToSend, observations });
-      } catch (error: any) {
-        throw new Error('Error al registrar la recarga: ' + (error.message || 'Error desconocido'));
+      
+      // Usar el nuevo endpoint que hace ambas operaciones en una sola llamada
+      const response = await fetch('/api/sheets/users/recharge', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ 
+          userId, 
+          quantity, 
+          newBalance, 
+          method: methodToSend, 
+          observations 
+        })
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => null);
+        throw new Error(errorData?.error || `Error ${response.status}: No se pudo procesar la recarga`);
       }
-      try {
-        await updateUserBalance(userId, newBalance);
-      } catch (error: any) {
-        throw new Error('Error al actualizar el saldo: ' + (error.message || 'Error desconocido'));
-      }
+
       // Mostrar mensaje de éxito y limpiar el formulario
       const successMessage = 'Transacción completada con éxito';
       // Primero limpiar todos los campos
@@ -189,7 +199,8 @@
 <div class="max-w-2xl mx-auto">
   <!-- Header -->
   <div class="text-center header-space">
-    <h1 class="section-title-center">Recargar Saldo</h1>
+    <h1 class="text-4xl font-bold text-[#35528C] mb-3 mt-3 font-sans s-xNGq_AHMpqrL">Recargar Saldo</h1>
+    <p class="text-lg text-[#35528C]/80 font-sans max-w-2xl mx-auto s-WmfxB9smyTUP">Recarga saldo para un usuario en el sistema</p>
   </div>
 
   <!-- Step Content -->
@@ -204,16 +215,25 @@
         </div>
       </div>
     {/if}
-    <form on:submit|preventDefault={() => {
-      const exactMatch = allUsers.find(u => u.id === userId);
-      if (exactMatch && userExists) {
-        handleSubmit();
-      } else if (userSuggestions.length > 1) {
-        alert('Hay más de un usuario que coincide, selecciona uno de la lista de sugerencias.');
-      } else {
-        alert('No existe un usuario con ese ID');
-      }
-    }} class="space-y-6">
+    <form 
+      on:submit|preventDefault={(e) => {
+        // Prevenir el envío si el evento fue causado por la tecla Enter
+        if (e.submitter === null) {
+          e.preventDefault();
+          return;
+        }
+        
+        const exactMatch = allUsers.find(u => u.id === userId);
+        if (exactMatch && userExists) {
+          handleSubmit();
+        } else if (userSuggestions.length > 1) {
+          alert('Hay más de un usuario que coincide, selecciona uno de la lista de sugerencias.');
+        } else {
+          alert('No existe un usuario con ese ID');
+        }
+      }} 
+      class="space-y-6"
+    >
       <div>
         <label for="userId" class="block text-sm font-medium text-gray-700 mb-2">
           ID de Usuario
@@ -230,17 +250,9 @@
             if ((e.ctrlKey || e.metaKey) && ['c', 'v', 'a'].includes(e.key.toLowerCase())) {
               return;
             }
+            // Prevenir el envío del formulario al presionar Enter
             if (e.key === 'Enter') {
-              const exactMatch = allUsers.find(u => u.id === userId);
-              if (exactMatch && userExists) {
-                handleSubmit();
-              } else if (userSuggestions.length > 1) {
-                alert('Hay más de un usuario que coincide, selecciona uno de la lista de sugerencias.');
-                e.preventDefault();
-              } else {
-                alert('No existe un usuario con ese ID');
-                e.preventDefault();
-              }
+              e.preventDefault();
             }
           }}
           placeholder="Ingrese ID del usuario"
@@ -258,11 +270,10 @@
                 type="button"
                 on:click={() => {
                   userId = u.id;
-                  // Si el usuario existe, auto-submit
+                  // Eliminamos el auto-submit
                   const found = allUsers.find(x => x.id === u.id);
                   if (found) {
                     userExists = true;
-                    handleSubmit();
                   }
                 }}
                 class="w-full text-left p-3 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors duration-200"
@@ -293,7 +304,23 @@
           <label for="quantity" class="block text-sm font-medium text-gray-700 mb-2">
             Cantidad a recargar
           </label>
-          <input id="quantity" type="number" bind:value={quantity} required class="input-field" step="0.01" placeholder="0.00" />
+          <input 
+            id="quantity" 
+            type="number" 
+            bind:value={quantity} 
+            required 
+            class="input-field" 
+            step="1" 
+            placeholder="0.00"
+            on:input={(e) => {
+              // Permitir números negativos y enteros
+              const value = e.currentTarget.value;
+              if (value) {
+                quantity = Math.round(Number(value));
+                e.currentTarget.value = quantity.toString();
+              }
+            }}
+          />
           <p class="text-sm text-gray-500 mt-1">Ingrese un número positivo para recargar o negativo para descontar</p>
         </div>
 

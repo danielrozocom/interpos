@@ -82,7 +82,7 @@
 <div class="min-h-screen bg-gray-50 p-4">
   <div class="max-w-4xl mx-auto">
     <div class="text-center mb-8">
-      <h1 class="text-4xl font-bold text-[#35528C] mb-3 font-sans">Consulta tu Saldo</h1>
+      <h1 class="text-4xl font-bold text-[#35528C] mb-3 font-sans s-xNGq_AHMpqrL">Consulta tu Saldo</h1>
       <p class="text-lg text-[#35528C]/80 font-sans max-w-2xl mx-auto">Ingresa tu ID para ver tu saldo actual y el historial de movimientos de tu cuenta</p>
     </div>
 
@@ -100,6 +100,7 @@
             on:keydown={handleKeydown}
             class="flex-1 h-12 rounded-xl border-2 border-gray-200 shadow-sm focus:border-[#35528C] focus:ring-2 focus:ring-[#35528C]/20 text-lg px-4"
             placeholder="Ingresa tu ID"
+            autofocus
           />
           <button
             type="button"
@@ -158,7 +159,8 @@
         {#if transactions.length > 0}
           <div class="bg-white rounded-2xl shadow-lg border border-[#35528C]/10 overflow-hidden">
             <div class="p-6 border-b border-gray-100">
-              <h3 class="text-xl font-semibold text-[#35528C]">Últimos Movimientos</h3>
+              <h3 class="text-xl font-semibold text-[#35528C]">Últimos 10 Movimientos</h3>
+              <p class="text-sm text-gray-600 mt-1">Mostrando las últimas 10 transacciones de tu cuenta</p>
             </div>
             <div class="overflow-x-auto">
               <table class="w-full">

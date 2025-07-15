@@ -16,69 +16,71 @@ const auth = new google.auth.GoogleAuth({
 const sheets = google.sheets({ version: 'v4', auth });
 const SPREADSHEET_ID = GOOGLE_SHEETS_ID;
 
-/** POST /api/sheets/users/update - Actualiza el saldo de un usuario en la hoja Users */
+/** POST /api/sheets/users/recharge - Actualiza el saldo del usuario y registra la transacción de recarga */
 export const POST: RequestHandler = async ({ request }) => {
   try {
-    const { userId, newBalance, userBalance, cartTotal, orderID } = await request.json();
-    console.log('Received userId:', userId);
-    // Buscar el índice de la fila del usuario
+    const { userId, quantity, newBalance, method, observations } = await request.json();
+    
+    // 1. Buscar el índice de la fila del usuario
     const res = await sheets.spreadsheets.values.get({
       spreadsheetId: SPREADSHEET_ID,
       range: 'Users!A2:A'
     });
     const rows = res.data.values || [];
     const rowIndex = rows.findIndex(([id]) => id === userId);
-    console.log('Row index found:', rowIndex);
+    
     if (rowIndex === -1) {
-      console.error('User not found:', userId);
       return new Response(JSON.stringify({ error: 'Usuario no encontrado' }), {
         status: 404,
         headers: { 'Content-Type': 'application/json' }
       });
     }
+    
     // La fila real en la hoja (A2 es la fila 2)
     const sheetRow = rowIndex + 2;
-    // Actualizar el saldo en la columna C
+    
+    // 2. Actualizar el saldo en la columna C de Users
     await sheets.spreadsheets.values.update({
       spreadsheetId: SPREADSHEET_ID,
       range: `Users!C${sheetRow}`,
       valueInputOption: 'USER_ENTERED',
       requestBody: { values: [[newBalance]] }
     });
-    console.log('Updated balance for userId:', userId, 'New balance:', newBalance);
-
-    // Add transaction to Transactions - Balance with previous and new balance values
+    
+    // 3. Registrar la transacción en Transactions - Balance
     const date = new Date().toLocaleString('sv-SE', { timeZone: 'America/Bogota', hour12: false }).replace(' ', 'T');
-    const prevBalance = newBalance + cartTotal; // El saldo anterior era el nuevo + lo que se gastó
+    const prevBalance = newBalance - Number(quantity);
+    const obs = observations ?? '';
     
     // Format numbers for Sheets (rounded, dot as decimal, comma as thousands)
     function formatNumber(n: number): string {
       return (isNaN(n) ? 0 : Math.round(n * 100) / 100).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
     }
     
-    const transactionRow = [[
+    const transactionValues = [[
       date,
-      userId, 
-      formatNumber(-cartTotal), // Cantidad negativa para compras
-      formatNumber(prevBalance), // Saldo anterior
-      formatNumber(newBalance),  // Nuevo saldo
-      '-', 
-      orderID ? `Compra #${orderID}` : 'Compra' // Usar OrderID en el comentario
+      userId,
+      formatNumber(quantity),
+      formatNumber(prevBalance),
+      formatNumber(newBalance),
+      method,
+      obs
     ]];
+    
     await sheets.spreadsheets.values.append({
       spreadsheetId: SPREADSHEET_ID,
-      range: 'Transactions - Balance!A:G',
+      range: 'Transactions - Balance!A2:G',
       valueInputOption: 'USER_ENTERED',
-      requestBody: { values: transactionRow }
+      requestBody: { values: transactionValues }
     });
-    console.log('Transaction added for userId:', userId, 'Quantity:', -cartTotal, 'PrevBalance:', prevBalance, 'NewBalance:', newBalance, 'Comment:', orderID ? `Compra #${orderID}` : 'Compra');
-
+    
     return new Response(JSON.stringify({ success: true }), {
       status: 200,
       headers: { 'Content-Type': 'application/json' }
     });
   } catch (error) {
-    return new Response(JSON.stringify({ error: String(error) }), {
+    console.error('Error en el endpoint de recarga:', error);
+    return new Response(JSON.stringify({ error: 'Error al procesar la recarga. Detalles: ' + String(error) }), {
       status: 500,
       headers: { 'Content-Type': 'application/json' }
     });
