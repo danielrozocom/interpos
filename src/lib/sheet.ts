@@ -44,5 +44,23 @@ export async function getDoc() {
   return doc;
 }
 
+// Obtener el balance de un usuario
+export async function getUserBalance(userId: string): Promise<number> {
+	const doc = await getDoc();
+	if (!doc) {
+		throw new Error('Google Sheets document is not initialized');
+	}
+	const sheet = doc.sheetsByTitle[SHEET_NAMES.users];
+	if (!sheet) {
+		throw new Error(`Sheet with title ${SHEET_NAMES.users} not found`);
+	}
+	const rows = await sheet.getRows();
+	const userRow = rows.find(row => row.get('id') === userId);
+	if (!userRow) {
+		throw new Error(`User with ID ${userId} not found`);
+	}
+	return parseFloat(userRow.get('balance'));
+}
+
 // Export sheet names for use in API routes
 export { SHEET_NAMES };
