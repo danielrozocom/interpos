@@ -5,7 +5,7 @@
 </script>
 
 <div class="min-h-screen bg-gray-50">
-  <nav class="bg-[#35528C] shadow-sm border-b">
+  <nav class="bg-[#35528C] shadow-sm border-b relative">
     <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
       <div class="flex justify-between h-16 items-center">
         <div class="flex items-center">
@@ -28,18 +28,20 @@
             </svg>
           </button>
         </div>
-      <!-- Mobile menu -->
-      {#if menuOpen}
-        <div class="md:hidden bg-[#35528C] border-b shadow-sm rounded-b-lg mt-2">
-          <a href="/" class="block text-white px-4 py-3 text-lg font-semibold uppercase border-b-2 transition-all duration-150 { $page.url.pathname === '/' ? 'border-white' : 'border-transparent' }" on:click={() => menuOpen = false}>INICIO</a>
-          <a href="/recharge" class="block text-white px-4 py-3 text-lg font-semibold uppercase border-b-2 transition-all duration-150 { $page.url.pathname === '/recharge' ? 'border-white' : 'border-transparent' }" on:click={() => menuOpen = false}>RECARGAR</a>
-          <a href="/history" class="block text-white px-4 py-3 text-lg font-semibold uppercase border-b-2 transition-all duration-150 { $page.url.pathname === '/history' ? 'border-white' : 'border-transparent' }" on:click={() => menuOpen = false}>HISTORIAL</a>
-          <a href="/check-balance" class="block text-white px-4 py-3 text-lg font-semibold uppercase border-b-2 transition-all duration-150 { $page.url.pathname === '/check-balance' ? 'border-white' : 'border-transparent' }" on:click={() => menuOpen = false}>CONSULTAR SALDO</a>
-          <a href="/sell" class="block text-white px-4 py-3 text-lg font-semibold uppercase border-b-2 transition-all duration-150 { $page.url.pathname === '/sell' ? 'border-white' : 'border-transparent' }" on:click={() => menuOpen = false}>VENDER</a>
-        </div>
-      {/if}
-      </div> <!-- Explicitly close the inner div before nav ends -->
+      </div>
     </div>
+    <!-- Mobile menu - positioned absolutely outside the container -->
+    {#if menuOpen}
+      <div class="md:hidden bg-[#35528C] border-t border-[#27406B] absolute top-full left-0 right-0 z-50 shadow-lg">
+        <div class="px-4 py-2 space-y-1">
+          <a href="/" class="block text-white px-4 py-3 text-base font-semibold uppercase hover:bg-[#27406B] rounded transition-colors duration-150 { $page.url.pathname === '/' ? 'bg-[#27406B]' : '' }" on:click={() => menuOpen = false}>INICIO</a>
+          <a href="/recharge" class="block text-white px-4 py-3 text-base font-semibold uppercase hover:bg-[#27406B] rounded transition-colors duration-150 { $page.url.pathname === '/recharge' ? 'bg-[#27406B]' : '' }" on:click={() => menuOpen = false}>RECARGAR</a>
+          <a href="/history" class="block text-white px-4 py-3 text-base font-semibold uppercase hover:bg-[#27406B] rounded transition-colors duration-150 { $page.url.pathname === '/history' ? 'bg-[#27406B]' : '' }" on:click={() => menuOpen = false}>HISTORIAL</a>
+          <a href="/check-balance" class="block text-white px-4 py-3 text-base font-semibold uppercase hover:bg-[#27406B] rounded transition-colors duration-150 { $page.url.pathname === '/check-balance' ? 'bg-[#27406B]' : '' }" on:click={() => menuOpen = false}>CONSULTAR SALDO</a>
+          <a href="/sell" class="block text-white px-4 py-3 text-base font-semibold uppercase hover:bg-[#27406B] rounded transition-colors duration-150 { $page.url.pathname === '/sell' ? 'bg-[#27406B]' : '' }" on:click={() => menuOpen = false}>VENDER</a>
+        </div>
+      </div>
+    {/if}
   </nav>
   
   <main class="max-w-7xl mx-auto py-6 px-4 sm:px-6 lg:px-8">

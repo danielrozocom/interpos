@@ -82,20 +82,20 @@
     <p class="text-[#35528C]/80">Panel de Administración</p>
   </div>
 
-  <!-- Stats Cards -->
-  <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-12">
-    <div class="bg-white p-6 rounded-lg shadow-lg">
+  <!-- Stats Cards Principales -->
+  <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6 mb-6">
+    <div class="bg-white p-4 sm:p-6 rounded-lg shadow-lg">
       <div class="flex items-center">
         <div class="flex-shrink-0">
-          <div class="w-12 h-12 bg-blue-100 text-blue-500 rounded-lg flex items-center justify-center">
-            <span class="text-xl">👥</span>
+          <div class="w-10 h-10 sm:w-12 sm:h-12 bg-blue-100 text-blue-500 rounded-lg flex items-center justify-center">
+            <span class="text-lg sm:text-xl">👥</span>
           </div>
         </div>
-        <div class="ml-4">
-          <p class="text-sm font-medium text-gray-600">Total Usuarios</p>
-          <p class="text-2xl font-bold text-gray-900">
+        <div class="ml-3 sm:ml-4">
+          <p class="text-sm sm:text-base font-medium text-gray-600">Total Usuarios</p>
+          <p class="text-xl sm:text-2xl font-bold text-gray-900">
             {#if loading}
-              <span class="inline-block h-6 w-20 bg-gray-200 rounded animate-pulse"></span>
+              <span class="inline-block h-5 sm:h-6 w-16 sm:w-20 bg-gray-200 rounded animate-pulse"></span>
             {:else}
               {users.length}
             {/if}
@@ -104,18 +104,18 @@
       </div>
     </div>
 
-    <div class="bg-white p-6 rounded-lg shadow-lg">
+    <div class="bg-white p-4 sm:p-6 rounded-lg shadow-lg">
       <div class="flex items-center">
         <div class="flex-shrink-0">
-          <div class="w-12 h-12 bg-green-100 text-green-500 rounded-lg flex items-center justify-center">
-            <span class="text-xl">💰</span>
+          <div class="w-10 h-10 sm:w-12 sm:h-12 bg-green-100 text-green-500 rounded-lg flex items-center justify-center">
+            <span class="text-lg sm:text-xl">💰</span>
           </div>
         </div>
-        <div class="ml-4">
-          <p class="text-sm font-medium text-gray-600">Balance Total</p>
-          <p class="text-2xl font-bold text-gray-900">
+        <div class="ml-3 sm:ml-4">
+          <p class="text-sm sm:text-base font-medium text-gray-600">Balance Total</p>
+          <p class="text-xl sm:text-2xl font-bold text-gray-900">
             {#if loading}
-              <span class="inline-block h-6 w-24 bg-gray-200 rounded animate-pulse"></span>
+              <span class="inline-block h-5 sm:h-6 w-24 sm:w-32 bg-gray-200 rounded animate-pulse"></span>
             {:else}
               {formatCurrency(totalBalance)}
             {/if}
@@ -124,18 +124,18 @@
       </div>
     </div>
 
-    <div class="bg-white p-6 rounded-lg shadow-lg">
+    <div class="bg-white p-4 sm:p-6 rounded-lg shadow-lg">
       <div class="flex items-center">
         <div class="flex-shrink-0">
-          <div class="w-12 h-12 bg-purple-100 text-purple-500 rounded-lg flex items-center justify-center">
-            <span class="text-xl">📊</span>
+          <div class="w-10 h-10 sm:w-12 sm:h-12 bg-purple-100 text-purple-500 rounded-lg flex items-center justify-center">
+            <span class="text-lg sm:text-xl">📊</span>
           </div>
         </div>
-        <div class="ml-4">
-          <p class="text-sm font-medium text-gray-600">Promedio por Usuario</p>
-          <p class="text-2xl font-bold text-gray-900">
+        <div class="ml-3 sm:ml-4">
+          <p class="text-sm sm:text-base font-medium text-gray-600">Promedio por Usuario</p>
+          <p class="text-xl sm:text-2xl font-bold text-gray-900">
             {#if loading}
-              <span class="inline-block h-6 w-24 bg-gray-200 rounded animate-pulse"></span>
+              <span class="inline-block h-5 sm:h-6 w-20 sm:w-28 bg-gray-200 rounded animate-pulse"></span>
             {:else}
               {users.length > 0 ? formatCurrency(totalBalance / users.length) : formatCurrency(0)}
             {/if}
@@ -145,20 +145,20 @@
     </div>
   </div>
 
-  <!-- Totales de Ventas en una línea -->
-  <div class="grid grid-cols-1 sm:grid-cols-2 gap-6 mb-12">
-    <div class="bg-white p-6 rounded-lg shadow-lg">
+  <!-- Totales de Ventas - En móvil junto con las demás, en PC en fila separada -->
+  <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-6 mb-12">
+    <div class="bg-white p-4 sm:p-6 rounded-lg shadow-lg">
       <div class="flex items-center">
         <div class="flex-shrink-0">
-          <div class="w-12 h-12 bg-red-100 text-red-500 rounded-lg flex items-center justify-center">
-            <span class="text-xl">🛒</span>
+          <div class="w-10 h-10 sm:w-12 sm:h-12 bg-red-100 text-red-500 rounded-lg flex items-center justify-center">
+            <span class="text-lg sm:text-xl">🛒</span>
           </div>
         </div>
-        <div class="ml-4">
-          <p class="text-sm font-medium text-gray-600">Total de Ventas - Hoy</p>
-          <p class="text-2xl font-bold text-gray-900">
+        <div class="ml-3 sm:ml-4">
+          <p class="text-sm sm:text-base font-medium text-gray-600">Total de Ventas - Hoy</p>
+          <p class="text-xl sm:text-2xl font-bold text-gray-900">
             {#if loading}
-              <span class="inline-block h-6 w-20 bg-gray-200 rounded animate-pulse"></span>
+              <span class="inline-block h-5 sm:h-6 w-16 sm:w-20 bg-gray-200 rounded animate-pulse"></span>
             {:else}
               {totalSalesCount}
             {/if}
@@ -167,18 +167,18 @@
       </div>
     </div>
 
-    <div class="bg-white p-6 rounded-lg shadow-lg">
+    <div class="bg-white p-4 sm:p-6 rounded-lg shadow-lg">
       <div class="flex items-center">
         <div class="flex-shrink-0">
-          <div class="w-12 h-12 bg-yellow-100 text-yellow-500 rounded-lg flex items-center justify-center">
-            <span class="text-xl">💵</span>
+          <div class="w-10 h-10 sm:w-12 sm:h-12 bg-yellow-100 text-yellow-500 rounded-lg flex items-center justify-center">
+            <span class="text-lg sm:text-xl">💵</span>
           </div>
         </div>
-        <div class="ml-4">
-          <p class="text-sm font-medium text-gray-600">Total de Ingresos - Hoy</p>
-          <p class="text-2xl font-bold text-gray-900">
+        <div class="ml-3 sm:ml-4">
+          <p class="text-sm sm:text-base font-medium text-gray-600">Total de Ingresos - Hoy</p>
+          <p class="text-xl sm:text-2xl font-bold text-gray-900">
             {#if loading}
-              <span class="inline-block h-6 w-24 bg-gray-200 rounded animate-pulse"></span>
+              <span class="inline-block h-5 sm:h-6 w-24 sm:w-32 bg-gray-200 rounded animate-pulse"></span>
             {:else}
               {formatCurrency(totalSalesAmount)}
             {/if}
