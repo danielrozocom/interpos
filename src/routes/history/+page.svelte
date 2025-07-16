@@ -16,7 +16,7 @@ let transactionType = 'all'; // 'all', 'positive', 'negative'
 let currentPage = 1;
 let itemsPerPage = 15; // Valor por defecto
 
-// Filtros computados
+// Filtros computados - NO reordenar aquí, mantener el orden de fetchTransactions
 $: filteredTransactions = transactions
   .filter(t => {
     // Filtro por tipo de transacción
@@ -114,9 +114,22 @@ async function fetchTransactions() {
     const res = await fetch(`/api/sheets/history?userId=${userId}`);
     if (!res.ok) throw new Error('No se pudo obtener el historial');
     let data = await res.json();
-    // Ordenar por fecha descendente (más reciente primero)
-    transactions = data
-      .sort((a: any, b: any) => new Date(b.Date).getTime() - new Date(a.Date).getTime());
+    
+    // Ordenar por fecha descendente (más reciente primero) - verificar formato de fecha
+    transactions = data.sort((a: any, b: any) => {
+      const dateA = new Date(a.Date);
+      const dateB = new Date(b.Date);
+      console.log('Comparando fechas:', { 
+        a: a.Date, 
+        b: b.Date, 
+        dateA: dateA.getTime(), 
+        dateB: dateB.getTime() 
+      });
+      return dateB.getTime() - dateA.getTime();
+    });
+    
+    console.log('Transacciones ordenadas:', transactions.slice(0, 5).map(t => ({ Date: t.Date, Quantity: t.Quantity })));
+    
     const user = allUsers.find(u => u.id === userId);
     userName = user ? user.name : '';
     step = 2;

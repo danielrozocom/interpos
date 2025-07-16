@@ -261,11 +261,16 @@ onMount(() => {
 
   .error-receipt {
     text-align: center;
-    padding: 40px 20px;
+    padding: 60px 20px;
     color: #718096;
-    max-width: 60%;
+    width: 100%;
     word-wrap: break-word;
     font-size: 1rem;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    min-height: 300px;
   }
 
   @media (max-width: 768px) {

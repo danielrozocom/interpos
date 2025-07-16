@@ -5,8 +5,6 @@
   let users: Array<{id: string, name: string, balance: number}> = [];
   let loading = true;
   let error = '';
-  let totalSalesCount = 0;
-  let totalSalesAmount = 0;
 
   async function fetchUsers() {
     try {
@@ -32,24 +30,6 @@
     }
   }
 
-  async function fetchSalesMetrics() {
-    try {
-      const res = await fetch('/api/sheets/transactions?date=today');
-      if (!res.ok) {
-        throw new Error('Error al obtener métricas de ventas');
-      }
-      const data = await res.json();
-      console.log('Sales data received:', data); // Debug log
-      totalSalesCount = data.totalSalesCount || 0;
-      totalSalesAmount = data.totalSalesAmount || 0;
-    } catch (err: any) {
-      console.error('Error fetching sales metrics:', err);
-      error = err.message || 'Error al cargar las métricas de ventas';
-    } finally {
-      loading = false;
-    }
-  }
-
   function formatCurrency(val: number): string {
     return `$${isNaN(val) ? 0 : Math.round(val).toLocaleString('es-MX')}`;
   }
@@ -58,7 +38,6 @@
 
   onMount(() => {
     fetchUsers();
-    fetchSalesMetrics();
   });
 </script>
 
@@ -83,7 +62,7 @@
   </div>
 
   <!-- Stats Cards Principales -->
-  <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6 mb-6">
+  <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6 mb-12">
     <div class="bg-white p-4 sm:p-6 rounded-lg shadow-lg">
       <div class="flex items-center">
         <div class="flex-shrink-0">
@@ -142,31 +121,6 @@
           </p>
         </div>
       </div>
-    </div>
-  </div>
-
-  <!-- Totales de Ventas - En móvil junto con las demás, en PC en fila separada -->
-  <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-6 mb-12">
-    <div class="bg-white p-4 sm:p-6 rounded-lg shadow-lg">
-      <h3 class="text-lg font-bold text-[#35528C] mb-2">Total Ventas</h3>
-      <p class="text-2xl font-bold text-gray-800">
-        {#if loading}
-          <span class="inline-block h-5 sm:h-6 w-16 sm:w-20 bg-gray-200 rounded animate-pulse"></span>
-        {:else}
-          {totalSalesCount}
-        {/if}
-      </p>
-    </div>
-
-    <div class="bg-white p-4 sm:p-6 rounded-lg shadow-lg">
-      <h3 class="text-lg font-bold text-[#35528C] mb-2">Total Ingresos</h3>
-      <p class="text-2xl font-bold text-gray-800">
-        {#if loading}
-          <span class="inline-block h-5 sm:h-6 w-24 sm:w-32 bg-gray-200 rounded animate-pulse"></span>
-        {:else}
-          {formatCurrency(totalSalesAmount)}
-        {/if}
-      </p>
     </div>
   </div>
 
