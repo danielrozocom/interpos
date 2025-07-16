@@ -280,6 +280,7 @@ let showAddedNotification = false;
         date: colombiaDate,
         orderID: orderID,
         userID: userId,
+        userName: userName,
         quantity: cartTotal, // Valor total de la compra
         products: cart.map(item => `${item.name} (ID: ${item.id}) x${item.quantity} - $${(item.price * item.quantity).toLocaleString('es-CO')}`).join('; '),
         total: cartTotal

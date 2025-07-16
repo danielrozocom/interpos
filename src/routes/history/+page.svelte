@@ -1,6 +1,6 @@
 <script lang="ts">
 import { onMount } from 'svelte';
-import { siteName } from '../../lib/config';
+import { siteName, formatDate } from '../../lib/config';
 
 let userId = '';
 let userName = '';
@@ -30,17 +30,17 @@ $: filteredTransactions = transactions
     if (dateFrom || dateTo) {
       const from = dateFrom ? new Date(dateFrom) : null;
       const to = dateTo ? new Date(dateTo) : null;
-      
+
       // Ajustar la fecha "hasta" al final del día
       if (to) {
         to.setHours(23, 59, 59, 999);
       }
-      
+
       if (from && to) {
-        return date >= from && date <= to;
+        return new Date(date) >= from && new Date(date) <= to;
       }
-      if (from) return date >= from;
-      if (to) return date <= to;
+      if (from) return new Date(date) >= from;
+      if (to) return new Date(date) <= to;
     }
     return true;
   });
@@ -84,21 +84,6 @@ function cleanNumber(str: string | number): number {
 
 function formatCurrency(val: number): string {
   return `$${isNaN(val) ? 0 : Math.round(val).toLocaleString('es-MX')}`;
-}
-
-function formatDate(dateStr: string): string {
-  try {
-    const date = new Date(dateStr);
-    return date.toLocaleDateString('es-MX', {
-      year: 'numeric',
-      month: '2-digit',
-      day: '2-digit',
-      hour: '2-digit',
-      minute: '2-digit'
-    });
-  } catch {
-    return dateStr;
-  }
 }
 
 async function fetchAllUsers() {
@@ -275,12 +260,13 @@ async function refreshTransactions() {
 
     {#if step === 2}
       <div class="space-y-8 animate-fadeIn">
-        <div class="flex items-center justify-between mb-4">
-          <div class="text-left">
+        <div class="flex flex-col md:flex-row items-start md:items-center justify-between mb-4">
+          <div class="text-left mb-4 md:mb-0">
             <h2 class="text-xl font-semibold text-[#35528C]">Historial de {userName}</h2>
             <p class="text-[#35528C]/80">ID: {userId}</p>
           </div>
-          <div class="flex items-center gap-3">
+          <!-- Botones debajo del título en móviles -->
+          <div class="flex flex-row justify-center items-center gap-3">
             <button 
               on:click={refreshTransactions}
               disabled={loading}
@@ -355,7 +341,6 @@ async function refreshTransactions() {
                     <option value="negative">Consumos</option>
                   </select>
                 </div>
-
               </div>
             </div>
             <div class="overflow-x-auto">
@@ -391,65 +376,77 @@ async function refreshTransactions() {
                         {transaction.Method || '-'}
                       </td>
                       <td class="px-6 py-4 text-sm text-gray-700 max-w-xs truncate" title={transaction["Observation(s)"]}>
-                        {transaction["Observation(s)"] || '-'}
+                        {#if transaction["Observation(s)"] && transaction["Observation(s)"].includes('Compra #')}
+                          {@const orderNumber = transaction["Observation(s)"].match(/Compra #(\d+)/)?.[1]}
+                          {#if orderNumber}
+                            <a href={`/voucher/${orderNumber}`} target="_blank" class="text-blue-600 underline hover:text-blue-800">
+                              {transaction["Observation(s)"]}
+                            </a>
+                          {:else}
+                            {transaction["Observation(s)"] || '-'}
+                          {/if}
+                        {:else}
+                          {transaction["Observation(s)"] || '-'}
+                        {/if}
                       </td>
                     </tr>
                   {/each}
                 </tbody>
               </table>
             </div>
-          </div>            <div class="bg-blue-50 border border-blue-200 rounded-lg p-4 mt-6">
-              <h3 class="text-lg font-medium text-blue-900 mb-2">Resumen</h3>
-            <div class="flex items-center justify-between mb-4">
-              <p class="text-blue-800">
-                Mostrando página {currentPage} de {totalPages} 
-                ({filteredTransactions.length} transacciones encontradas)
+
+            <!-- Nueva sección: Información y selección de ítems por página -->
+            <div class="flex flex-col md:flex-row justify-between items-center p-6 border-t border-gray-100">
+              <p class="text-sm text-gray-700 mb-2 md:mb-0">
+                Mostrando {paginatedTransactions.length} de {filteredTransactions.length} transacciones
               </p>
-              
               <div class="flex items-center gap-2">
-                <label class="text-sm font-medium text-gray-700">Mostrar:</label>
+                <label for="itemsPerPage" class="text-sm text-gray-700">Transacciones por página:</label>
                 <select 
-                  bind:value={itemsPerPage}
-                  class="rounded-lg border border-gray-300 px-3 py-1 text-sm min-w-[100px]"
+                  id="itemsPerPage" 
+                  bind:value={itemsPerPage} 
+                  class="rounded-lg border border-gray-300 px-3 py-2 text-sm"
                 >
-                  <option value={15}>15 items</option>
-                  <option value={25}>25 items</option>
-                  <option value={50}>50 items</option>
-                  <option value={100}>100 items</option>
+                  <option value="15">15</option>
+                  <option value="30">30</option>
+                  <option value="50">50</option>
+                  <option value="100">100</option>
                 </select>
               </div>
             </div>
-            
-            <!-- Paginación -->
-            {#if totalPages > 1}
-              <div class="flex justify-center mt-4 gap-2">
-                <button 
-                  class="px-3 py-1 rounded border {currentPage === 1 ? 'bg-gray-100 text-gray-400' : 'bg-white hover:bg-gray-50 text-[#35528C]'}"
-                  on:click={() => currentPage = Math.max(1, currentPage - 1)}
-                  disabled={currentPage === 1}
-                >
-                  Anterior
-                </button>
-                
-                {#each Array(totalPages) as _, i}
-                  <button 
-                    class="px-3 py-1 rounded border {currentPage === i + 1 ? 'bg-[#35528C] text-white' : 'bg-white hover:bg-gray-50 text-[#35528C]'}"
-                    on:click={() => currentPage = i + 1}
-                  >
-                    {i + 1}
-                  </button>
-                {/each}
-                
-                <button 
-                  class="px-3 py-1 rounded border {currentPage === totalPages ? 'bg-gray-100 text-gray-400' : 'bg-white hover:bg-gray-50 text-[#35528C]'}"
-                  on:click={() => currentPage = Math.min(totalPages, currentPage + 1)}
-                  disabled={currentPage === totalPages}
-                >
-                  Siguiente
-                </button>
-              </div>
-            {/if}
           </div>
+          <!-- Paginación única -->
+          {#if totalPages > 1}
+            <div class="flex justify-center mt-4 gap-2">
+              <button 
+                class="px-3 py-1 rounded border {currentPage === 1 ? 'bg-gray-100 text-gray-400' : 'bg-white hover:bg-gray-50 text-[#35528C]'}"
+                on:click={() => currentPage = Math.max(1, currentPage - 1)}
+                disabled={currentPage === 1}
+              >
+                <span>&larr;</span>
+              </button>
+              
+              {#each Array(Math.min(5, totalPages)) as _, i}
+                {@const pageNum = Math.max(1, Math.min(totalPages - 4, currentPage - 2)) + i}
+                {#if pageNum <= totalPages}
+                  <button 
+                    class="px-3 py-1 rounded border {currentPage === pageNum ? 'bg-[#35528C] text-white' : 'bg-white hover:bg-gray-50 text-[#35528C]'}"
+                    on:click={() => currentPage = pageNum}
+                  >
+                    {pageNum}
+                  </button>
+                {/if}
+              {/each}
+              
+              <button 
+                class="px-3 py-1 rounded border {currentPage === totalPages ? 'bg-gray-100 text-gray-400' : 'bg-white hover:bg-gray-50 text-[#35528C]'}"
+                on:click={() => currentPage = Math.min(totalPages, currentPage + 1)}
+                disabled={currentPage === totalPages}
+              >
+                <span>&rarr;</span>
+              </button>
+            </div>
+          {/if}
         {/if}
       </div>
     {/if}

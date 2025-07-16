@@ -21,20 +21,25 @@ export const POST: RequestHandler = async ({ request }) => {
   try {
     const { userId, quantity, newBalance, method, observations } = await request.json();
     
-    // 1. Buscar el índice de la fila del usuario
+    // 1. Buscar el índice de la fila del usuario y obtener su nombre
     const res = await sheets.spreadsheets.values.get({
       spreadsheetId: SPREADSHEET_ID,
-      range: 'Users!A2:A'
+      range: 'Users!A2:B'
     });
     const rows = res.data.values || [];
-    const rowIndex = rows.findIndex(([id]) => id === userId);
+    const userRow = rows.find(([id]) => id === userId);
     
-    if (rowIndex === -1) {
+    if (!userRow) {
       return new Response(JSON.stringify({ error: 'Usuario no encontrado' }), {
         status: 404,
         headers: { 'Content-Type': 'application/json' }
       });
     }
+    
+    const userName = userRow[1] || '';
+    const rowIndex = rows.findIndex(([id]) => id === userId);
+    
+    console.log('Recharge data:', { userId, userName, quantity, newBalance, method });
     
     // La fila real en la hoja (A2 es la fila 2)
     const sheetRow = rowIndex + 2;
@@ -48,7 +53,23 @@ export const POST: RequestHandler = async ({ request }) => {
     });
     
     // 3. Registrar la transacción en Transactions - Balance
-    const date = new Date().toLocaleString('sv-SE', { timeZone: 'America/Bogota', hour12: false }).replace(' ', 'T');
+    const now = new Date();
+    const monthsShort = ['ene', 'feb', 'mar', 'abr', 'may', 'jun', 
+                        'jul', 'ago', 'sep', 'oct', 'nov', 'dic'];
+    
+    const day = now.getDate().toString().padStart(2, '0');
+    const month = monthsShort[now.getMonth()];
+    const year = now.getFullYear();
+    
+    let hours = now.getHours();
+    const minutes = now.getMinutes().toString().padStart(2, '0');
+    const seconds = now.getSeconds().toString().padStart(2, '0');
+    const ampm = hours >= 12 ? 'p.m.' : 'a.m.';
+    
+    hours = hours % 12;
+    if (hours === 0) hours = 12;
+    
+    const date = `${day}/${month}/${year} ${hours}:${minutes}:${seconds}${ampm}`;
     const prevBalance = newBalance - Number(quantity);
     const obs = observations ?? '';
     
@@ -60,6 +81,7 @@ export const POST: RequestHandler = async ({ request }) => {
     const transactionValues = [[
       date,
       userId,
+      userName,
       formatNumber(quantity),
       formatNumber(prevBalance),
       formatNumber(newBalance),
@@ -67,9 +89,11 @@ export const POST: RequestHandler = async ({ request }) => {
       obs
     ]];
     
+    console.log('Values to insert in Transactions - Balance:', transactionValues);
+    
     await sheets.spreadsheets.values.append({
       spreadsheetId: SPREADSHEET_ID,
-      range: 'Transactions - Balance!A2:G',
+      range: 'Transactions - Balance!A2:H',
       valueInputOption: 'USER_ENTERED',
       requestBody: { values: transactionValues }
     });

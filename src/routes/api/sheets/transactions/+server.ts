@@ -2,6 +2,7 @@ import { google } from 'googleapis';
 import { GOOGLE_SHEETS_ID } from '$env/static/private';
 import type { RequestHandler } from '@sveltejs/kit';
 import { json } from '@sveltejs/kit';
+import { getCurrentDateInTimezone, formatDate } from '$lib/date-utils';
 
 // Autenticación
 const auth = new google.auth.GoogleAuth({
@@ -20,7 +21,9 @@ const SPREADSHEET_ID = GOOGLE_SHEETS_ID;
 
 export const POST: RequestHandler = async ({ request }) => {
   try {
-    const { date, orderID, userID, quantity, products } = await request.json();
+    const { date, orderID, userID, userName, quantity, products } = await request.json();
+
+    console.log('Received transaction data:', { date, orderID, userID, userName, quantity, products });
 
     // Validate required fields
     if (!date || !orderID || !userID || !quantity || !products) {
@@ -30,17 +33,24 @@ export const POST: RequestHandler = async ({ request }) => {
       }, { status: 400 });
     }
 
-    // Crear fecha y hora actual
+    // Crear fecha y hora actual en formato estándar del sistema
     const now = new Date();
-    const dateTimeString = now.toLocaleString('es-CO', {
-      year: 'numeric',
-      month: '2-digit',
-      day: '2-digit',
-      hour: '2-digit',
-      minute: '2-digit',
-      second: '2-digit',
-      hour12: false
-    });
+    const monthsShort = ['ene', 'feb', 'mar', 'abr', 'may', 'jun', 
+                        'jul', 'ago', 'sep', 'oct', 'nov', 'dic'];
+    
+    const day = now.getDate().toString().padStart(2, '0');
+    const month = monthsShort[now.getMonth()];
+    const year = now.getFullYear();
+    
+    let hours = now.getHours();
+    const minutes = now.getMinutes().toString().padStart(2, '0');
+    const seconds = now.getSeconds().toString().padStart(2, '0');
+    const ampm = hours >= 12 ? 'p.m.' : 'a.m.';
+    
+    hours = hours % 12;
+    if (hours === 0) hours = 12;
+    
+    const dateTimeString = `${day}/${month}/${year} ${hours}:${minutes}:${seconds}${ampm}`;
 
     // Prepare the row data for Google Sheets
     const values = [
@@ -48,15 +58,18 @@ export const POST: RequestHandler = async ({ request }) => {
         dateTimeString,  // Date with time
         `'${orderID}`,   // OrderID con apóstrofe para forzar formato de texto
         userID,         // UserID
+        userName || '',  // UserName (puede estar vacío)
         quantity,       // Quantity (valor total de la compra)
         products        // Product(s) - formatted string
       ]
     ];
 
+    console.log('Values to insert:', values);
+
     // Add the transaction to the "Transactions - Orders" sheet
     const result = await sheets.spreadsheets.values.append({
       spreadsheetId: SPREADSHEET_ID,
-      range: 'Transactions - Orders!A:E', // Columns A to E
+      range: 'Transactions - Orders!A:F', // Columns A to F
       valueInputOption: 'USER_ENTERED',
       requestBody: {
         values,
@@ -98,7 +111,7 @@ export const GET: RequestHandler = async ({ url }) => {
     // Get all transactions from the sheet
     const result = await sheets.spreadsheets.values.get({
       spreadsheetId: SPREADSHEET_ID,
-      range: 'Transactions - Orders!A:E',
+      range: 'Transactions - Orders!A:F',
     });
 
     const rows = result.data.values || [];
@@ -120,9 +133,9 @@ export const GET: RequestHandler = async ({ url }) => {
     const transactions = rows.slice(1).map((row, index) => {
       // Parse quantity/amount - could be in different formats
       let amount = 0;
-      if (row[3]) {
+      if (row[4]) {
         // Remove any currency symbols and parse
-        const cleanAmount = String(row[3]).replace(/[$,\s]/g, '');
+        const cleanAmount = String(row[4]).replace(/[$,\s]/g, '');
         amount = parseFloat(cleanAmount) || 0;
       }
       
@@ -131,8 +144,9 @@ export const GET: RequestHandler = async ({ url }) => {
         date: row[0] || '',
         orderID: row[1] || '',
         userID: row[2] || '',
+        name: row[3] || '',
         quantity: amount,
-        products: row[4] || ''
+        products: row[5] || ''
       };
       
       if (index < 3) {
@@ -156,29 +170,37 @@ export const GET: RequestHandler = async ({ url }) => {
     }
 
     if (startDate) {
-      filteredTransactions = filteredTransactions.filter(t => t.date >= startDate);
+      const parsedStartDate = new Date(startDate);
+      filteredTransactions = filteredTransactions.filter(t => {
+        const transactionDate = new Date(t.date);
+        return transactionDate >= parsedStartDate;
+      });
     }
 
     if (endDate) {
-      filteredTransactions = filteredTransactions.filter(t => t.date <= endDate);
+      const parsedEndDate = new Date(endDate);
+      filteredTransactions = filteredTransactions.filter(t => {
+        const transactionDate = new Date(t.date);
+        return transactionDate <= parsedEndDate;
+      });
     }
 
     if (date === 'today') {
       // Obtener fecha actual en zona horaria de Colombia
-      const colombiaTime = new Date().toLocaleString("en-CA", {timeZone: "America/Bogota"}).split(' ')[0]; // YYYY-MM-DD
-      const colombiaDate = new Date(colombiaTime + 'T00:00:00');
+      const colombiaTime = new Date().toISOString().split('T')[0]; // YYYY-MM-DD
+      const colombiaDate = new Date(`${colombiaTime}T00:00:00`);
       const todayDay = colombiaDate.getDate();
       const todayMonth = colombiaDate.getMonth() + 1;
       const todayYear = colombiaDate.getFullYear();
-      
-      console.log('Colombia today:', { 
+
+      console.log('Colombia today:', {
         colombiaTime,
-        todayDay, 
-        todayMonth, 
+        todayDay,
+        todayMonth,
         todayYear,
         formatted14: `14/${todayMonth}/${todayYear}`,
-        formatted14_2: `14/7/2025`,
-        formatted14_3: `14/07/2025`
+        formatted14_2: `14/${todayMonth}/${todayYear}`,
+        formatted14_3: `14/${todayMonth.toString().padStart(2, '0')}/${todayYear}`
       });
       console.log('Total transactions before filter:', filteredTransactions.length);
       console.log('All transactions dates:', filteredTransactions.map(t => ({

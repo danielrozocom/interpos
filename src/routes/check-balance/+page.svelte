@@ -4,6 +4,7 @@
 </svelte:head>
 <script lang="ts">
   import { onMount } from 'svelte';
+  import { formatDate } from '../../lib/config';
 
   let userId = '';
   let userSuggestions: any[] = [];
@@ -45,25 +46,30 @@
     error = '';
 
     try {
-      // Obtener el saldo
+      // Obtener el saldo del usuario primero
       const balanceResponse = await fetch(`/api/sheets/users?userId=${encodeURIComponent(userId)}`);
       if (!balanceResponse.ok) throw new Error('Error al obtener el saldo');
       const balanceData = await balanceResponse.json();
-      console.log('balanceData:', balanceData); // Debug API response
       balance = balanceData.balance;
       name = balanceData.name || '';
 
-      // Obtener las últimas 10 transacciones
+      // Obtener el historial
       const historyResponse = await fetch(`/api/sheets/history?userId=${encodeURIComponent(userId)}`);
       if (!historyResponse.ok) throw new Error('Error al obtener el historial');
       const allTransactions = await historyResponse.json();
-      
+
+      // Si no tenemos nombre del balance, usar el del historial
+      if (!name && allTransactions.length > 0) {
+        name = allTransactions[0].Name || '';
+      }
+
       // Procesar las transacciones
       transactions = allTransactions.map((t: any) => ({
         timestamp: t.Date,
         amount: cleanNumber(t.Quantity),
         method: t.Method,
-        notes: t['Observation(s)']
+        notes: t['Observation(s)'],
+        orderID: t.orderID // Agregar orderID para el enlace del voucher
       }))
       .sort((a: any, b: any) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime())
       .slice(0, 10); // Obtener solo las últimas 10
@@ -177,13 +183,7 @@
                   {#each transactions as transaction}
                     <tr class="hover:bg-[#35528C]/5 transition-colors duration-150">
                       <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-700">
-                        {new Date(transaction.timestamp).toLocaleString('es-MX', { 
-                          day: '2-digit', 
-                          month: '2-digit', 
-                          year: 'numeric', 
-                          hour: '2-digit', 
-                          minute: '2-digit' 
-                        })}
+                        {formatDate(transaction.timestamp)}
                       </td>
                       <td class="px-6 py-4 whitespace-nowrap">
                         <span class={transaction.amount >= 0 ? 
@@ -203,7 +203,18 @@
                         </span>
                       </td>
                       <td class="px-6 py-4 text-sm text-gray-600 max-w-xs truncate">
-                        {transaction.notes || '-'}
+                        {#if transaction.notes && transaction.notes.includes('Compra #')}
+                          {@const orderNumber = transaction.notes.match(/Compra #(\d+)/)?.[1]}
+                          {#if orderNumber}
+                            <a href={`/voucher/${orderNumber}`} target="_blank" class="text-blue-600 underline hover:text-blue-800">
+                              {transaction.notes}
+                            </a>
+                          {:else}
+                            {transaction.notes || '-'}
+                          {/if}
+                        {:else}
+                          {transaction.notes || '-'}
+                        {/if}
                       </td>
                     </tr>
                   {/each}

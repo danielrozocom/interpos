@@ -148,43 +148,25 @@
   <!-- Totales de Ventas - En móvil junto con las demás, en PC en fila separada -->
   <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-6 mb-12">
     <div class="bg-white p-4 sm:p-6 rounded-lg shadow-lg">
-      <div class="flex items-center">
-        <div class="flex-shrink-0">
-          <div class="w-10 h-10 sm:w-12 sm:h-12 bg-red-100 text-red-500 rounded-lg flex items-center justify-center">
-            <span class="text-lg sm:text-xl">🛒</span>
-          </div>
-        </div>
-        <div class="ml-3 sm:ml-4">
-          <p class="text-sm sm:text-base font-medium text-gray-600">Total de Ventas - Hoy</p>
-          <p class="text-xl sm:text-2xl font-bold text-gray-900">
-            {#if loading}
-              <span class="inline-block h-5 sm:h-6 w-16 sm:w-20 bg-gray-200 rounded animate-pulse"></span>
-            {:else}
-              {totalSalesCount}
-            {/if}
-          </p>
-        </div>
-      </div>
+      <h3 class="text-lg font-bold text-[#35528C] mb-2">Total Ventas</h3>
+      <p class="text-2xl font-bold text-gray-800">
+        {#if loading}
+          <span class="inline-block h-5 sm:h-6 w-16 sm:w-20 bg-gray-200 rounded animate-pulse"></span>
+        {:else}
+          {totalSalesCount}
+        {/if}
+      </p>
     </div>
 
     <div class="bg-white p-4 sm:p-6 rounded-lg shadow-lg">
-      <div class="flex items-center">
-        <div class="flex-shrink-0">
-          <div class="w-10 h-10 sm:w-12 sm:h-12 bg-yellow-100 text-yellow-500 rounded-lg flex items-center justify-center">
-            <span class="text-lg sm:text-xl">💵</span>
-          </div>
-        </div>
-        <div class="ml-3 sm:ml-4">
-          <p class="text-sm sm:text-base font-medium text-gray-600">Total de Ingresos - Hoy</p>
-          <p class="text-xl sm:text-2xl font-bold text-gray-900">
-            {#if loading}
-              <span class="inline-block h-5 sm:h-6 w-24 sm:w-32 bg-gray-200 rounded animate-pulse"></span>
-            {:else}
-              {formatCurrency(totalSalesAmount)}
-            {/if}
-          </p>
-        </div>
-      </div>
+      <h3 class="text-lg font-bold text-[#35528C] mb-2">Total Ingresos</h3>
+      <p class="text-2xl font-bold text-gray-800">
+        {#if loading}
+          <span class="inline-block h-5 sm:h-6 w-24 sm:w-32 bg-gray-200 rounded animate-pulse"></span>
+        {:else}
+          {formatCurrency(totalSalesAmount)}
+        {/if}
+      </p>
     </div>
   </div>
 

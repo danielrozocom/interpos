@@ -21,12 +21,13 @@ export const POST: RequestHandler = async ({ request }) => {
   try {
     const { userId, newBalance, userBalance, cartTotal, orderID } = await request.json();
     console.log('Received userId:', userId);
-    // Buscar el índice de la fila del usuario
+    // Buscar el índice de la fila del usuario y obtener su nombre
     const res = await sheets.spreadsheets.values.get({
       spreadsheetId: SPREADSHEET_ID,
-      range: 'Users!A2:A'
+      range: 'Users!A2:B' // Obtener ID y nombre
     });
     const rows = res.data.values || [];
+    const userRow = rows.find(([id]) => id === userId);
     const rowIndex = rows.findIndex(([id]) => id === userId);
     console.log('Row index found:', rowIndex);
     if (rowIndex === -1) {
@@ -36,6 +37,9 @@ export const POST: RequestHandler = async ({ request }) => {
         headers: { 'Content-Type': 'application/json' }
       });
     }
+    
+    const userName = userRow ? (userRow[1] || '') : '';
+    console.log('User name found:', userName);
     // La fila real en la hoja (A2 es la fila 2)
     const sheetRow = rowIndex + 2;
     // Actualizar el saldo en la columna C
@@ -48,7 +52,23 @@ export const POST: RequestHandler = async ({ request }) => {
     console.log('Updated balance for userId:', userId, 'New balance:', newBalance);
 
     // Add transaction to Transactions - Balance with previous and new balance values
-    const date = new Date().toLocaleString('sv-SE', { timeZone: 'America/Bogota', hour12: false }).replace(' ', 'T');
+    const now = new Date();
+    const monthsShort = ['ene', 'feb', 'mar', 'abr', 'may', 'jun', 
+                        'jul', 'ago', 'sep', 'oct', 'nov', 'dic'];
+    
+    const day = now.getDate().toString().padStart(2, '0');
+    const month = monthsShort[now.getMonth()];
+    const year = now.getFullYear();
+    
+    let hours = now.getHours();
+    const minutes = now.getMinutes().toString().padStart(2, '0');
+    const seconds = now.getSeconds().toString().padStart(2, '0');
+    const ampm = hours >= 12 ? 'p.m.' : 'a.m.';
+    
+    hours = hours % 12;
+    if (hours === 0) hours = 12;
+    
+    const date = `${day}/${month}/${year} ${hours}:${minutes}:${seconds}${ampm}`;
     const prevBalance = newBalance + cartTotal; // El saldo anterior era el nuevo + lo que se gastó
     
     // Format numbers for Sheets (rounded, dot as decimal, comma as thousands)
@@ -58,7 +78,8 @@ export const POST: RequestHandler = async ({ request }) => {
     
     const transactionRow = [[
       date,
-      userId, 
+      userId,
+      userName || '', // Incluir el nombre del usuario en la columna Name
       formatNumber(-cartTotal), // Cantidad negativa para compras
       formatNumber(prevBalance), // Saldo anterior
       formatNumber(newBalance),  // Nuevo saldo
@@ -67,7 +88,7 @@ export const POST: RequestHandler = async ({ request }) => {
     ]];
     await sheets.spreadsheets.values.append({
       spreadsheetId: SPREADSHEET_ID,
-      range: 'Transactions - Balance!A:G',
+      range: 'Transactions - Balance!A:H', // Ahora incluye 8 columnas (A-H)
       valueInputOption: 'USER_ENTERED',
       requestBody: { values: transactionRow }
     });

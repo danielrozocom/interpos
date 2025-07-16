@@ -29,20 +29,21 @@ export const GET: RequestHandler = async ({ url }) => {
     // Read all rows from Transactions - Balance
     const res = await sheets.spreadsheets.values.get({
       spreadsheetId: SPREADSHEET_ID,
-      range: 'Transactions - Balance!A2:G'
+      range: 'Transactions - Balance!A2:H'
     });
     const rows = res.data.values || [];
-    // Columns: Date, UserID, Quantity, PrevBalance, NewBalance, Method, Observation(s)
+    // Columns: Date, UserID, Name, Quantity, PrevBalance, NewBalance, Method, Observation(s)
     const history = rows
       .filter(row => row[1] === userId)
       .map(row => ({
         Date: row[0] ?? '',
         UserID: row[1] ?? '',
-        Quantity: row[2] ?? '0',
-        PrevBalance: row[3] ?? '0',
-        NewBalance: row[4] ?? '0',
-        Method: row[5] ?? '',
-        "Observation(s)": row[6] ?? ''
+        Name: row[2] ?? '',
+        Quantity: row[3] ?? '0',
+        PrevBalance: row[4] ?? '0',
+        NewBalance: row[5] ?? '0',
+        Method: row[6] ?? '',
+        "Observation(s)": row[7] ?? ''
       }));
     return new Response(JSON.stringify(history), {
       status: 200,

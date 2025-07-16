@@ -59,20 +59,15 @@ export const GET: RequestHandler = async () => {
 
     console.log('Valid order numbers extracted:', orderNumbers);
 
-    // Encontrar el próximo número disponible
-    let nextOrderNumber = 0;
-    if (orderNumbers.length > 0) {
-      nextOrderNumber = Math.max(...orderNumbers) + 1;
-    }
+    // Encontrar el próximo número disponible (comenzar desde 1 para 000001)
+    let nextOrderNumber = orderNumbers.length > 0 ? Math.max(...orderNumbers) + 1 : 1;
     
     console.log('Next order number calculated:', nextOrderNumber);
 
-    // Formatear el OrderID con el mínimo de 6 dígitos, pero permitiendo crecer
-    const minDigits = 6;
-    const requiredDigits = Math.max(minDigits, nextOrderNumber.toString().length);
-    const formattedOrderId = nextOrderNumber.toString().padStart(requiredDigits, '0');
+    // Formatear el OrderID con 6 dígitos (000001, 000002, etc.)
+    const formattedOrderId = nextOrderNumber.toString().padStart(6, '0');
     
-    console.log('Formatted OrderID:', formattedOrderId, 'with', requiredDigits, 'digits');
+    console.log('Formatted OrderID:', formattedOrderId);
 
     // NO registrar automáticamente el OrderID aquí - se registrará cuando se complete la transacción
 
