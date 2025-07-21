@@ -6,9 +6,9 @@ export const siteName = 'InterPOS';
 
 // Configuración de nombres de hojas de Google Sheets
 export const SHEET_NAMES = {
-	orders: 'Orders',
-	transactions: 'Transactions',
-	users: 'Users'
+  orders: 'Orders',
+  transactions: 'Transactions',
+  users: 'Users'
 };
 
 // Función utilitaria para formatear fechas desde ISO 8601 en zona horaria de Colombia
@@ -31,7 +31,7 @@ export function formatDate(dateInput: string | Date): string {
     
     // Convertir a zona horaria de Colombia
     const colombiaOptions: Intl.DateTimeFormatOptions = {
-      timeZone: 'America/Bogota',
+      timeZone: 'Etc/GMT+5',
       day: '2-digit',
       month: 'short',
       year: 'numeric',

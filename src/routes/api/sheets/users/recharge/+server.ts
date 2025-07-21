@@ -56,9 +56,9 @@ export const POST: RequestHandler = async ({ request }) => {
     const now = new Date();
     
     // Crear Date y Time separados en zona horaria de Colombia
-    const colombiaDate = new Date(now.toLocaleString("en-US", {timeZone: "America/Bogota"}));
-    const dateStr = colombiaDate.toLocaleDateString('en-CA'); // YYYY-MM-DD format
-    const timeStr = colombiaDate.toLocaleTimeString('en-GB', { hour12: false }); // HH:MM:SS format
+    const gmt5Date = new Date(now.toLocaleString("en-US", {timeZone: "Etc/GMT+5"}));
+    const dateStr = gmt5Date.toLocaleDateString('en-CA'); // YYYY-MM-DD format
+    const timeStr = gmt5Date.toLocaleTimeString('en-GB', { hour12: false }); // HH:MM:SS format
     
     const prevBalance = newBalance - Number(quantity);
     const obs = observations ?? '';

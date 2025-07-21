@@ -37,9 +37,9 @@ export const POST: RequestHandler = async ({ request }) => {
     const now = new Date();
     
     // Crear Date y Time separados en zona horaria de Colombia
-    const colombiaDate = new Date(now.toLocaleString("en-US", {timeZone: "America/Bogota"}));
-    const dateStr = colombiaDate.toLocaleDateString('en-CA'); // YYYY-MM-DD format
-    const timeStr = colombiaDate.toLocaleTimeString('en-GB', { hour12: false }); // HH:MM:SS format
+    const gmt5Date = new Date(now.toLocaleString("en-US", {timeZone: "Etc/GMT+5"}));
+    const dateStr = gmt5Date.toLocaleDateString('en-CA'); // YYYY-MM-DD format
+    const timeStr = gmt5Date.toLocaleTimeString('en-GB', { hour12: false }); // HH:MM:SS format
 
     // Prepare the row data for Google Sheets
     const values = [
@@ -156,7 +156,7 @@ export const GET: RequestHandler = async ({ url }) => {
       // Si es ISO 8601, conviértelo a Colombia para mostrar
       let colombiaDateObj;
       if (combinedDateTime && /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}/.test(combinedDateTime)) {
-        colombiaDateObj = new Date(new Date(combinedDateTime).toLocaleString("en-US", { timeZone: "America/Bogota" }));
+        colombiaDateObj = new Date(new Date(combinedDateTime).toLocaleString("en-US", { timeZone: "Etc/GMT+5" }));
       } else {
         colombiaDateObj = new Date(combinedDateTime);
       }
