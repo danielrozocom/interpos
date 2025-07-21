@@ -36,22 +36,7 @@
 
   // Función para parsear fecha ISO 8601 correctamente
   function parseISODate(dateTimeStr: string): Date {
-    if (!dateTimeStr) {
-      console.log('Missing DateTime:', { dateTimeStr });
-      return new Date(0); // Fecha muy antigua si faltan datos
-    }
-
-    try {
-      const date = new Date(dateTimeStr);
-      if (isNaN(date.getTime())) {
-        console.log('Invalid ISO date:', dateTimeStr);
-        return new Date(0);
-      }
-      return date;
-    } catch (error) {
-      console.error('Error parsing ISO date:', error, { dateTimeStr });
-      return new Date(0);
-    }
+  // Eliminar función parseISODate ya que no se utiliza
   }
 
   // Eliminar búsqueda en cada input para evitar sobrecarga
