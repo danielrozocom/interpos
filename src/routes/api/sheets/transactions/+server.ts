@@ -134,27 +134,30 @@ export const GET: RequestHandler = async ({ url }) => {
         amount = parseFloat(cleanAmount) || 0;
       }
       
-      const dateStr = row[0] || '';     // Date en columna A
-      const timeStr = row[1] || '';     // Time en columna B
-      
-      // Combinar date y time para crear un DateTime ISO
+      const dateStr = row[0] || '';
+      const timeStr = row[1] || '';
+      // Soporta ambos: (date+time) o solo ISO 8601 en A
       let combinedDateTime = '';
-      try {
-        if (dateStr && timeStr) {
-          // Crear fecha combinada
+      if (dateStr && timeStr) {
+        try {
           const dateTimeString = `${dateStr} ${timeStr}`;
           const dateTime = new Date(dateTimeString);
           if (!isNaN(dateTime.getTime())) {
             combinedDateTime = dateTime.toISOString();
+          } else {
+            combinedDateTime = dateStr; // fallback
           }
+        } catch (error) {
+          console.error('Error combining date and time:', { dateStr, timeStr, error });
+          combinedDateTime = dateStr;
         }
-      } catch (error) {
-        console.error('Error combining date and time:', { dateStr, timeStr, error });
+      } else if (dateStr) {
+        combinedDateTime = dateStr;
       }
-      
+
       const transaction = {
         rowIndex: index + 2,
-        date: combinedDateTime,                    // DateTime combinado en ISO 8601
+        date: combinedDateTime,                    // DateTime combinado o ISO 8601 directo
         dateOnly: formatDateOnly(combinedDateTime), // Fecha formateada para Colombia
         timeOnly: formatTimeOnly(combinedDateTime), // Hora formateada para Colombia
         orderID: row[2] || '',        // OrderID (columna C)
