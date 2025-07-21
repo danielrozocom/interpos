@@ -54,22 +54,12 @@ export const POST: RequestHandler = async ({ request }) => {
     
     // 3. Registrar la transacción en Transactions - Balance
     const now = new Date();
-    const monthsShort = ['ene', 'feb', 'mar', 'abr', 'may', 'jun', 
-                        'jul', 'ago', 'sep', 'oct', 'nov', 'dic'];
     
-    const day = now.getDate().toString().padStart(2, '0');
-    const month = monthsShort[now.getMonth()];
-    const year = now.getFullYear();
+    // Crear Date y Time separados en zona horaria de Colombia
+    const colombiaDate = new Date(now.toLocaleString("en-US", {timeZone: "America/Bogota"}));
+    const dateStr = colombiaDate.toLocaleDateString('en-CA'); // YYYY-MM-DD format
+    const timeStr = colombiaDate.toLocaleTimeString('en-GB', { hour12: false }); // HH:MM:SS format
     
-    let hours = now.getHours();
-    const minutes = now.getMinutes().toString().padStart(2, '0');
-    const seconds = now.getSeconds().toString().padStart(2, '0');
-    const ampm = hours >= 12 ? 'p.m.' : 'a.m.';
-    
-    hours = hours % 12;
-    if (hours === 0) hours = 12;
-    
-    const date = `${day}/${month}/${year} ${hours}:${minutes}:${seconds}${ampm}`;
     const prevBalance = newBalance - Number(quantity);
     const obs = observations ?? '';
     
@@ -79,21 +69,22 @@ export const POST: RequestHandler = async ({ request }) => {
     }
     
     const transactionValues = [[
-      date,
-      userId,
-      userName,
-      formatNumber(quantity),
-      formatNumber(prevBalance),
-      formatNumber(newBalance),
-      method,
-      obs
+      dateStr,      // Date en formato YYYY-MM-DD (columna A)
+      timeStr,      // Time en formato HH:MM:SS (columna B)
+      userId,       // UserID (columna C)
+      userName,     // Name (columna D)
+      formatNumber(quantity),    // Quantity (columna E)
+      formatNumber(prevBalance), // PrevBalance (columna F)
+      formatNumber(newBalance),  // NewBalance (columna G)
+      method,       // Method (columna H)
+      obs           // Observation(s) (columna I)
     ]];
     
     console.log('Values to insert in Transactions - Balance:', transactionValues);
     
     await sheets.spreadsheets.values.append({
       spreadsheetId: SPREADSHEET_ID,
-      range: 'Transactions - Balance!A2:H',
+      range: 'Transactions - Balance!A:I', // Ahora son 9 columnas: Date, Time, UserID, Name, Quantity, PrevBalance, NewBalance, Method, Observation(s)
       valueInputOption: 'USER_ENTERED',
       requestBody: { values: transactionValues }
     });

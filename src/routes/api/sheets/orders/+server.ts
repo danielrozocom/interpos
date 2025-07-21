@@ -32,7 +32,7 @@ export const GET: RequestHandler = async () => {
     // Obtener todas las órdenes existentes para determinar el próximo número
     const response = await sheets.spreadsheets.values.get({
       spreadsheetId: SPREADSHEET_ID,
-      range: 'Transactions - Orders!B:B', // Columna OrderID (B)
+      range: 'Transactions - Orders!C:C', // Columna OrderID (C)
     });
 
     console.log('SPREADSHEET_ID:', SPREADSHEET_ID);

@@ -4,7 +4,8 @@
 </svelte:head>
 <script lang="ts">
   import { onMount } from 'svelte';
-  import { formatDate } from '../../lib/config';
+  // Solo mantenemos formatDate para casos especiales, los campos dateOnly y timeOnly vienen del servidor
+  import { formatDate } from '../../lib/date-utils';
 
   let userId = '';
   let userSuggestions: any[] = [];
@@ -31,6 +32,26 @@
 
   function formatCurrency(val: number): string {
     return `$${isNaN(val) ? 0 : Math.round(val).toLocaleString('es-MX')}`;
+  }
+
+  // Función para parsear fecha ISO 8601 correctamente
+  function parseISODate(dateTimeStr: string): Date {
+    if (!dateTimeStr) {
+      console.log('Missing DateTime:', { dateTimeStr });
+      return new Date(0); // Fecha muy antigua si faltan datos
+    }
+
+    try {
+      const date = new Date(dateTimeStr);
+      if (isNaN(date.getTime())) {
+        console.log('Invalid ISO date:', dateTimeStr);
+        return new Date(0);
+      }
+      return date;
+    } catch (error) {
+      console.error('Error parsing ISO date:', error, { dateTimeStr });
+      return new Date(0);
+    }
   }
 
   // Eliminar búsqueda en cada input para evitar sobrecarga
@@ -64,15 +85,35 @@
       }
 
       // Procesar las transacciones
-      transactions = allTransactions.map((t: any) => ({
-        timestamp: t.Date,
-        amount: cleanNumber(t.Quantity),
-        method: t.Method,
-        notes: t['Observation(s)'],
-        orderID: t.orderID // Agregar orderID para el enlace del voucher
-      }))
-      .sort((a: any, b: any) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime())
+      transactions = allTransactions.map((t: any) => {
+        // Usar el DateTime en formato ISO 8601
+        const dateTime = t.DateTime || '';
+        const parsedDate = parseISODate(dateTime);
+        
+        return {
+          timestamp: dateTime,
+          dateTime: dateTime,         // DateTime completo en ISO 8601
+          dateOnly: t.dateOnly || '', // Fecha ya formateada desde el servidor
+          timeOnly: t.timeOnly || '', // Hora ya formateada desde el servidor
+          amount: cleanNumber(t.Quantity),
+          method: t.Method,
+          notes: t['Observation(s)'],
+          orderID: t.orderID,         // Agregar orderID para el enlace del voucher
+          parsedDate: parsedDate      // Fecha parseada para ordenamiento
+        };
+      })
+      .sort((a: any, b: any) => {
+        // Ordenar por fecha parseada (más reciente primero)
+        return b.parsedDate.getTime() - a.parsedDate.getTime();
+      })
       .slice(0, 10); // Obtener solo las últimas 10
+
+      console.log('Processed transactions:', transactions.map(t => ({
+        dateOnly: t.dateOnly,
+        timeOnly: t.timeOnly,
+        parsedDate: t.parsedDate,
+        amount: t.amount
+      })));
     } catch (err) {
       console.error('Error:', err);
       error = 'No existe un usuario con ese ID';
@@ -173,6 +214,7 @@
                 <thead class="bg-[#35528C]/5">
                   <tr>
                     <th class="px-6 py-4 text-left text-xs font-bold uppercase tracking-wider text-[#35528C]">Fecha</th>
+                    <th class="px-6 py-4 text-left text-xs font-bold uppercase tracking-wider text-[#35528C]">Hora</th>
                     <th class="px-6 py-4 text-left text-xs font-bold uppercase tracking-wider text-[#35528C]">Tipo</th>
                     <th class="px-6 py-4 text-left text-xs font-bold uppercase tracking-wider text-[#35528C]">Cantidad</th>
                     <th class="px-6 py-4 text-left text-xs font-bold uppercase tracking-wider text-[#35528C]">Método</th>
@@ -183,7 +225,10 @@
                   {#each transactions as transaction}
                     <tr class="hover:bg-[#35528C]/5 transition-colors duration-150">
                       <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-700">
-                        {formatDate(transaction.timestamp)}
+                        {transaction.dateOnly}
+                      </td>
+                      <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
+                        {transaction.timeOnly}
                       </td>
                       <td class="px-6 py-4 whitespace-nowrap">
                         <span class={transaction.amount >= 0 ? 

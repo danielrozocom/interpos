@@ -1,6 +1,8 @@
 <script lang="ts">
 import { onMount } from 'svelte';
-import { siteName, formatDate } from '../../lib/config';
+import { siteName } from '../../lib/config';
+// Ya no necesitamos formatDateOnly y formatTimeOnly porque vienen del servidor
+// import { formatDateOnly, formatTimeOnly } from '../../lib/date-utils';
 
 let userId = '';
 let userName = '';
@@ -16,34 +18,39 @@ let transactionType = 'all'; // 'all', 'positive', 'negative'
 let currentPage = 1;
 let itemsPerPage = 15; // Valor por defecto
 
-// Filtros computados - NO reordenar aquí, mantener el orden de fetchTransactions
-$: filteredTransactions = transactions
-  .filter(t => {
-    // Filtro por tipo de transacción
-    if (transactionType === 'positive') return cleanNumber(t.Quantity) > 0;
-    if (transactionType === 'negative') return cleanNumber(t.Quantity) < 0;
-    return true;
-  })
-  .filter(t => {
-    // Filtro por fecha
-    const date = new Date(t.Date);
-    if (dateFrom || dateTo) {
-      const from = dateFrom ? new Date(dateFrom) : null;
-      const to = dateTo ? new Date(dateTo) : null;
-
-      // Ajustar la fecha "hasta" al final del día
-      if (to) {
-        to.setHours(23, 59, 59, 999);
-      }
-
-      if (from && to) {
-        return new Date(date) >= from && new Date(date) <= to;
-      }
-      if (from) return new Date(date) >= from;
-      if (to) return new Date(date) <= to;
-    }
-    return true;
+// Filtros computados - TEMPORALMENTE SIMPLIFICADO PARA DEBUG
+$: filteredTransactions = (() => {
+  console.log('=== APLICANDO FILTROS ===');
+  console.log('Transacciones disponibles:', transactions.length);
+  console.log('Tipo de filtro:', transactionType);
+  console.log('Fechas de filtro:', { dateFrom, dateTo });
+  
+  if (transactions.length === 0) {
+    console.log('No hay transacciones para filtrar');
+    return [];
+  }
+  
+  console.log('Muestra de transacciones antes de filtrar:');
+  transactions.slice(0, 3).forEach((t, i) => {
+    console.log(`Transacción ${i + 1}: Date="${t.Date}", Time="${t.Time}", Quantity="${t.Quantity}"`);
   });
+  
+  // POR AHORA - SOLO FILTRO POR TIPO, SIN FILTRO DE FECHA
+  const filtered = transactions.filter(t => {
+    const quantity = cleanNumber(t.Quantity);
+    let typeMatch = true;
+    
+    if (transactionType === 'positive') typeMatch = quantity > 0;
+    if (transactionType === 'negative') typeMatch = quantity < 0;
+    
+    return typeMatch;
+  });
+  
+  console.log('Resultado después de filtrar por tipo:', filtered.length);
+  console.log('Primeras 3 filtradas:', filtered.slice(0, 3).map(t => ({ Date: t.Date, Quantity: t.Quantity })));
+  
+  return filtered;
+})();
 
 $: totalPages = Math.ceil(filteredTransactions.length / itemsPerPage);
 
@@ -51,10 +58,23 @@ $: if (currentPage > totalPages) {
   currentPage = totalPages > 0 ? totalPages : 1;
 }
 
-$: paginatedTransactions = filteredTransactions.slice(
-  (currentPage - 1) * itemsPerPage,
-  currentPage * itemsPerPage
-);
+$: paginatedTransactions = (() => {
+  const start = (currentPage - 1) * itemsPerPage;
+  const end = currentPage * itemsPerPage;
+  const paginated = filteredTransactions.slice(start, end);
+  
+  console.log('Paginación:', {
+    currentPage,
+    itemsPerPage,
+    totalFiltered: filteredTransactions.length,
+    start,
+    end,
+    paginatedLength: paginated.length,
+    totalPages: Math.ceil(filteredTransactions.length / itemsPerPage)
+  });
+  
+  return paginated;
+})();
 
 // Función para validar que solo se ingresen números en el ID
 function validateNumericInput(event: KeyboardEvent) {
@@ -106,6 +126,26 @@ function updateSuggestions() {
   userSuggestions = allUsers.filter(u => u.id.startsWith(userId));
 }
 
+function parseCustomDate(dateTimeStr: string): Date {
+  if (!dateTimeStr) {
+    console.log('Missing DateTime:', { dateTimeStr });
+    return new Date(0); // Fecha muy antigua si faltan datos
+  }
+
+  try {
+    const date = new Date(dateTimeStr);
+    if (isNaN(date.getTime())) {
+      console.log('Invalid ISO date:', dateTimeStr);
+      return new Date(0);
+    }
+    console.log('Parsed ISO date:', { dateTimeStr, result: date });
+    return date;
+  } catch (error) {
+    console.error('Error parsing ISO date:', error, { dateTimeStr });
+    return new Date(0);
+  }
+}
+
 async function fetchTransactions() {
   loading = true;
   error = '';
@@ -115,26 +155,73 @@ async function fetchTransactions() {
     if (!res.ok) throw new Error('No se pudo obtener el historial');
     let data = await res.json();
     
-    // Ordenar por fecha descendente (más reciente primero) - verificar formato de fecha
+    console.log('=== DATOS COMPLETOS DEL API ===');
+    console.log('Total de registros:', data.length);
+    console.log('Primer registro completo:', data[0]);
+    console.log('Campos disponibles:', data[0] ? Object.keys(data[0]) : 'No hay datos');
+    console.log('Primeros 5 registros:', data.slice(0, 5));
+    
+    // Verificar si data es un array
+    if (!Array.isArray(data)) {
+      console.error('Los datos no son un array:', data);
+      throw new Error('Formato de datos inválido');
+    }
+    
+    if (data.length === 0) {
+      console.log('No hay transacciones para el usuario:', userId);
+      transactions = [];
+      const user = allUsers.find(u => u.id === userId);
+      userName = user ? user.name : '';
+      step = 2;
+      loading = false;
+      return;
+    }
+    
+    // POR AHORA - ASIGNAR Y ORDENAR POR FECHA/HORA
     transactions = data.sort((a: any, b: any) => {
-      const dateA = new Date(a.Date);
-      const dateB = new Date(b.Date);
-      console.log('Comparando fechas:', { 
-        a: a.Date, 
-        b: b.Date, 
-        dateA: dateA.getTime(), 
-        dateB: dateB.getTime() 
-      });
-      return dateB.getTime() - dateA.getTime();
+      try {
+        const dateA = parseCustomDate(a.DateTime);
+        const dateB = parseCustomDate(b.DateTime);
+        
+        // Verificar que las fechas son válidas antes de comparar
+        if (isNaN(dateA.getTime()) || isNaN(dateB.getTime())) {
+          console.warn('Fecha inválida detectada:', { 
+            a: { Date: a.Date, Time: a.Time }, 
+            b: { Date: b.Date, Time: b.Time },
+            dateA_valid: !isNaN(dateA.getTime()),
+            dateB_valid: !isNaN(dateB.getTime())
+          });
+          return 0; // No cambiar orden si alguna fecha es inválida
+        }
+        
+        // Ordenar de más reciente a más antigua (descendente)
+        return dateB.getTime() - dateA.getTime();
+      } catch (error) {
+        console.error('Error en comparación de fechas:', error);
+        return 0;
+      }
     });
     
-    console.log('Transacciones ordenadas:', transactions.slice(0, 5).map(t => ({ Date: t.Date, Quantity: t.Quantity })));
+    console.log('=== TRANSACCIONES ASIGNADAS Y ORDENADAS ===');
+    console.log('Total:', transactions.length);
+    console.log('Primeras 3 transacciones con sus fechas exactas:');
+    transactions.slice(0, 3).forEach((t, i) => {
+      console.log(`Transacción ${i + 1}:`);
+      console.log('- Date:', t.Date);
+      console.log('- Time:', t.Time);
+      console.log('- Combined DateTime:', parseCustomDate(t.DateTime).toISOString());
+      console.log('- Tipo de Date:', typeof t.Date);
+      console.log('- Quantity:', t.Quantity);
+      console.log('- Todos los campos:', Object.keys(t));
+      console.log('---');
+    });
     
     const user = allUsers.find(u => u.id === userId);
     userName = user ? user.name : '';
     step = 2;
   } catch (e) {
-    error = 'Error al consultar el historial.';
+    console.error('Error completo:', e);
+    error = 'Error al consultar el historial: ' + String(e);
     // Solo limpiar transacciones si hay error
     transactions = [];
   }
@@ -361,6 +448,7 @@ async function refreshTransactions() {
                 <thead class="bg-[#35528C]/5">
                   <tr>
                     <th class="px-6 py-4 text-left text-xs font-bold uppercase tracking-wider text-[#35528C]">Fecha</th>
+                    <th class="px-6 py-4 text-left text-xs font-bold uppercase tracking-wider text-[#35528C]">Hora</th>
                     <th class="px-6 py-4 text-left text-xs font-bold uppercase tracking-wider text-[#35528C]">Cantidad</th>
                     <th class="px-6 py-4 text-left text-xs font-bold uppercase tracking-wider text-[#35528C]">Saldo Anterior</th>
                     <th class="px-6 py-4 text-left text-xs font-bold uppercase tracking-wider text-[#35528C]">Nuevo Saldo</th>
@@ -372,7 +460,10 @@ async function refreshTransactions() {
                   {#each paginatedTransactions as transaction}
                     <tr class="hover:bg-[#35528C]/5 transition-colors duration-150">
                       <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-700">
-                        {formatDate(transaction.Date)}
+                        {transaction.dateOnly || '-'}
+                      </td>
+                      <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
+                        {transaction.timeOnly || '-'}
                       </td>
                       <td class="px-6 py-4 whitespace-nowrap text-sm font-medium">
                         <span class="{cleanNumber(transaction.Quantity) >= 0 ? 'text-green-600 font-bold' : 'text-red-600 font-bold'}">
