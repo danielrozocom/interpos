@@ -350,7 +350,11 @@ onMount(() => {
       <div class="receipt-body">
         <div class="receipt-line">
           <span class="line-label">FECHA:</span>
-          <span class="line-value">{transactionDetails.date ? formatDate(transactionDetails.date) : 'Fecha no disponible'}</span>
+          <span class="line-value">{transactionDetails.dateOnly || (transactionDetails.date ? formatDate(transactionDetails.date) : 'Fecha no disponible')}</span>
+        </div>
+        <div class="receipt-line">
+          <span class="line-label">HORA:</span>
+          <span class="line-value">{transactionDetails.timeOnly || ''}</span>
         </div>
         
         <div class="receipt-line">
