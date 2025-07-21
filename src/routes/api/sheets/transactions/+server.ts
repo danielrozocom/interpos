@@ -136,7 +136,6 @@ export const GET: RequestHandler = async ({ url }) => {
       
       const dateStr = row[0] || '';
       const timeStr = row[1] || '';
-      // Soporta ambos: (date+time) o solo ISO 8601 en A
       let combinedDateTime = '';
       if (dateStr && timeStr) {
         try {
@@ -154,17 +153,23 @@ export const GET: RequestHandler = async ({ url }) => {
       } else if (dateStr) {
         combinedDateTime = dateStr;
       }
-
+      // Si es ISO 8601, conviértelo a Colombia para mostrar
+      let colombiaDateObj;
+      if (combinedDateTime && /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}/.test(combinedDateTime)) {
+        colombiaDateObj = new Date(new Date(combinedDateTime).toLocaleString("en-US", { timeZone: "America/Bogota" }));
+      } else {
+        colombiaDateObj = new Date(combinedDateTime);
+      }
       const transaction = {
         rowIndex: index + 2,
-        date: combinedDateTime,                    // DateTime combinado o ISO 8601 directo
-        dateOnly: formatDateOnly(combinedDateTime), // Fecha formateada para Colombia
-        timeOnly: formatTimeOnly(combinedDateTime), // Hora formateada para Colombia
-        orderID: row[2] || '',        // OrderID (columna C)
-        userID: row[3] || '',         // UserID (columna D)
-        name: row[4] || '',           // Name (columna E)
-        quantity: amount,             // Quantity (columna F)
-        products: row[6] || ''        // Products (columna G)
+        date: colombiaDateObj.toISOString(), // SIEMPRE en hora Colombia (ISO)
+        dateOnly: formatDateOnly(colombiaDateObj),
+        timeOnly: formatTimeOnly(colombiaDateObj),
+        orderID: row[2] || '',
+        userID: row[3] || '',
+        name: row[4] || '',
+        quantity: amount,
+        products: row[6] || ''
       };
       
       if (index < 3) {
