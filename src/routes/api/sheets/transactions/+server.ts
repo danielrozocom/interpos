@@ -2,7 +2,7 @@ import { google } from 'googleapis';
 import { GOOGLE_SHEETS_ID } from '$env/static/private';
 import type { RequestHandler } from '@sveltejs/kit';
 import { json } from '@sveltejs/kit';
-import { getCurrentDateInTimezone, formatDate } from '$lib/date-utils';
+import { getCurrentDateInTimezone, formatDate, formatDateOnly, formatTimeOnly } from '$lib/date-utils';
 
 // Autenticación
 const auth = new google.auth.GoogleAuth({
@@ -33,34 +33,24 @@ export const POST: RequestHandler = async ({ request }) => {
       }, { status: 400 });
     }
 
-    // Crear fecha y hora actual en formato estándar del sistema
+    // Crear fecha y hora actual en zona horaria de Colombia
     const now = new Date();
-    const monthsShort = ['ene', 'feb', 'mar', 'abr', 'may', 'jun', 
-                        'jul', 'ago', 'sep', 'oct', 'nov', 'dic'];
     
-    const day = now.getDate().toString().padStart(2, '0');
-    const month = monthsShort[now.getMonth()];
-    const year = now.getFullYear();
-    
-    let hours = now.getHours();
-    const minutes = now.getMinutes().toString().padStart(2, '0');
-    const seconds = now.getSeconds().toString().padStart(2, '0');
-    const ampm = hours >= 12 ? 'p.m.' : 'a.m.';
-    
-    hours = hours % 12;
-    if (hours === 0) hours = 12;
-    
-    const dateTimeString = `${day}/${month}/${year} ${hours}:${minutes}:${seconds}${ampm}`;
+    // Crear Date y Time separados en zona horaria de Colombia
+    const colombiaDate = new Date(now.toLocaleString("en-US", {timeZone: "America/Bogota"}));
+    const dateStr = colombiaDate.toLocaleDateString('en-CA'); // YYYY-MM-DD format
+    const timeStr = colombiaDate.toLocaleTimeString('en-GB', { hour12: false }); // HH:MM:SS format
 
     // Prepare the row data for Google Sheets
     const values = [
       [
-        dateTimeString,  // Date with time
-        `'${orderID}`,   // OrderID con apóstrofe para forzar formato de texto
-        userID,         // UserID
-        userName || '',  // UserName (puede estar vacío)
-        quantity,       // Quantity (valor total de la compra)
-        products        // Product(s) - formatted string
+        dateStr,         // Date en formato YYYY-MM-DD (columna A)
+        timeStr,         // Time en formato HH:MM:SS (columna B)
+        orderID,         // OrderID como número de 6 dígitos, sin apóstrofe (columna C)
+        userID,          // UserID (columna D)
+        userName || '',  // UserName (columna E)
+        quantity,        // Quantity - valor total de la compra (columna F)
+        products         // Product(s) - formatted string (columna G)
       ]
     ];
 
@@ -69,7 +59,7 @@ export const POST: RequestHandler = async ({ request }) => {
     // Add the transaction to the "Transactions - Orders" sheet
     const result = await sheets.spreadsheets.values.append({
       spreadsheetId: SPREADSHEET_ID,
-      range: 'Transactions - Orders!A:F', // Columns A to F
+      range: 'Transactions - Orders!A:G', // Ahora son 7 columnas: Date, Time, OrderID, UserID, UserName, Quantity, Products
       valueInputOption: 'USER_ENTERED',
       requestBody: {
         values,
@@ -100,6 +90,11 @@ export const POST: RequestHandler = async ({ request }) => {
 
 export const GET: RequestHandler = async ({ url }) => {
   try {
+    console.log('--- /api/sheets/transactions GET ---');
+    const incomingOrderID = url.searchParams.get('orderID');
+    if (incomingOrderID) {
+      console.log('Incoming orderID param:', incomingOrderID);
+    }
     const userID = url.searchParams.get('userID');
     const orderID = url.searchParams.get('orderID');
     const startDate = url.searchParams.get('startDate');
@@ -111,7 +106,7 @@ export const GET: RequestHandler = async ({ url }) => {
     // Get all transactions from the sheet
     const result = await sheets.spreadsheets.values.get({
       spreadsheetId: SPREADSHEET_ID,
-      range: 'Transactions - Orders!A:F',
+      range: 'Transactions - Orders!A:G', // Ahora son 7 columnas: Date, Time, OrderID, UserID, UserName, Quantity, Products
     });
 
     const rows = result.data.values || [];
@@ -133,20 +128,40 @@ export const GET: RequestHandler = async ({ url }) => {
     const transactions = rows.slice(1).map((row, index) => {
       // Parse quantity/amount - could be in different formats
       let amount = 0;
-      if (row[4]) {
+      if (row[5]) { // Quantity ahora está en columna F (índice 5)
         // Remove any currency symbols and parse
-        const cleanAmount = String(row[4]).replace(/[$,\s]/g, '');
+        const cleanAmount = String(row[5]).replace(/[$,\s]/g, '');
         amount = parseFloat(cleanAmount) || 0;
+      }
+      
+      const dateStr = row[0] || '';     // Date en columna A
+      const timeStr = row[1] || '';     // Time en columna B
+      
+      // Combinar date y time para crear un DateTime ISO
+      let combinedDateTime = '';
+      try {
+        if (dateStr && timeStr) {
+          // Crear fecha combinada
+          const dateTimeString = `${dateStr} ${timeStr}`;
+          const dateTime = new Date(dateTimeString);
+          if (!isNaN(dateTime.getTime())) {
+            combinedDateTime = dateTime.toISOString();
+          }
+        }
+      } catch (error) {
+        console.error('Error combining date and time:', { dateStr, timeStr, error });
       }
       
       const transaction = {
         rowIndex: index + 2,
-        date: row[0] || '',
-        orderID: row[1] || '',
-        userID: row[2] || '',
-        name: row[3] || '',
-        quantity: amount,
-        products: row[5] || ''
+        date: combinedDateTime,                    // DateTime combinado en ISO 8601
+        dateOnly: formatDateOnly(combinedDateTime), // Fecha formateada para Colombia
+        timeOnly: formatTimeOnly(combinedDateTime), // Hora formateada para Colombia
+        orderID: row[2] || '',        // OrderID (columna C)
+        userID: row[3] || '',         // UserID (columna D)
+        name: row[4] || '',           // Name (columna E)
+        quantity: amount,             // Quantity (columna F)
+        products: row[6] || ''        // Products (columna G)
       };
       
       if (index < 3) {
@@ -157,6 +172,8 @@ export const GET: RequestHandler = async ({ url }) => {
     });
 
     console.log('Total parsed transactions:', transactions.length);
+    // Log all parsed orderIDs for debugging
+    console.log('All parsed orderIDs:', transactions.map(t => t.orderID));
 
     // Apply filters if provided
     let filteredTransactions = transactions;
@@ -166,7 +183,14 @@ export const GET: RequestHandler = async ({ url }) => {
     }
 
     if (orderID) {
+      console.log('Filtering transactions by orderID:', orderID);
       filteredTransactions = filteredTransactions.filter(t => t.orderID.includes(orderID));
+      console.log('Filtered transactions count:', filteredTransactions.length);
+      if (filteredTransactions.length === 0) {
+        console.log('No transactions matched for orderID:', orderID);
+      } else {
+        console.log('Matched transactions:', filteredTransactions.map(t => t.orderID));
+      }
     }
 
     if (startDate) {
