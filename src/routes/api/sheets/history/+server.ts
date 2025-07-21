@@ -1,5 +1,6 @@
 import { google } from 'googleapis';
 import { GOOGLE_SHEETS_ID } from '$env/static/private';
+import { formatDateOnly, formatTimeOnly } from '$lib/date-utils';
 import type { RequestHandler } from '@sveltejs/kit';
 
 const auth = new google.auth.GoogleAuth({
@@ -29,22 +30,54 @@ export const GET: RequestHandler = async ({ url }) => {
     // Read all rows from Transactions - Balance
     const res = await sheets.spreadsheets.values.get({
       spreadsheetId: SPREADSHEET_ID,
-      range: 'Transactions - Balance!A2:H'
+      range: 'Transactions - Balance!A2:I' // Ahora son 9 columnas: Date, Time, UserID, Name, Quantity, PrevBalance, NewBalance, Method, Observation(s)
     });
     const rows = res.data.values || [];
-    // Columns: Date, UserID, Name, Quantity, PrevBalance, NewBalance, Method, Observation(s)
+    console.log('=== DEBUG HISTORY API ===');
+    console.log('Total filas leídas:', rows.length);
+    if (rows.length > 0) {
+      console.log('Primeras 3 filas:', rows.slice(0, 3));
+      console.log('UserIDs encontrados (primeras 10):', rows.slice(0, 10).map(r => r[2]));
+    }
+    // Columns: Date, Time, UserID, Name, Quantity, PrevBalance, NewBalance, Method, Observation(s)
     const history = rows
-      .filter(row => row[1] === userId)
-      .map(row => ({
-        Date: row[0] ?? '',
-        UserID: row[1] ?? '',
-        Name: row[2] ?? '',
-        Quantity: row[3] ?? '0',
-        PrevBalance: row[4] ?? '0',
-        NewBalance: row[5] ?? '0',
-        Method: row[6] ?? '',
-        "Observation(s)": row[7] ?? ''
-      }));
+      .filter(row => row[2] === userId)
+      .map(row => {
+        const dateStr = row[0] ?? '';
+        const timeStr = row[1] ?? '';
+        // Combinar date y time para crear un DateTime ISO
+        let combinedDateTime = '';
+        try {
+          if (dateStr && timeStr) {
+            // Crear fecha combinada
+            const dateTimeString = `${dateStr} ${timeStr}`;
+            const dateTime = new Date(dateTimeString);
+            if (!isNaN(dateTime.getTime())) {
+              combinedDateTime = dateTime.toISOString();
+            }
+          }
+        } catch (error) {
+          console.error('Error combining date and time:', { dateStr, timeStr, error });
+        }
+        return {
+          DateTime: combinedDateTime,
+          Date: dateStr,
+          Time: timeStr,
+          dateOnly: formatDateOnly(combinedDateTime),
+          timeOnly: formatTimeOnly(combinedDateTime),
+          UserID: row[2] ?? '',
+          Name: row[3] ?? '',
+          Quantity: row[4] ?? '0',
+          PrevBalance: row[5] ?? '0',
+          NewBalance: row[6] ?? '0',
+          Method: row[7] ?? '',
+          "Observation(s)": row[8] ?? ''
+        };
+      });
+    console.log('Filas filtradas por userId:', history.length);
+    if (history.length > 0) {
+      console.log('Primeras 2 transacciones filtradas:', history.slice(0, 2));
+    }
     return new Response(JSON.stringify(history), {
       status: 200,
       headers: { 'Content-Type': 'application/json' }
