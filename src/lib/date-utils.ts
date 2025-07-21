@@ -105,5 +105,3 @@ export function toISOLocal(date: Date = new Date()): string {
   return localDate.toISOString().slice(0, 19);
 }
 
-// Export explícito para compatibilidad con SvelteKit/Vercel
-export { formatDateOnly, formatTimeOnly };
