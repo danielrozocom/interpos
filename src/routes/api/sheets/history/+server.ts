@@ -45,13 +45,13 @@ export const GET: RequestHandler = async ({ url }) => {
       .map(row => {
         const dateStr = row[0] ?? '';
         const timeStr = row[1] ?? '';
-        // Combinar date y time para crear un DateTime ISO
+        // Combina date y hora sin modificar la zona horaria
         let combinedDateTime = '';
         try {
           if (dateStr && timeStr) {
-            // Crear fecha combinada
-            const dateTimeString = `${dateStr} ${timeStr}`;
-            const dateTime = new Date(dateTimeString);
+            // Simplemente combina la fecha y hora como ISO
+            const dateTimeString = `${dateStr}T${timeStr}`;
+            let dateTime = new Date(dateTimeString);
             if (!isNaN(dateTime.getTime())) {
               combinedDateTime = dateTime.toISOString();
             }
@@ -63,8 +63,8 @@ export const GET: RequestHandler = async ({ url }) => {
           DateTime: combinedDateTime,
           Date: dateStr,
           Time: timeStr,
-          dateOnly: formatDateOnly(combinedDateTime),
-          timeOnly: formatTimeOnly(combinedDateTime),
+          dateOnly: dateStr,
+          timeOnly: timeStr,
           UserID: row[2] ?? '',
           Name: row[3] ?? '',
           Quantity: row[4] ?? '0',
@@ -73,7 +73,7 @@ export const GET: RequestHandler = async ({ url }) => {
           Method: row[7] ?? '',
           "Observation(s)": row[8] ?? ''
         };
-      });
+      })
     console.log('Filas filtradas por userId:', history.length);
     if (history.length > 0) {
       console.log('Primeras 2 transacciones filtradas:', history.slice(0, 2));

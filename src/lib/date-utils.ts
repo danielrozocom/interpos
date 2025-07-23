@@ -15,7 +15,7 @@ export function formatDate(dateString: string | Date, formatString: string = 'dd
     
     // Convert to GMT-5 timezone
     const gmt5Date = new Date(date.toLocaleString("en-US", {timeZone: "Etc/GMT+5"}));
-    return format(colombiaDate, formatString);
+    return format(gmt5Date, formatString);
   } catch (error) {
     console.error('Error formatting date:', error);
     return 'Fecha inválida';

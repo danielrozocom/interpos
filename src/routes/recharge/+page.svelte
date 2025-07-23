@@ -1,7 +1,7 @@
 <script lang="ts">
   import { onMount } from 'svelte';
   import { siteName } from '../../lib/config';
-  // MoneyA  async function fetchBalance() {per request
+  // Fetch balance per request
 
   let userId = '';
   let userName = '';
@@ -185,10 +185,25 @@ function formatCurrency(val: number): string {
   }
 
   // Observadores reactivos actualizados
-  $: if (userId) {
-    fetchBalance();
-    updateSuggestions();
+$: userSuggestions = userId
+  ? allUsers.filter(u => u.id.startsWith(userId))
+  : [];
+$: {
+  if (userId && allUsers.length > 0) {
+    const user = allUsers.find(u => u.id === userId);
+    userExists = !!user;
+    userName = user ? user.name ?? '' : '';
+    if (userExists) {
+      fetchBalance();
+    } else {
+      currentBalance = null;
+    }
+  } else {
+    userExists = false;
+    userName = '';
+    currentBalance = null;
   }
+}
 </script>
 
 <svelte:head>

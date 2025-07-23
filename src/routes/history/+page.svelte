@@ -9,8 +9,9 @@ let userName = '';
 let allUsers: Array<{id: string, name: string}> = [];
 let userSuggestions: Array<{id: string, name: string}> = [];
 let transactions: Array<any> = [];
-let loading = false;
+
 let error = '';
+let loading = false;
 let step = 1;
 let dateFrom = '';
 let dateTo = '';
@@ -18,38 +19,48 @@ let transactionType = 'all'; // 'all', 'positive', 'negative'
 let currentPage = 1;
 let itemsPerPage = 15; // Valor por defecto
 
-// Filtros computados - TEMPORALMENTE SIMPLIFICADO PARA DEBUG
+// Filtros computados con filtro de fechas funcional
 $: filteredTransactions = (() => {
-  console.log('=== APLICANDO FILTROS ===');
-  console.log('Transacciones disponibles:', transactions.length);
-  console.log('Tipo de filtro:', transactionType);
-  console.log('Fechas de filtro:', { dateFrom, dateTo });
-  
   if (transactions.length === 0) {
-    console.log('No hay transacciones para filtrar');
     return [];
   }
   
-  console.log('Muestra de transacciones antes de filtrar:');
-  transactions.slice(0, 3).forEach((t, i) => {
-    console.log(`Transacción ${i + 1}: Date="${t.Date}", Time="${t.Time}", Quantity="${t.Quantity}"`);
-  });
-  
-  // POR AHORA - SOLO FILTRO POR TIPO, SIN FILTRO DE FECHA
   const filtered = transactions.filter(t => {
     const quantity = cleanNumber(t.Quantity);
-    let typeMatch = true;
     
+    // Filtro por tipo de transacción
+    let typeMatch = true;
     if (transactionType === 'positive') typeMatch = quantity > 0;
     if (transactionType === 'negative') typeMatch = quantity < 0;
     
-    return typeMatch;
+    // Filtro por fechas
+    let dateMatch = true;
+    if (dateFrom || dateTo) {
+      // Convertir la fecha de la transacción a formato YYYY-MM-DD para comparar
+      const transactionDate = t.Date; // Asumiendo que viene en formato YYYY-MM-DD desde el servidor
+      
+      if (dateFrom && transactionDate < dateFrom) {
+        dateMatch = false;
+      }
+      if (dateTo && transactionDate > dateTo) {
+        dateMatch = false;
+      }
+    }
+    
+    return typeMatch && dateMatch;
   });
   
-  console.log('Resultado después de filtrar por tipo:', filtered.length);
-  console.log('Primeras 3 filtradas:', filtered.slice(0, 3).map(t => ({ Date: t.Date, Quantity: t.Quantity })));
+  // Ordenar de más reciente a más vieja
+  const sorted = filtered.sort((a, b) => {
+    // Combinar fecha y hora para comparación completa
+    const dateTimeA = new Date(`${a.Date}T${a.Time || '00:00:00'}`);
+    const dateTimeB = new Date(`${b.Date}T${b.Time || '00:00:00'}`);
+    
+    // Ordenar descendente (más reciente primero)
+    return dateTimeB.getTime() - dateTimeA.getTime();
+  });
   
-  return filtered;
+  return sorted;
 })();
 
 $: totalPages = Math.ceil(filteredTransactions.length / itemsPerPage);
@@ -78,12 +89,66 @@ $: paginatedTransactions = (() => {
 
 // Función para validar que solo se ingresen números en el ID
 function validateNumericInput(event: KeyboardEvent) {
-  const allowedKeys = ['Backspace', 'Delete', 'Tab', 'Enter', 'ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown'];
+  const allowedKeys = ['Backspace', 'Delete', 'Tab', 'Escape', 'Enter', 'ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown'];
   if (allowedKeys.includes(event.key)) {
-    return; // Permitir teclas de navegación
+    return;
   }
-  if (!/^[0-9]$/.test(event.key)) {
-    event.preventDefault(); // Bloquear cualquier carácter que no sea número
+  if (!/[0-9]/.test(event.key)) {
+    event.preventDefault();
+  }
+}
+
+// Función para buscar usuarios y mostrar sugerencias
+async function searchUsers(searchTerm: string) {
+  // Limpiar sugerencias si no hay texto o es muy corto
+  if (!searchTerm || searchTerm.trim().length < 1) {
+    userSuggestions = [];
+    return;
+  }
+  
+  const cleanTerm = searchTerm.trim();
+  
+  // Solo buscar si hay al menos 1 carácter
+  if (cleanTerm.length < 1) {
+    userSuggestions = [];
+    return;
+  }
+  
+  try {
+    const response = await fetch(`/api/sheets/users?search=${encodeURIComponent(cleanTerm)}`);
+    if (response.ok) {
+      const data = await response.json();
+      let users = [];
+      
+      if (Array.isArray(data.users)) {
+        users = data.users;
+      } else if (Array.isArray(data)) {
+        users = data;
+      }
+      
+      // Solo mostrar sugerencias si hay usuarios válidos
+      if (!users || users.length === 0) {
+        userSuggestions = [];
+        return;
+      }
+      
+      // Priorizar coincidencias exactas por ID, luego por nombre, luego parciales
+      const exactId = users.filter((u: any) => u.id && u.id.toString() === cleanTerm);
+      const exactName = users.filter((u: any) => u.name && u.name.toLowerCase() === cleanTerm.toLowerCase() && !exactId.includes(u));
+      const startWithId = users.filter((u: any) => u.id && u.id.toString().startsWith(cleanTerm) && !exactId.includes(u));
+      const startWithName = users.filter((u: any) => u.name && u.name.toLowerCase().startsWith(cleanTerm.toLowerCase()) && !exactName.includes(u) && !startWithId.includes(u));
+      const partialName = users.filter((u: any) => u.name && u.name.toLowerCase().includes(cleanTerm.toLowerCase()) && !exactId.includes(u) && !exactName.includes(u) && !startWithId.includes(u) && !startWithName.includes(u));
+      
+      const filteredSuggestions = [...exactId, ...exactName, ...startWithId, ...startWithName, ...partialName].slice(0, 5);
+      
+      // Solo asignar si hay coincidencias reales
+      userSuggestions = filteredSuggestions.length > 0 ? filteredSuggestions : [];
+    } else {
+      userSuggestions = [];
+    }
+  } catch (error) {
+    console.error('Error buscando usuarios:', error);
+    userSuggestions = [];
   }
 }
 
@@ -132,106 +197,54 @@ function parseCustomDate(dateTimeStr: string): Date {
     return new Date(0); // Fecha muy antigua si faltan datos
   }
 
-  try {
-    const date = new Date(dateTimeStr);
-    if (isNaN(date.getTime())) {
-      console.log('Invalid ISO date:', dateTimeStr);
-      return new Date(0);
-    }
-    console.log('Parsed ISO date:', { dateTimeStr, result: date });
-    return date;
-  } catch (error) {
-    console.error('Error parsing ISO date:', error, { dateTimeStr });
+  const date = new Date(dateTimeStr);
+  if (isNaN(date.getTime())) {
+    console.log('Invalid ISO date:', dateTimeStr);
     return new Date(0);
   }
+
+  console.log('Parsed ISO date:', { dateTimeStr, result: date });
+  return date;
 }
 
-async function fetchTransactions() {
-  loading = true;
-  error = '';
-  // No limpiar transactions aquí para evitar el flash
-  try {
-    const res = await fetch(`/api/sheets/history?userId=${userId}`);
-    if (!res.ok) throw new Error('No se pudo obtener el historial');
-    let data = await res.json();
-    
-    console.log('=== DATOS COMPLETOS DEL API ===');
-    console.log('Total de registros:', data.length);
-    console.log('Primer registro completo:', data[0]);
-    console.log('Campos disponibles:', data[0] ? Object.keys(data[0]) : 'No hay datos');
-    console.log('Primeros 5 registros:', data.slice(0, 5));
-    
-    // Verificar si data es un array
-    if (!Array.isArray(data)) {
-      console.error('Los datos no son un array:', data);
-      throw new Error('Formato de datos inválido');
-    }
-    
-    if (data.length === 0) {
-      console.log('No hay transacciones para el usuario:', userId);
-      transactions = [];
-      const user = allUsers.find(u => u.id === userId);
-      userName = user ? user.name : '';
-      step = 2;
-      loading = false;
-      return;
-    }
-    
-    // POR AHORA - ASIGNAR Y ORDENAR POR FECHA/HORA
-    transactions = data.sort((a: any, b: any) => {
-      try {
-        const dateA = parseCustomDate(a.DateTime);
-        const dateB = parseCustomDate(b.DateTime);
-        
-        // Verificar que las fechas son válidas antes de comparar
-        if (isNaN(dateA.getTime()) || isNaN(dateB.getTime())) {
-          console.warn('Fecha inválida detectada:', { 
-            a: { Date: a.Date, Time: a.Time }, 
-            b: { Date: b.Date, Time: b.Time },
-            dateA_valid: !isNaN(dateA.getTime()),
-            dateB_valid: !isNaN(dateB.getTime())
-          });
-          return 0; // No cambiar orden si alguna fecha es inválida
-        }
-        
-        // Ordenar de más reciente a más antigua (descendente)
-        return dateB.getTime() - dateA.getTime();
-      } catch (error) {
-        console.error('Error en comparación de fechas:', error);
-        return 0;
-      }
-    });
-    
-    console.log('=== TRANSACCIONES ASIGNADAS Y ORDENADAS ===');
-    console.log('Total:', transactions.length);
-    console.log('Primeras 3 transacciones con sus fechas exactas:');
-    transactions.slice(0, 3).forEach((t, i) => {
-      console.log(`Transacción ${i + 1}:`);
-      console.log('- Date:', t.Date);
-      console.log('- Time:', t.Time);
-      console.log('- Combined DateTime:', parseCustomDate(t.DateTime).toISOString());
-      console.log('- Tipo de Date:', typeof t.Date);
-      console.log('- Quantity:', t.Quantity);
-      console.log('- Todos los campos:', Object.keys(t));
-      console.log('---');
-    });
-    
-    const user = allUsers.find(u => u.id === userId);
-    userName = user ? user.name : '';
-    step = 2;
-  } catch (e) {
-    console.error('Error completo:', e);
-    error = 'Error al consultar el historial: ' + String(e);
-    // Solo limpiar transacciones si hay error
-    transactions = [];
-  }
-  loading = false;
-}
-
-$: userId, updateSuggestions();
+$: updateSuggestions();
 
 // Manual refresh function
+
+// Fetch transaction history for selected user
+async function fetchTransactions() {
+  if (!userId) {
+    error = 'Por favor ingrese un ID de usuario válido';
+    return;
+  }
+  loading = true;
+  error = '';
+  try {
+    const res = await fetch(`/api/sheets/history?userId=${encodeURIComponent(userId)}`);
+    if (!res.ok) {
+      const errData = await res.json().catch(() => ({}));
+      throw new Error(errData.error || 'Error al consultar el historial');
+    }
+    const data = await res.json();
+    transactions = data;
+    // Set userName from first transaction if available
+    userName = (data.length > 0 && data[0].Name) ? data[0].Name : '';
+    step = 2;
+  } catch (err) {
+    if (typeof err === 'object' && err !== null && 'message' in err && typeof (err as any).message === 'string') {
+      error = (err as any).message;
+    } else {
+      error = 'Error desconocido al consultar el historial';
+    }
+    transactions = [];
+    userName = '';
+  } finally {
+    loading = false;
+  }
+}
+
 async function refreshTransactions() {
+
   if (step === 2 && userId) {
     await fetchTransactions();
   }
@@ -264,15 +277,7 @@ async function refreshTransactions() {
     background-color: #2A4170 !important;
     box-shadow: 0 4px 16px #35528C33 !important;
   }
-  .btn-secondary {
-    background-color: #35528C !important;
-    color: white !important;
-    border: 1px solid #35528C !important;
-    box-shadow: none !important;
-    opacity: 0.7;
-    font-weight: 600;
-  }
-  .btn-primary:disabled, .btn-secondary:disabled, button:disabled {
+  .btn-primary:disabled, button:disabled {
     background-color: #c4c8cf !important;
     color: #fff !important;
     cursor: not-allowed !important;
@@ -304,18 +309,26 @@ async function refreshTransactions() {
               on:keydown={(e) => {
                 validateNumericInput(e);
                 if (e.key === 'Enter') {
-                  if (allUsers.some(u => u.id === userId)) {
+                  if (userSuggestions.length > 0 && userSuggestions.some(u => u.id === userId)) {
                     fetchTransactions();
                     e.preventDefault();
-                  } else {
-                    alert('No existe un usuario con ese ID');
+                  } else if (userId.trim()) {
+                    fetchTransactions();
                     e.preventDefault();
                   }
                 }
               }}
+              on:input={() => {
+                // Limpiar sugerencias inmediatamente si el campo está vacío
+                if (!userId || userId.trim().length === 0) {
+                  userSuggestions = [];
+                } else {
+                  searchUsers(userId);
+                }
+              }}
               on:paste={cleanPastedValue}
               placeholder="Ingrese ID del usuario"
-              autofocus
+              autocomplete="off"
             />
           </div>
 
@@ -411,35 +424,55 @@ async function refreshTransactions() {
         {:else}
           <div class="bg-white rounded-2xl shadow-lg border border-[#35528C]/10 overflow-hidden">
             <div class="p-6 border-b border-gray-100">
-              <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <!-- Filtro por fecha -->
-                <div>
-                  <label class="block text-sm font-medium text-gray-700 mb-1">Fecha desde:</label>
-                  <input 
-                    type="date" 
-                    bind:value={dateFrom}
-                    class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
-                  />
+              <div class="flex flex-col md:flex-row md:items-end gap-4">
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-4 flex-1">
+                  <!-- Filtro por fecha -->
+                  <div>
+                    <label for="dateFrom" class="block text-sm font-medium text-gray-700 mb-1">Fecha desde:</label>
+                    <input 
+                      id="dateFrom"
+                      type="date" 
+                      bind:value={dateFrom}
+                      class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-[#35528C] focus:ring-2 focus:ring-[#35528C]/20"
+                    />
+                  </div>
+                  <div>
+                    <label for="dateTo" class="block text-sm font-medium text-gray-700 mb-1">Fecha hasta:</label>
+                    <input 
+                      id="dateTo"
+                      type="date" 
+                      bind:value={dateTo}
+                      class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-[#35528C] focus:ring-2 focus:ring-[#35528C]/20"
+                    />
+                  </div>
+                  <!-- Filtro por tipo -->
+                  <div>
+                    <label for="transactionType" class="block text-sm font-medium text-gray-700 mb-1">Tipo de transacción:</label>
+                    <select 
+                      id="transactionType"
+                      bind:value={transactionType}
+                      class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-[#35528C] focus:ring-2 focus:ring-[#35528C]/20"
+                    >
+                      <option value="all">Todas</option>
+                      <option value="positive">Recargas</option>
+                      <option value="negative">Consumos</option>
+                    </select>
+                  </div>
                 </div>
-                <div>
-                  <label class="block text-sm font-medium text-gray-700 mb-1">Fecha hasta:</label>
-                  <input 
-                    type="date" 
-                    bind:value={dateTo}
-                    class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
-                  />
-                </div>
-                <!-- Filtro por tipo -->
-                <div>
-                  <label class="block text-sm font-medium text-gray-700 mb-1">Tipo de transacción:</label>
-                  <select 
-                    bind:value={transactionType}
-                    class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
+                <!-- Botón para limpiar filtros -->
+                <div class="flex gap-2">
+                  <button 
+                    type="button"
+                    on:click={() => {
+                      dateFrom = '';
+                      dateTo = '';
+                      transactionType = 'all';
+                      currentPage = 1;
+                    }}
+                    class="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors duration-200 text-sm font-medium"
                   >
-                    <option value="all">Todas</option>
-                    <option value="positive">Recargas</option>
-                    <option value="negative">Consumos</option>
-                  </select>
+                    Limpiar Filtros
+                  </button>
                 </div>
               </div>
             </div>

@@ -44,8 +44,8 @@ export function formatDate(dateInput: string | Date): string {
     return date.toLocaleString('es-CO', colombiaOptions);
   } catch (error) {
     console.error('Error formatting date:', error, 'Original:', dateInput);
-    return new Date().toLocaleString('es-CO', {
-      timeZone: 'America/Bogota',
+        return new Date().toLocaleString('es-CO', {
+            timeZone: 'Etc/GMT+5',
       day: '2-digit',
       month: 'short',
       year: 'numeric',

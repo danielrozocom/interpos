@@ -79,32 +79,34 @@ let showAddedNotification = false;
     }
   }
 
-  // Search products by ID or name
+
+  // Search products by ID or name (single robust version)
   async function searchProducts() {
-    if (!searchTerm.trim()) {
-      searchResults = [];
-      return;
-    }
     try {
-      const response = await fetch(`/api/sheets/products?search=${encodeURIComponent(searchTerm)}`);
-      let data;
-      try {
-        data = await response.json();
-      } catch (jsonErr) {
-        throw new Error('La respuesta del servidor de productos no es válida (no es JSON).');
-      }
-      if (!response.ok) {
-        const errorMessage = data?.message || data?.error || 'Error al buscar productos';
-        throw new Error(errorMessage);
-      }
       let productsArr = [];
-      if (data.success && data.products && Array.isArray(data.products)) {
-        productsArr = data.products;
-      } else if (Array.isArray(data)) {
-        productsArr = data;
+      let data;
+      // Realizar fetch si searchTerm existe
+      if (searchTerm && searchTerm.trim()) {
+        const response = await fetch(`/api/sheets/products?search=${encodeURIComponent(searchTerm)}`);
+        try {
+          data = await response.json();
+        } catch (jsonErr) {
+          throw new Error('La respuesta del servidor de productos no es válida (no es JSON).');
+        }
+        if (!response.ok) {
+          const errorMessage = data?.message || data?.error || 'Error al buscar productos';
+          throw new Error(errorMessage);
+        }
+        if (data.success && data.products && Array.isArray(data.products)) {
+          productsArr = data.products;
+        } else if (Array.isArray(data)) {
+          productsArr = data;
+        }
+        // Filtrar productos válidos
+        searchResults = productsArr.filter(p => p?.id && p?.name && typeof p?.price === 'number');
+      } else {
+        searchResults = [];
       }
-      // Filtrar productos válidos
-      searchResults = productsArr.filter(p => p?.id && p?.name && typeof p?.price === 'number');
     } catch (err: any) {
       error = err.message || 'Error al buscar productos';
       console.error('Error searching products:', err);
@@ -112,8 +114,8 @@ let showAddedNotification = false;
     }
   }
 
-  // Watch for search term changes
-  $: if (searchTerm) {
+  // Watch for search term changes (single reactive statement)
+  $: if (searchTerm && searchTerm.trim()) {
     searchProducts();
   } else {
     searchResults = [];
@@ -121,7 +123,6 @@ let showAddedNotification = false;
 
   // Load categories and products
   async function loadProducts() {
-    error = '';
     try {
       const response = await fetch('/api/sheets/products');
       let data;
@@ -131,10 +132,10 @@ let showAddedNotification = false;
         throw new Error('La respuesta del servidor de productos no es válida (no es JSON).');
       }
       if (!response.ok) {
-        const errorMessage = data?.message || data?.error || 'Error al cargar los productos';
+        const errorMessage = data?.message || data?.error || 'Error al cargar productos';
         throw new Error(errorMessage);
       }
-
+      
       let productsArray = [];
       if (data.success && data.products && Array.isArray(data.products)) {
         productsArray = data.products;
@@ -159,6 +160,11 @@ let showAddedNotification = false;
       console.error('Error loading products:', err);
     }
   }
+
+  // Load products on mount
+  onMount(() => {
+    loadProducts();
+  });
 
   // Handle category selection
   function selectCategory(category: string) {
@@ -274,10 +280,10 @@ let showAddedNotification = false;
       }
       
       // Preparar datos de la transacción usando zona horaria de Colombia
-      const colombiaDate = new Date().toLocaleString("en-CA", {timeZone: "America/Bogota"}).split(' ')[0]; // YYYY-MM-DD
+      const gmt5Date = new Date().toLocaleString("en-CA", {timeZone: "Etc/GMT+5"}).split(' ')[0]; // YYYY-MM-DD
       
       const transactionData = {
-        date: colombiaDate,
+        date: gmt5Date,
         orderID: orderID,
         userID: userId,
         userName: userName,
@@ -494,13 +500,21 @@ let showAddedNotification = false;
               }}
             >
               <div class="text-xs sm:text-sm text-primary mb-1 sm:mb-2 font-medium">ID: {product.id}</div>
-              <div class="overflow-hidden w-full">
-                <span class="font-semibold text-sm sm:text-lg mb-1 sm:mb-2 block truncate product-name-hover" style="color:#35528C;">
-                  <span class="marquee-on-hover" style="display:block; width:calc(100% - 8px); margin:0 4px;">{product.name}</span>
-                </span>
+              <div class="w-full relative group">
+                <div 
+                  class="font-semibold text-sm sm:text-lg mb-1 sm:mb-2 block truncate product-name-hover" 
+                  style="color:#35528C;"
+                  title="{product.name}"
+                >
+                  {product.name}
+                </div>
+                <!-- Tooltip que aparece en hover -->
+                <div class="absolute bottom-full left-1/2 transform -translate-x-1/2 bg-black bg-opacity-90 text-white text-xs px-2 py-1 rounded whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none z-50 mb-1">
+                  {product.name}
+                </div>
               </div>
-              <p class="text-base sm:text-xl font-bold truncate product-price-hover" style="color:#35528C">
-                <span class="marquee-on-hover" style="display:block; width:calc(100% - 8px); margin:0 4px;">${product.price.toLocaleString('es-CO')}</span>
+              <p class="text-base sm:text-xl font-bold" style="color:#35528C">
+                ${product.price.toLocaleString('es-CO')}
               </p>
               <div class="absolute inset-0 bg-white bg-opacity-0 group-hover:bg-opacity-10 transition-all duration-200 rounded-lg">
                 <!-- Removed quick add indicator -->
@@ -985,23 +999,6 @@ let showAddedNotification = false;
     text-overflow: ellipsis;
     white-space: nowrap;
   }
-  .product-name-hover:hover .marquee-on-hover,
-  .product-price-hover:hover .marquee-on-hover {
-    display: block;
-    min-width: 100%;
-    white-space: nowrap;
-    animation: marquee-hover 5s linear infinite;
-    background: none;
-    position: static;
-    overflow: visible;
-    text-overflow: unset;
-    width: calc(100% - 8px);
-    margin: 0 4px;
-  }
-  @keyframes marquee-hover {
-    0% { transform: translateX(0); }
-    100% { transform: translateX(-100%); }
-  }
 
   /* Animación suave para cambios de texto */
   .transition-all {
@@ -1019,6 +1016,21 @@ let showAddedNotification = false;
   }
   .border-primary {
     border-color: #35528C;
+  }
+
+  /* Simple hover tooltip for product names */
+  .product-name-hover {
+    position: relative;
+  }
+
+  /* Mobile: show full text without truncation */
+  @media (max-width: 768px) {
+    .product-name-hover {
+      white-space: normal !important;
+      overflow: visible !important;
+      text-overflow: unset !important;
+      line-height: 1.3;
+    }
   }
 </style>
 

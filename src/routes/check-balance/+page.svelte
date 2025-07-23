@@ -1,7 +1,3 @@
-<svelte:head>
-  <title>Consulta tu Saldo | InterPOS</title>
-  <meta name="description" content="Consulta el saldo y los últimos movimientos de tu cuenta en InterPOS ingresando tu ID de usuario." />
-</svelte:head>
 <script lang="ts">
   import { onMount } from 'svelte';
   // Solo mantenemos formatDate para casos especiales, los campos dateOnly y timeOnly vienen del servidor
@@ -15,32 +11,28 @@
   let loading = false;
   let name = '';
 
-  $: if (!userId) name = '';
 
+  $: if (userId === '') name = '';
+
+  // Convierte string o número a número limpio
+  function cleanNumber(str: string | number): number {
+    if (typeof str === 'number') return str;
+    if (!str) return 0;
+    return Number(String(str).replace(/[^\d.-]/g, ''));
+  }
+
+  // Formatea número como moneda
+  function formatCurrency(val: number): string {
+    return `$${isNaN(val) ? 0 : Math.round(val).toLocaleString('es-MX')}`;
+  }
+
+  // Maneja Enter en input para consultar saldo
   function handleKeydown(event: KeyboardEvent) {
     if (event.key === 'Enter' && userId && !loading) {
       checkBalance();
     }
   }
 
-  function cleanNumber(str: string | number): number {
-    if (typeof str === 'number') return str;
-    if (!str) return 0;
-    // Elimina $ y comas, conserva el signo
-    return Number(String(str).replace(/[^\d.-]/g, ''));
-  }
-
-  function formatCurrency(val: number): string {
-    return `$${isNaN(val) ? 0 : Math.round(val).toLocaleString('es-MX')}`;
-  }
-
-  // Función para parsear fecha ISO 8601 correctamente
-  function parseISODate(dateTimeStr: string): Date {
-  // Eliminar función parseISODate ya que no se utiliza
-  }
-
-  // Eliminar búsqueda en cada input para evitar sobrecarga
-  // El nombre se obtiene al consultar saldo
 
   async function checkBalance() {
     if (!userId) {
@@ -56,8 +48,11 @@
       const balanceResponse = await fetch(`/api/sheets/users?userId=${encodeURIComponent(userId)}`);
       if (!balanceResponse.ok) throw new Error('Error al obtener el saldo');
       const balanceData = await balanceResponse.json();
+      console.log('Balance data received:', balanceData);
+      console.log('Raw balance value:', balanceData.balance, 'Type:', typeof balanceData.balance);
       balance = balanceData.balance;
       name = balanceData.name || '';
+      console.log('Processed balance:', balance, 'Name:', name);
 
       // Obtener el historial
       const historyResponse = await fetch(`/api/sheets/history?userId=${encodeURIComponent(userId)}`);
@@ -69,34 +64,29 @@
         name = allTransactions[0].Name || '';
       }
 
-      // Procesar las transacciones
-      transactions = allTransactions.map((t: any) => {
-        // Usar el DateTime en formato ISO 8601
-        const dateTime = t.DateTime || '';
-        const parsedDate = parseISODate(dateTime);
-        
-        return {
-          timestamp: dateTime,
-          dateTime: dateTime,         // DateTime completo en ISO 8601
-          dateOnly: t.dateOnly || '', // Fecha ya formateada desde el servidor
-          timeOnly: t.timeOnly || '', // Hora ya formateada desde el servidor
-          amount: cleanNumber(t.Quantity),
-          method: t.Method,
-          notes: t['Observation(s)'],
-          orderID: t.orderID,         // Agregar orderID para el enlace del voucher
-          parsedDate: parsedDate      // Fecha parseada para ordenamiento
-        };
-      })
-      .sort((a: any, b: any) => {
-        // Ordenar por fecha parseada (más reciente primero)
-        return b.parsedDate.getTime() - a.parsedDate.getTime();
-      })
-      .slice(0, 10); // Obtener solo las últimas 10
+      // Procesar y ordenar las transacciones (más reciente primero)
+      transactions = allTransactions
+        .map((t: any) => {
+          return {
+            dateOnly: t.dateOnly || '',
+            timeOnly: t.timeOnly || '',
+            amount: cleanNumber(t.Quantity),
+            method: t.Method,
+            notes: t['Observation(s)'],
+            orderID: t.orderID
+          };
+        })
+        .sort((a: any, b: any) => {
+          // Combina fecha y hora para comparar
+          const aDate = new Date(`${a.dateOnly}T${a.timeOnly}`);
+          const bDate = new Date(`${b.dateOnly}T${b.timeOnly}`);
+          return bDate.getTime() - aDate.getTime();
+        })
+        .slice(0, 10); // Obtener solo las últimas 10
 
       console.log('Processed transactions:', transactions.map(t => ({
         dateOnly: t.dateOnly,
         timeOnly: t.timeOnly,
-        parsedDate: t.parsedDate,
         amount: t.amount
       })));
     } catch (err) {
@@ -111,10 +101,16 @@
   }
 </script>
 
+<svelte:head>
+  <title>Consulta tu Saldo | InterPOS</title>
+  <meta name="description" content="Consulta el saldo y los últimos movimientos de tu cuenta en InterPOS ingresando tu ID de usuario." />
+</svelte:head>
+
 <div class="min-h-screen bg-gray-50 p-4">
   <div class="max-w-4xl mx-auto">
     <div class="text-center mb-8">
-      <h1 class="text-4xl font-bold text-[#35528C] mb-3 font-sans s-xNGq_AHMpqrL">Consulta tu Saldo</h1>
+      <h1 class="text-4xl font-bold text-[#35528C] mb-3 mt-3 font-sans">Consulta tu Saldo</h1>
+
       <p class="text-lg text-[#35528C]/80 font-sans max-w-2xl mx-auto">Ingresa tu ID para ver tu saldo actual y el historial de movimientos de tu cuenta</p>
     </div>
 
@@ -132,7 +128,7 @@
             on:keydown={handleKeydown}
             class="flex-1 h-12 rounded-xl border-2 border-gray-200 shadow-sm focus:border-[#35528C] focus:ring-2 focus:ring-[#35528C]/20 text-lg px-4"
             placeholder="Ingresa tu ID"
-            autofocus
+
           />
           <button
             type="button"
@@ -161,7 +157,7 @@
         <div class="bg-red-50 border-l-4 border-red-400 p-4 rounded-r-xl">
           <div class="flex items-center">
             <svg class="h-5 w-5 text-red-400 mr-3" viewBox="0 0 20 20" fill="currentColor">
-              <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd"/>
+                <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clip-rule="evenodd"/>
             </svg>
             <p class="text-red-700 font-medium">{error}</p>
           </div>
@@ -180,7 +176,7 @@
             <p class="text-5xl font-bold mb-2">{formatCurrency(balance)}</p>
             <div class="inline-flex items-center gap-2 bg-white/10 px-3 py-1 rounded-full">
               <svg class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
-                <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-12a1 1 0 10-2 0v4a1 1 0 00.293.707l2.828 2.829a1 1 0 101.415-1.415L11 9.586V6z" clipRule="evenodd"/>
+                <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-12a1 1 0 10-2 0v4a1 1 0 00.293.707l2.828 2.829a1 1 0 101.415-1.415L11 9.586V6z" clip-rule="evenodd"/>
               </svg>
               <span class="text-sm opacity-90">Actualizado al último movimiento</span>
             </div>

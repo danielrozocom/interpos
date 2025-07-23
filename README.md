@@ -70,4 +70,4 @@ Para producción, despliega en Vercel o en tu VPS usando el adapter correspondie
 
 ---
 
-*Tutorial y configuración básica generados por ChatGPT.*
+*Tutorial y configuración básica generados por ChatGPT.*|
