@@ -26,11 +26,31 @@
     return `$${isNaN(val) ? 0 : Math.round(val).toLocaleString('es-MX')}`;
   }
 
+  // Validación para solo permitir números
+  function validateNumericInput(event: KeyboardEvent) {
+    const allowedKeys = ['Backspace', 'Delete', 'Tab', 'Escape', 'Enter', 'ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown'];
+    if (allowedKeys.includes(event.key)) {
+      return;
+    }
+    if (!/[0-9]/.test(event.key)) {
+      event.preventDefault();
+    }
+  }
+
   // Maneja Enter en input para consultar saldo
   function handleKeydown(event: KeyboardEvent) {
+    validateNumericInput(event);
     if (event.key === 'Enter' && userId && !loading) {
       checkBalance();
     }
+  }
+
+  // Limpia caracteres no numéricos al pegar
+  function cleanPastedValue(event: ClipboardEvent) {
+    event.preventDefault();
+    const paste = (event.clipboardData || (window as any).clipboardData).getData('text');
+    const numericValue = paste.replace(/[^0-9]/g, '');
+    userId = numericValue;
   }
 
 
@@ -42,6 +62,10 @@
 
     loading = true;
     error = '';
+    // Limpiar datos anteriores al iniciar nueva consulta
+    balance = null;
+    transactions = [];
+    name = '';
 
     try {
       // Obtener el saldo del usuario primero
@@ -94,7 +118,7 @@
       error = 'No existe un usuario con ese ID';
       balance = null;
       transactions = [];
-      name = '';
+      // No limpiar el nombre para mantenerlo visible al editar ID
     } finally {
       loading = false;
     }
@@ -122,13 +146,16 @@
         </label>
         <div class="flex flex-col sm:flex-row gap-4">
           <input
-            type="text"
+            type="tel"
             id="userId"
             bind:value={userId}
             on:keydown={handleKeydown}
+            on:paste={cleanPastedValue}
             class="flex-1 h-12 rounded-xl border-2 border-gray-200 shadow-sm focus:border-[#35528C] focus:ring-2 focus:ring-[#35528C]/20 text-lg px-4"
             placeholder="Ingresa tu ID"
-
+            inputmode="numeric"
+            pattern="[0-9]*"
+            autocomplete="off"
           />
           <button
             type="button"
