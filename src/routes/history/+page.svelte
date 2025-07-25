@@ -101,15 +101,15 @@ function validateNumericInput(event: KeyboardEvent) {
 // Función para buscar usuarios y mostrar sugerencias
 async function searchUsers(searchTerm: string) {
   // Limpiar sugerencias si no hay texto o es muy corto
-  if (!searchTerm || searchTerm.trim().length < 1) {
+  if (!searchTerm || searchTerm.trim().length < 2) {
     userSuggestions = [];
     return;
   }
   
   const cleanTerm = searchTerm.trim();
   
-  // Solo buscar si hay al menos 1 carácter
-  if (cleanTerm.length < 1) {
+  // Solo buscar si hay al menos 2 caracteres
+  if (cleanTerm.length < 2) {
     userSuggestions = [];
     return;
   }
@@ -305,7 +305,8 @@ async function refreshTransactions() {
               type="tel"
               bind:value={userId}
               required
-              class="flex-1 h-12 rounded-xl border-2 border-gray-200 shadow-sm focus:border-[#35528C] focus:ring-2 focus:ring-[#35528C]/20 text-lg px-4 font-sans"
+              autofocus
+              class="flex-1 h-12 rounded-xl border-2 border-[#35528C] shadow-sm focus:border-[#35528C] focus:ring-2 focus:ring-[#35528C]/20 text-lg px-4 font-sans"
               on:keydown={(e) => {
                 validateNumericInput(e);
                 if (e.key === 'Enter') {
@@ -322,8 +323,11 @@ async function refreshTransactions() {
                 // Limpiar sugerencias inmediatamente si el campo está vacío
                 if (!userId || userId.trim().length === 0) {
                   userSuggestions = [];
-                } else {
+                } else if (userId.trim().length >= 2) {
+                  // Solo mostrar sugerencias si hay al menos 2 caracteres
                   searchUsers(userId);
+                } else {
+                  userSuggestions = [];
                 }
               }}
               on:paste={cleanPastedValue}
@@ -398,6 +402,7 @@ async function refreshTransactions() {
                 transactions = []; 
                 error = '';
                 currentPage = 1;
+                userSuggestions = []; // Limpiar sugerencias de usuarios
               }} 
               class="btn-primary px-4 py-2 rounded-xl text-white font-medium hover:bg-[#2A4170] transition-opacity"
             >
@@ -476,11 +481,45 @@ async function refreshTransactions() {
                 </div>
               </div>
             </div>
-            <div class="overflow-x-auto">
-              <table class="w-full">
-                <thead class="bg-[#35528C]/5">
-                  <tr>
-                    <th class="px-6 py-4 text-left text-xs font-bold uppercase tracking-wider text-[#35528C]">Fecha</th>
+            {#if filteredTransactions.length === 0}
+              <!-- Mensaje cuando no hay datos después del filtrado -->
+              <div class="text-center py-12">
+                <div class="mb-4">
+                  <svg class="mx-auto h-16 w-16 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                  </svg>
+                </div>
+                <h3 class="text-lg font-medium text-gray-900 mb-2">No se encontraron transacciones</h3>
+                <p class="text-gray-500 mb-4">
+                  {#if dateFrom || dateTo || transactionType !== 'all'}
+                    No hay transacciones que coincidan con los filtros aplicados.
+                  {:else}
+                    Este usuario no tiene transacciones registradas.
+                  {/if}
+                </p>
+                {#if dateFrom || dateTo || transactionType !== 'all'}
+                  <button 
+                    on:click={() => {
+                      dateFrom = '';
+                      dateTo = '';
+                      transactionType = 'all';
+                      currentPage = 1;
+                    }}
+                    class="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-[#35528C] bg-[#35528C]/10 hover:bg-[#35528C]/20 transition-colors duration-200"
+                  >
+                    <svg class="-ml-1 mr-2 h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                    </svg>
+                    Limpiar filtros
+                  </button>
+                {/if}
+              </div>
+            {:else}
+              <div class="overflow-x-auto">
+                <table class="w-full">
+                  <thead class="bg-[#35528C]/5">
+                    <tr>
+                      <th class="px-6 py-4 text-left text-xs font-bold uppercase tracking-wider text-[#35528C]">Fecha</th>
                     <th class="px-6 py-4 text-left text-xs font-bold uppercase tracking-wider text-[#35528C]">Hora</th>
                     <th class="px-6 py-4 text-left text-xs font-bold uppercase tracking-wider text-[#35528C]">Cantidad</th>
                     <th class="px-6 py-4 text-left text-xs font-bold uppercase tracking-wider text-[#35528C]">Saldo Anterior</th>
@@ -530,27 +569,28 @@ async function refreshTransactions() {
                   {/each}
                 </tbody>
               </table>
-            </div>
-
-            <!-- Nueva sección: Información y selección de ítems por página -->
-            <div class="flex flex-col md:flex-row justify-between items-center p-6 border-t border-gray-100">
-              <p class="text-sm text-gray-700 mb-2 md:mb-0">
-                Mostrando {paginatedTransactions.length} de {filteredTransactions.length} transacciones
-              </p>
-              <div class="flex items-center gap-2">
-                <label for="itemsPerPage" class="text-sm text-gray-700">Transacciones por página:</label>
-                <select 
-                  id="itemsPerPage" 
-                  bind:value={itemsPerPage} 
-                  class="rounded-lg border border-gray-300 px-3 py-2 text-sm"
-                >
-                  <option value="15">15</option>
-                  <option value="30">30</option>
-                  <option value="50">50</option>
-                  <option value="100">100</option>
-                </select>
               </div>
-            </div>
+
+              <!-- Nueva sección: Información y selección de ítems por página -->
+                <div class="flex flex-col md:flex-row justify-between items-center p-6 border-t border-gray-100">
+                  <p class="text-sm text-gray-700 mb-2 md:mb-0">
+                    Mostrando {paginatedTransactions.length} de {filteredTransactions.length} transacciones
+                  </p>
+                  <div class="flex items-center gap-2">
+                    <label for="itemsPerPage" class="text-sm text-gray-700">Transacciones por página:</label>
+                    <select 
+                      id="itemsPerPage" 
+                      bind:value={itemsPerPage} 
+                      class="rounded-lg border border-gray-300 px-3 py-2 text-sm"
+                    >
+                      <option value="15">15</option>
+                      <option value="30">30</option>
+                      <option value="50">50</option>
+                      <option value="100">100</option>
+                    </select>
+                  </div>
+                </div>
+            {/if}
           </div>
           <!-- Paginación única -->
           {#if totalPages > 1}

@@ -13,9 +13,9 @@ export function formatDate(dateString: string | Date, formatString: string = 'dd
       return 'Fecha inválida';
     }
     
-    // Convert to GMT-5 timezone
-    const gmt5Date = new Date(date.toLocaleString("en-US", {timeZone: "Etc/GMT+5"}));
-    return format(gmt5Date, formatString);
+    // Convert to Colombia timezone (GMT-5)
+    const colombiaDate = new Date(date.toLocaleString("en-US", {timeZone: "America/Bogota"}));
+    return format(colombiaDate, formatString);
   } catch (error) {
     console.error('Error formatting date:', error);
     return 'Fecha inválida';
@@ -34,9 +34,9 @@ export function formatDateOnly(dateString: string | Date): string {
       return '-';
     }
     
-    // Convert to GMT-5 timezone and format as date only
+    // Convert to Colombia timezone (GMT-5) and format as date only
     const options: Intl.DateTimeFormatOptions = {
-      timeZone: 'Etc/GMT+5',
+      timeZone: 'America/Bogota',
       day: '2-digit',
       month: '2-digit',
       year: 'numeric'
@@ -61,9 +61,9 @@ export function formatTimeOnly(dateString: string | Date): string {
       return '-';
     }
     
-    // Convert to GMT-5 timezone and format as time only
+    // Convert to Colombia timezone (GMT-5) and format as time only
     const options: Intl.DateTimeFormatOptions = {
-      timeZone: 'Etc/GMT+5',
+      timeZone: 'America/Bogota',
       hour: '2-digit',
       minute: '2-digit',
       second: '2-digit',
@@ -83,7 +83,7 @@ export function formatTimeOnly(dateString: string | Date): string {
  * @returns The current date as an ISO 8601 string.
  */
 export function getCurrentDateInTimezone(timezone: string = 'America/Bogota'): string {
-  return new Date().toLocaleString('sv-SE', { timeZone: 'Etc/GMT+5' });
+  return new Date().toLocaleString('sv-SE', { timeZone: 'America/Bogota' });
 }
 
 /**

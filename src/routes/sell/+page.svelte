@@ -29,6 +29,12 @@ let successMsg = '';
 let mobileView = 'products'; // 'products' or 'cart' for mobile view switching
 let showAddedNotification = false;
 
+// Payment method variables
+let paymentMethod = 'saldo'; // 'saldo' or 'efectivo'
+let cashReceived = 0;
+let cashChange = 0;
+let showCashModal = false;
+
   // Load user balance
   async function loadUserBalance(showErrors = false) {
     if (!userId) {
@@ -225,17 +231,28 @@ let showAddedNotification = false;
       return;
     }
 
-    // Validar ID de usuario
-    if (!userId?.trim()) {
+    // Validar ID de usuario (solo para pagos con saldo)
+    if (paymentMethod === 'saldo' && !userId?.trim()) {
       const userIdInput = document.getElementById('userId');
       userIdInput?.focus();
       userIdInput?.scrollIntoView({ behavior: 'smooth', block: 'center' });
       return;
     }
 
-    // Validar que el usuario existe y tiene nombre
+    // Validar si el usuario existe
+    if (!userId) {
+      alert('Por favor ingrese un ID de usuario válido');
+      return;
+    }
+
     if (!userName) {
-      error = 'Usuario no válido. Por favor verifica el ID del usuario';
+      alert('No se encontró el usuario con el ID proporcionado');
+      return;
+    }
+
+    // Validar saldo solo para pagos con saldo
+    if (paymentMethod === 'saldo' && userBalance < cartTotal) {
+      alert('El usuario no tiene saldo suficiente');
       return;
     }
 
@@ -252,17 +269,10 @@ let showAddedNotification = false;
       }
     }
 
-    // Si el saldo quedará negativo, mostrar advertencia
-    if (userBalance < cartTotal) {
-      if (!confirm(`ADVERTENCIA: El saldo quedará negativo.\n\nSaldo actual: $${userBalance.toLocaleString('es-CO')}\nTotal a pagar: $${cartTotal.toLocaleString('es-CO')}\nSaldo final: $${(userBalance - cartTotal).toLocaleString('es-CO')}\n\n¿El usuario acepta asumir esta deuda?`)) {
-        return;
-      }
-    }
-    
     loading = true;
     try {
-      // Calcular el nuevo saldo
-      const newBalance = userBalance - cartTotal;
+      // Calcular el nuevo saldo (solo para pagos con saldo)
+      const newBalance = paymentMethod === 'saldo' ? userBalance - cartTotal : userBalance;
       
       // Obtener el próximo OrderID numérico
       let orderID = '000000'; // Valor por defecto en caso de error
@@ -281,36 +291,44 @@ let showAddedNotification = false;
       
       // Preparar datos de la transacción usando zona horaria de Colombia
       const gmt5Date = new Date().toLocaleString("en-CA", {timeZone: "Etc/GMT+5"}).split(' ')[0]; // YYYY-MM-DD
-      
+      // Preparar datos de la transacción
       const transactionData = {
         date: gmt5Date,
         orderID: orderID,
-        userID: userId,
-        userName: userName,
-        quantity: cartTotal, // Valor total de la compra
+        userID: userId, // Siempre usamos el ID del cliente
+        userName: userName, // Siempre usamos el nombre del cliente
+        quantity: cartTotal,
         products: cart.map(item => `${item.name} (ID: ${item.id}) x${item.quantity} - $${(item.price * item.quantity).toLocaleString('es-CO')}`).join('; '),
-        total: cartTotal
+        paymentMethod: paymentMethod === 'saldo' ? 'Saldo' : 'Efectivo',
+        cashReceived: paymentMethod === 'efectivo' ? cashReceived : null,
+        cashChange: paymentMethod === 'efectivo' ? cashChange : null
       };
       
-      // Actualizar el saldo del usuario
-      const updateResponse = await fetch('/api/sheets/users/update', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-          userId,
-          newBalance: newBalance,
-          cartTotal: cartTotal,
-          orderID: orderID
-        })
-      });
-      
-      const updateData = await updateResponse.json();
-      console.log('Respuesta del servidor:', updateData);
-      
-      if (!updateResponse.ok) {
-        throw new Error(updateData.error || updateData.message || 'Error al procesar el pago');
+      // Actualizar el saldo del usuario (solo para pagos con saldo)
+      let updateResponse, updateData;
+      if (paymentMethod === 'saldo') {
+        updateResponse = await fetch('/api/sheets/users/update', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            userId,
+            newBalance: newBalance,
+            cartTotal: cartTotal,
+            orderID: orderID
+          })
+        });
+        
+        updateData = await updateResponse.json();
+        console.log('Respuesta del servidor:', updateData);
+        
+        if (!updateResponse.ok) {
+          throw new Error(updateData.error || updateData.message || 'Error al procesar el pago');
+        }
+      } else {
+        // Para pagos en efectivo, simular respuesta exitosa
+        updateData = { success: true };
       }
       
       if (updateData.success) {
@@ -359,6 +377,34 @@ let showAddedNotification = false;
     } finally {
       loading = false;
     }
+  }
+
+  // Handle cash payment modal
+  function openCashModal() {
+    if (paymentMethod === 'efectivo') {
+      cashReceived = 0;
+      cashChange = 0;
+      showCashModal = true;
+    } else {
+      handlePayment();
+    }
+  }
+
+  function processCashPayment() {
+    if (cashReceived < cartTotal) {
+      error = `Efectivo insuficiente. Se necesitan $${cartTotal.toLocaleString('es-CO')} y se recibieron $${cashReceived.toLocaleString('es-CO')}`;
+      return;
+    }
+    cashChange = cashReceived - cartTotal;
+    showCashModal = false;
+    handlePayment();
+  }
+
+  function closeCashModal() {
+    showCashModal = false;
+    cashReceived = 0;
+    cashChange = 0;
+    error = '';
   }
 
   // Load products on mount
@@ -894,9 +940,31 @@ let showAddedNotification = false;
             <span class="text-gray-600 text-base sm:text-lg">Total</span>
             <span class="text-xl sm:text-2xl font-bold text-primary">${cartTotal.toLocaleString('es-CO')}</span>
           </div>
+          
+          <!-- Payment Method Selection -->
+          <div class="mb-4">
+            <label class="block text-sm font-medium text-gray-700 mb-2">Método de Pago</label>
+            <div class="flex space-x-2">
+              <button
+                type="button"
+                on:click={() => paymentMethod = 'saldo'}
+                class="flex-1 py-2 px-3 rounded-lg border-2 transition-all duration-200 {paymentMethod === 'saldo' ? 'border-primary bg-primary text-white' : 'border-gray-300 bg-white text-gray-700 hover:border-primary'}"
+              >
+                💳 Saldo
+              </button>
+              <button
+                type="button"
+                on:click={() => paymentMethod = 'efectivo'}
+                class="flex-1 py-2 px-3 rounded-lg border-2 transition-all duration-200 {paymentMethod === 'efectivo' ? 'border-primary bg-primary text-white' : 'border-gray-300 bg-white text-gray-700 hover:border-primary'}"
+              >
+                💵 Efectivo
+              </button>
+            </div>
+          </div>
+          
           <div class="flex space-x-2">
             <button
-              on:click={handlePayment}
+              on:click={openCashModal}
               disabled={loading}
               class="flex-1 bg-primary text-white px-3 sm:px-4 py-2 sm:py-3 rounded-lg hover:bg-[#27406a] focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 disabled:opacity-50 text-base sm:text-lg font-medium"
             >
@@ -916,6 +984,73 @@ let showAddedNotification = false;
     </div>
   </div>
 </div>
+
+<!-- Cash Payment Modal -->
+{#if showCashModal}
+  <div class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+    <div class="bg-white rounded-lg shadow-xl max-w-md w-full p-6">
+      <h3 class="text-xl font-bold text-gray-900 mb-4">💵 Pago en Efectivo</h3>
+      
+      <div class="mb-4">
+        <p class="text-gray-600 mb-2">Total a pagar:</p>
+        <p class="text-2xl font-bold text-primary">${cartTotal.toLocaleString('es-CO')}</p>
+      </div>
+      
+      <div class="mb-4">
+        <label for="cashReceived" class="block text-sm font-medium text-gray-700 mb-2">
+          Efectivo recibido:
+        </label>
+        <input
+          id="cashReceived"
+          type="number"
+          bind:value={cashReceived}
+          min="0"
+          step="100"
+          class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent text-lg"
+          placeholder="0"
+        />
+      </div>
+      
+      {#if cashReceived > 0}
+        <div class="mb-4 p-3 bg-gray-50 rounded-lg">
+          <div class="flex justify-between items-center">
+            <span class="text-gray-600">Cambio:</span>
+            <span class="text-lg font-bold {cashReceived >= cartTotal ? 'text-green-600' : 'text-red-600'}">
+              ${Math.max(0, cashReceived - cartTotal).toLocaleString('es-CO')}
+            </span>
+          </div>
+          {#if cashReceived < cartTotal}
+            <p class="text-red-600 text-sm mt-1">
+              Faltan ${(cartTotal - cashReceived).toLocaleString('es-CO')}
+            </p>
+          {/if}
+        </div>
+      {/if}
+      
+      {#if error}
+        <div class="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg">
+          <p class="text-red-600 text-sm">{error}</p>
+        </div>
+      {/if}
+      
+      <div class="flex space-x-3">
+        <button
+          on:click={closeCashModal}
+          class="flex-1 px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2"
+        >
+          Cancelar
+        </button>
+        <button
+          on:click={processCashPayment}
+          disabled={cashReceived < cartTotal || loading}
+          class="flex-1 px-4 py-2 bg-primary text-white rounded-lg hover:bg-[#27406a] focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed"
+        >
+          {loading ? 'Procesando...' : 'Confirmar Pago'}
+        </button>
+      </div>
+    </div>
+  </div>
+{/if}
 
 {#if error && !error.includes('usuario')}
   <!-- Eliminada la alerta roja flotante -->

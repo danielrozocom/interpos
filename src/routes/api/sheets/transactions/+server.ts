@@ -21,48 +21,95 @@ const SPREADSHEET_ID = GOOGLE_SHEETS_ID;
 
 export const POST: RequestHandler = async ({ request }) => {
   try {
-    const { date, orderID, userID, userName, quantity, products } = await request.json();
+    const { date, orderID, userID, userName, quantity, products, paymentMethod, cashReceived, cashChange } = await request.json();
 
-    console.log('Received transaction data:', { date, orderID, userID, userName, quantity, products });
+    console.log('Received transaction data:', { date, orderID, userID, userName, quantity, products, paymentMethod, cashReceived, cashChange });
 
     // Validate required fields
-    if (!date || !orderID || !userID || !quantity || !products) {
+    if (!date || !orderID || !userID || !quantity || !products || !paymentMethod) {
       return json({ 
         success: false, 
-        error: 'Faltan campos requeridos: date, orderID, userID, quantity (valor de compra), products' 
+        error: 'Faltan campos requeridos: date, orderID, userID, quantity (valor de compra), products, paymentMethod' 
       }, { status: 400 });
     }
 
     // Crear fecha y hora actual en zona horaria de Colombia
     const now = new Date();
     
-    // Crear Date y Time separados en zona horaria de Colombia
-    const gmt5Date = new Date(now.toLocaleString("en-US", {timeZone: "Etc/GMT+5"}));
-    const dateStr = gmt5Date.toLocaleDateString('en-CA'); // YYYY-MM-DD format
-    const timeStr = gmt5Date.toLocaleTimeString('en-GB', { hour12: false }); // HH:MM:SS format
+    // Crear Date y Time separados en zona horaria de Colombia (GMT-5)
+    const colombiaDate = new Date(now.toLocaleString("en-US", {timeZone: "America/Bogota"}));
+    const dateStr = colombiaDate.toLocaleDateString('en-CA'); // YYYY-MM-DD format
+    const timeStr = colombiaDate.toLocaleTimeString('en-GB', { hour12: false }); // HH:MM:SS format
 
-    // Prepare the row data for Google Sheets
-    const values = [
+    // Prepare the row data for Google Sheets - Orders
+    const ordersValues = [
       [
         dateStr,         // Date en formato YYYY-MM-DD (columna A)
         timeStr,         // Time en formato HH:MM:SS (columna B)
         orderID,         // OrderID como número de 6 dígitos, sin apóstrofe (columna C)
         userID,          // UserID (columna D)
-        userName || '',  // UserName (columna E)
+        userName || '',  // Name (columna E)
         quantity,        // Quantity - valor total de la compra (columna F)
-        products         // Product(s) - formatted string (columna G)
+        paymentMethod,   // Method - Saldo o Efectivo (columna G)
+        products         // Product(s) - formatted string (columna H)
       ]
     ];
 
-    console.log('Values to insert:', values);
+    console.log('Values to insert (Orders):', ordersValues);
 
     // Add the transaction to the "Transactions - Orders" sheet
     const result = await sheets.spreadsheets.values.append({
       spreadsheetId: SPREADSHEET_ID,
-      range: 'Transactions - Orders!A:G', // Ahora son 7 columnas: Date, Time, OrderID, UserID, UserName, Quantity, Products
+      range: 'Transactions - Orders!A:H',
       valueInputOption: 'USER_ENTERED',
       requestBody: {
-        values,
+        values: ordersValues,
+      },
+    });
+
+    // Get current user balance for the transaction
+    let currentBalance = 0;
+    try {
+      const usersSheet = await sheets.spreadsheets.values.get({
+        spreadsheetId: SPREADSHEET_ID,
+        range: 'Users!A:Z',
+      });
+      
+      const users = usersSheet.data.values?.slice(1) || [];
+      const user = users.find(row => row[0] === userID);
+      
+      if (user) {
+        // Asumiendo que el saldo está en la columna 6 (índice 5) de la hoja Users
+        currentBalance = parseFloat(user[5] || '0');
+      }
+    } catch (error) {
+      console.error('Error getting user balance:', error);
+    }
+
+    // Prepare data for "Transactions - Balance" sheet with correct structure
+    const balanceValues = [
+      [
+        dateStr,                     // Date (columna A)
+        timeStr,                     // Time (columna B)
+        userID,                      // UserID (columna C)
+        userName || '',              // Name (columna D)
+        -Math.abs(quantity),         // Quantity - valor negativo de la compra (columna E)
+        currentBalance,              // PrevBalance (columna F) - Saldo actual
+        currentBalance,              // NewBalance (columna G) - Mismo saldo actual
+        paymentMethod,               // Method - Saldo o Efectivo (columna H)
+        `Compra #${orderID}`         // Observation(s) - Formato: Compra #000005 (columna I)
+      ]
+    ];
+
+    console.log('Values to insert (Balance):', balanceValues);
+
+    // Add to "Transactions - Balance" sheet
+    await sheets.spreadsheets.values.append({
+      spreadsheetId: SPREADSHEET_ID,
+      range: 'Transactions - Balance!A:I', // 9 columnas: Date, Time, UserID, Name, Quantity, PrevBalance, NewBalance, Method, Observation(s)
+      valueInputOption: 'USER_ENTERED',
+      requestBody: {
+        values: balanceValues,
       },
     });
 
@@ -106,7 +153,7 @@ export const GET: RequestHandler = async ({ url }) => {
     // Get all transactions from the sheet
     const result = await sheets.spreadsheets.values.get({
       spreadsheetId: SPREADSHEET_ID,
-      range: 'Transactions - Orders!A:G', // Ahora son 7 columnas: Date, Time, OrderID, UserID, UserName, Quantity, Products
+      range: 'Transactions - Orders!A:H', // 8 columnas: Date, Time, OrderID, UserID, Name, Quantity, Method, Product(s)
     });
 
     const rows = result.data.values || [];
@@ -156,10 +203,12 @@ export const GET: RequestHandler = async ({ url }) => {
       // Si es ISO 8601, conviértelo a Colombia para mostrar
       let colombiaDateObj;
       if (combinedDateTime && /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}/.test(combinedDateTime)) {
-        colombiaDateObj = new Date(new Date(combinedDateTime).toLocaleString("en-US", { timeZone: "Etc/GMT+5" }));
+        colombiaDateObj = new Date(new Date(combinedDateTime).toLocaleString("en-US", { timeZone: "America/Bogota" }));
       } else {
         colombiaDateObj = new Date(combinedDateTime);
       }
+      // Mapeo de columnas según el orden en Google Sheets:
+      // 0: Date, 1: Time, 2: OrderID, 3: UserID, 4: Name, 5: Quantity, 6: Method (Saldo/Efectivo), 7: Product(s)
       const transaction = {
         rowIndex: index + 2,
         date: colombiaDateObj.toISOString(), // SIEMPRE en hora Colombia (ISO)
@@ -169,7 +218,8 @@ export const GET: RequestHandler = async ({ url }) => {
         userID: row[3] || '',
         name: row[4] || '',
         quantity: amount,
-        products: row[6] || ''
+        paymentMethod: row[6] || 'Saldo', // Method (columna G)
+        products: row[7] || '' // Product(s) (columna H)
       };
       
       if (index < 3) {
