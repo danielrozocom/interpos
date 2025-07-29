@@ -299,6 +299,12 @@ let showCashModal = false;
         const fallbackId = (Date.now() % 1000000).toString().padStart(6, '0');
         orderID = fallbackId;
       }
+    } catch (error) {
+      console.error('Error al procesar el pago:', error);
+      error = 'Error al procesar el pago';
+      loading = false;
+      return;
+    }
       
       // Preparar datos de la transacción usando zona horaria de Colombia
       const gmt5Date = new Date().toLocaleString("en-CA", {timeZone: "Etc/GMT+5"}).split(' ')[0]; // YYYY-MM-DD
