@@ -14,26 +14,86 @@
 
   $: if (userId === '') name = '';
 
-  // Convierte string o número a número limpio
+  // Convierte string o número a número limpio, manejando correctamente los negativos
   function cleanNumber(str: string | number): number {
     if (typeof str === 'number') return str;
     if (!str) return 0;
-    return Number(String(str).replace(/[^\d.-]/g, ''));
+    
+    // Verificar si el número es negativo
+    const isNegative = String(str).startsWith('-');
+    // Limpiar todo excepto números y punto decimal
+    const cleaned = String(str).replace(/[^\d.]/g, '');
+    
+    // Convertir a número y aplicar el signo negativo si es necesario
+    const num = parseFloat(cleaned) || 0;
+    return isNegative ? -Math.abs(num) : num;
   }
 
   // Formatea número como moneda
   function formatCurrency(val: number): string {
-    return `$${isNaN(val) ? 0 : Math.round(val).toLocaleString('es-MX')}`;
+    if (isNaN(val)) return '$0';
+    const absVal = Math.abs(val);
+    const formatted = Math.round(absVal).toLocaleString('es-MX');
+    return val < 0 ? `-$${formatted}` : `$${formatted}`;
   }
 
-  // Validación para solo permitir números
+  // Validación para permitir números, signo negativo y manejar Enter
   function validateNumericInput(event: KeyboardEvent) {
+    const input = event.target as HTMLInputElement;
     const allowedKeys = ['Backspace', 'Delete', 'Tab', 'Escape', 'Enter', 'ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown'];
+    
+    // Permitir Enter para enviar el formulario
+    if (event.key === 'Enter') {
+      event.preventDefault();
+      checkBalance();
+      return;
+    }
+    
+    // Permitir atajos de teclado (Ctrl+C, Ctrl+V, etc.)
+    if (event.ctrlKey || event.metaKey) {
+      return; // Permitir comandos del sistema
+    }
+    
     if (allowedKeys.includes(event.key)) {
       return;
     }
-    if (!/[0-9]/.test(event.key)) {
+    
+    // Permitir dígitos, signo negativo solo al principio
+    const isMinusSign = event.key === '-' && input.selectionStart === 0;
+    if (!/^[0-9]$/.test(event.key) && !isMinusSign) {
       event.preventDefault();
+    }
+  }
+  
+  // Manejar el evento de pegado
+  function handlePaste(event: ClipboardEvent) {
+    event.preventDefault();
+    const pastedText = event.clipboardData?.getData('text/plain') || '';
+    
+    // Permitir solo números y signo negativo al principio
+    const hasMinus = pastedText.startsWith('-');
+    const numbersOnly = (hasMinus ? '-' : '') + pastedText.replace(/[^0-9]/g, '');
+    
+    if (numbersOnly) {
+      const input = event.target as HTMLInputElement;
+      const start = input.selectionStart || 0;
+      const end = input.selectionEnd || 0;
+      const currentValue = input.value;
+      
+      // Insertar el texto pegado en la posición del cursor
+      const newValue = currentValue.substring(0, start) + numbersOnly + currentValue.substring(end);
+      
+      // Actualizar el valor del input
+      input.value = newValue;
+      
+      // Actualizar la variable userId
+      userId = newValue;
+      
+      // Mover el cursor a la posición correcta
+      const newCursorPos = start + numbersOnly.length;
+      setTimeout(() => {
+        input.setSelectionRange(newCursorPos, newCursorPos);
+      }, 0);
     }
   }
 
@@ -149,8 +209,8 @@
             type="tel"
             id="userId"
             bind:value={userId}
-            on:keydown={handleKeydown}
-            on:paste={cleanPastedValue}
+            on:keydown={validateNumericInput}
+            on:paste={handlePaste}
             class="flex-1 h-12 rounded-xl border-2 border-gray-200 shadow-sm focus:border-[#35528C] focus:ring-2 focus:ring-[#35528C]/20 text-lg px-4"
             placeholder="Ingresa tu ID"
             inputmode="numeric"

@@ -86,6 +86,28 @@ export const POST: RequestHandler = async ({ request }) => {
       console.error('Error getting user balance:', error);
     }
 
+    // Calculate transaction amount and handle balance based on payment method
+    const isNegativeAmount = quantity < 0;
+    const isCashPayment = paymentMethod === 'Efectivo';
+    
+    // Initialize balances
+    let prevBalance = currentBalance;
+    let newBalance = currentBalance;
+    let transactionAmount = 0;
+    
+    // Handle different transaction types
+    if (isCashPayment && isNegativeAmount) {
+      // Caso 1: Pago en efectivo con cantidad negativa (consumo pagado por fuera)
+      // No se modifica el saldo virtual
+      transactionAmount = quantity; // Mantener el valor negativo
+      // prevBalance y newBalance permanecen iguales
+    } else {
+      // Caso 2: Cualquier otro caso (método distinto a efectivo o cantidad positiva)
+      transactionAmount = isNegativeAmount ? quantity : -Math.abs(quantity); // Negativo para consumos
+      prevBalance = currentBalance;
+      newBalance = currentBalance + transactionAmount; // Suma si es recarga, resta si es consumo
+    }
+    
     // Prepare data for "Transactions - Balance" sheet with correct structure
     const balanceValues = [
       [
@@ -93,9 +115,9 @@ export const POST: RequestHandler = async ({ request }) => {
         timeStr,                     // Time (columna B)
         userID,                      // UserID (columna C)
         userName || '',              // Name (columna D)
-        -Math.abs(quantity),         // Quantity - valor negativo de la compra (columna E)
-        currentBalance,              // PrevBalance (columna F) - Saldo actual
-        currentBalance,              // NewBalance (columna G) - Mismo saldo actual
+        transactionAmount,           // Quantity (always negative for purchases)
+        prevBalance,                 // PrevBalance (columna F) - Saldo anterior
+        newBalance,                  // NewBalance (columna G) - Nuevo saldo (solo cambia si es Saldo)
         paymentMethod,               // Method - Saldo o Efectivo (columna H)
         `Compra #${orderID}`         // Observation(s) - Formato: Compra #000005 (columna I)
       ]

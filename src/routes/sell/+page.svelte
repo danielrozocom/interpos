@@ -250,10 +250,21 @@ let showCashModal = false;
       return;
     }
 
-    // Validar saldo solo para pagos con saldo
-    if (paymentMethod === 'saldo' && userBalance < cartTotal) {
-      alert('El usuario no tiene saldo suficiente');
-      return;
+    // Validar saldo para pagos con saldo
+    if (paymentMethod === 'saldo') {
+      const newBalance = userBalance - cartTotal;
+      if (newBalance < 0) {
+        const confirmMessage = `⚠️ El usuario quedará con un saldo de $${newBalance.toLocaleString('es-CO')} ⚠️\n\n` +
+                             `💰 Saldo actual: $${userBalance.toLocaleString('es-CO')}\n` +
+                             `🛒 Total: $${cartTotal.toLocaleString('es-CO')}\n` +
+                             `📉 Nuevo saldo: $${newBalance.toLocaleString('es-CO')}\n\n` +
+                             `❓ ¿Acepta asumir la deuda?`;
+        
+        const proceed = window.confirm(confirmMessage);
+        if (!proceed) {
+          return;
+        }
+      }
     }
 
     // Verificar que todas las cantidades sean válidas y los productos tengan datos completos
@@ -304,55 +315,49 @@ let showCashModal = false;
         cashChange: paymentMethod === 'efectivo' ? cashChange : null
       };
       
-      // Actualizar el saldo del usuario (solo para pagos con saldo)
-      let updateResponse, updateData;
-      if (paymentMethod === 'saldo') {
-        updateResponse = await fetch('/api/sheets/users/update', {
+      // Registrar la transacción (esto actualizará el saldo si es pago con saldo)
+      try {
+        const transactionResponse = await fetch('/api/sheets/transactions', {
           method: 'POST',
           headers: {
-            'Content-Type': 'application/json'
+            'Content-Type': 'application/json',
           },
           body: JSON.stringify({
-            userId,
-            newBalance: newBalance,
-            cartTotal: cartTotal,
-            orderID: orderID
+            ...transactionData,
+            // Incluir el saldo actual para validación en el servidor
+            currentBalance: userBalance,
+            // Incluir el nuevo saldo calculado
+            newBalance: paymentMethod === 'saldo' ? newBalance : userBalance
           })
         });
+
+        const transactionResult = await transactionResponse.json();
+        console.log('Transacción registrada:', transactionResult);
         
-        updateData = await updateResponse.json();
-        console.log('Respuesta del servidor:', updateData);
-        
-        if (!updateResponse.ok) {
-          throw new Error(updateData.error || updateData.message || 'Error al procesar el pago');
+        if (!transactionResponse.ok) {
+          throw new Error(transactionResult.error || 'Error al registrar la transacción');
         }
-      } else {
-        // Para pagos en efectivo, simular respuesta exitosa
-        updateData = { success: true };
+
+        // Clear data for new transaction using tick to ensure reactive context
+        await tick();
+        clearCart();
+        userId = ''; // Clear userId for new transaction
+        userName = ''; // Clear userName as well
+        userBalance = 0; // Reset balance display
+        posType = '';
+        error = '';
+        successMsg = 'Venta exitosa';
+        
+        // Scroll to top of the page
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+        
+        setTimeout(() => { successMsg = ''; }, 2000);
+        
+      } catch (transactionError) {
+        console.error('Error al registrar transacción:', transactionError);
+        error = transactionError.message || 'Error al registrar la transacción';
+        loading = false;
       }
-      
-      if (updateData.success) {
-        // Registrar la transacción en la hoja "Transactions - Orders"
-        try {
-          const transactionResponse = await fetch('/api/sheets/transactions', {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json'
-            },
-            body: JSON.stringify(transactionData)
-          });
-          
-          const transactionResult = await transactionResponse.json();
-          console.log('Transacción registrada:', transactionResult);
-          
-          if (!transactionResponse.ok) {
-            console.error('Error al registrar transacción:', transactionResult);
-            // No detenemos el proceso si falla el registro de transacción
-          }
-        } catch (transactionError) {
-          console.error('Error al registrar transacción:', transactionError);
-          // No detenemos el proceso si falla el registro de transacción
-        }
         
         // Clear data for new transaction using tick to ensure reactive context
         await tick();
