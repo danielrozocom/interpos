@@ -299,12 +299,6 @@ let showCashModal = false;
         const fallbackId = (Date.now() % 1000000).toString().padStart(6, '0');
         orderID = fallbackId;
       }
-    } catch (error) {
-      console.error('Error al procesar el pago:', error);
-      error = 'Error al procesar el pago';
-      loading = false;
-      return;
-    }
       
       // Preparar datos de la transacción usando zona horaria de Colombia
       const gmt5Date = new Date().toLocaleString("en-CA", {timeZone: "Etc/GMT+5"}).split(' ')[0]; // YYYY-MM-DD
@@ -322,66 +316,42 @@ let showCashModal = false;
       };
       
       // Registrar la transacción (esto actualizará el saldo si es pago con saldo)
-      try {
-        const transactionResponse = await fetch('/api/sheets/transactions', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            ...transactionData,
-            // Incluir el saldo actual para validación en el servidor
-            currentBalance: userBalance,
-            // Incluir el nuevo saldo calculado
-            newBalance: paymentMethod === 'saldo' ? newBalance : userBalance
-          })
-        });
+      const transactionResponse = await fetch('/api/sheets/transactions', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          ...transactionData,
+          // Incluir el saldo actual para validación en el servidor
+          currentBalance: userBalance,
+          // Incluir el nuevo saldo calculado
+          newBalance: paymentMethod === 'saldo' ? newBalance : userBalance
+        })
+      });
 
-        const transactionResult = await transactionResponse.json();
-        console.log('Transacción registrada:', transactionResult);
-        
-        if (!transactionResponse.ok) {
-          throw new Error(transactionResult.error || 'Error al registrar la transacción');
-        }
+      const transactionResult = await transactionResponse.json();
+      console.log('Transacción registrada:', transactionResult);
+      
+      if (!transactionResponse.ok) {
+        throw new Error(transactionResult.error || 'Error al registrar la transacción');
+      }
 
-        // Clear data for new transaction using tick to ensure reactive context
-        await tick();
-        clearCart();
-        userId = ''; // Clear userId for new transaction
-        userName = ''; // Clear userName as well
-        userBalance = 0; // Reset balance display
-        posType = '';
-        error = '';
-        successMsg = 'Venta exitosa';
+      // Clear data for new transaction using tick to ensure reactive context
+      await tick();
+      clearCart();
+      userId = ''; // Clear userId for new transaction
+      userName = ''; // Clear userName as well
+      userBalance = 0; // Reset balance display
+      posType = '';
+      error = '';
+      successMsg = 'Venta exitosa';
+      
+      // Scroll to top of the page
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+      
+      setTimeout(() => { successMsg = ''; }, 2000);
         
-        // Scroll to top of the page
-        window.scrollTo({ top: 0, behavior: 'smooth' });
-        
-        setTimeout(() => { successMsg = ''; }, 2000);
-        
-      } catch (transactionError) {
-        console.error('Error al registrar transacción:', transactionError);
-        error = transactionError.message || 'Error al registrar la transacción';
-        loading = false;
-      }
-        
-        // Clear data for new transaction using tick to ensure reactive context
-        await tick();
-        clearCart();
-        userId = ''; // Clear userId for new transaction
-        userName = ''; // Clear userName as well
-        userBalance = 0; // Reset balance display
-        posType = '';
-        error = '';
-        successMsg = 'Venta exitosa';
-        
-        // Scroll to top of the page
-        window.scrollTo({ top: 0, behavior: 'smooth' });
-        
-        setTimeout(() => { successMsg = ''; }, 2000);
-      } else {
-        throw new Error(updateData.error || updateData.message || 'Error al procesar el pago');
-      }
     } catch (err: any) {
       error = err.message || 'Error al procesar el pago';
       console.error('Error processing payment:', err);
@@ -1179,9 +1149,3 @@ let showCashModal = false;
     }
   }
 </style>
-
-
-
-
-
-
