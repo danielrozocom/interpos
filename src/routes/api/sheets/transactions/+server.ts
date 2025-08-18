@@ -169,7 +169,10 @@ export const POST: RequestHandler = async ({ request }) => {
           valueInputOption: 'USER_ENTERED',
           requestBody: { values: [[newBalance]] }
         });
-        console.log('User balance updated successfully');
+        console.log('✅ User balance updated successfully in Users sheet');
+        console.log('   - Row:', sheetRow);
+        console.log('   - Range: Users!C' + sheetRow);
+        console.log('   - New value written:', newBalance);
       } else {
         console.error('User not found for balance update:', userID);
       }
