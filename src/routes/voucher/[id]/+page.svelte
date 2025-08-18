@@ -379,16 +379,19 @@ onMount(() => {
                   const [day, month, year] = transactionDetails.dateOnly.split('/');
                   const reformattedDateOnly = `${year}-${month}-${day}`;
 
-                  const originalDate = new Date(`${reformattedDateOnly}T${transactionDetails.timeOnly}`);
-                  console.log('Original Date:', originalDate.toISOString()); // Log original date
+                  const originalDate = new Date(`${reformattedDateOnly}T${transactionDetails.timeOnly}Z`); // Assume UTC
+                  console.log('Original Date (UTC):', originalDate.toISOString()); // Log original date
 
                   if (isNaN(originalDate.getTime())) {
                     console.warn('Invalid Date:', reformattedDateOnly, transactionDetails.timeOnly);
                     return transactionDetails.timeOnly;
                   }
 
-                  // Return the original time without timezone adjustment
-                  return originalDate.toLocaleTimeString('es-CO', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false });
+                  // Adjust to local timezone
+                  const localDate = new Date(originalDate.getTime() - originalDate.getTimezoneOffset() * 60000);
+                  console.log('Local Date:', localDate.toISOString()); // Log local date
+
+                  return localDate.toLocaleTimeString('es-CO', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false });
                 }
 
                 console.warn('Missing timeOnly or dateOnly:', transactionDetails);
