@@ -364,21 +364,38 @@ onMount(() => {
             (() => {
               try {
                 if (transactionDetails.timeOnly && transactionDetails.dateOnly) {
-                  const originalDate = new Date(`${transactionDetails.dateOnly}T${transactionDetails.timeOnly}`);
+                  console.log('DateOnly:', transactionDetails.dateOnly, 'TimeOnly:', transactionDetails.timeOnly); // Log inputs
+
+                  // Validate dateOnly and timeOnly
+                  const dateRegex = /^\d{2}\/\d{2}\/\d{4}$/; // DD/MM/YYYY format
+                  const timeRegex = /^\d{2}:\d{2}:\d{2}$/; // HH:MM:SS format
+
+                  if (!dateRegex.test(transactionDetails.dateOnly) || !timeRegex.test(transactionDetails.timeOnly)) {
+                    console.warn('Invalid dateOnly or timeOnly format:', transactionDetails);
+                    return transactionDetails.timeOnly || 'Hora no disponible';
+                  }
+
+                  // Reformat dateOnly to YYYY-MM-DD
+                  const [day, month, year] = transactionDetails.dateOnly.split('/');
+                  const reformattedDateOnly = `${year}-${month}-${day}`;
+
+                  const originalDate = new Date(`${reformattedDateOnly}T${transactionDetails.timeOnly}`);
                   console.log('Original Date:', originalDate.toISOString()); // Log original date
+
                   if (isNaN(originalDate.getTime())) {
-                    console.warn('Invalid Date:', transactionDetails.dateOnly, transactionDetails.timeOnly);
+                    console.warn('Invalid Date:', reformattedDateOnly, transactionDetails.timeOnly);
                     return transactionDetails.timeOnly;
                   }
-                  const adjustedDate = new Date(originalDate.getTime() - (5 * 60 * 60 * 1000));
-                  console.log('Adjusted Date:', adjustedDate.toISOString()); // Log adjusted date
-                  return adjustedDate.toLocaleTimeString('es-CO', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false });
+
+                  // Return the original time without timezone adjustment
+                  return originalDate.toLocaleTimeString('es-CO', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false });
                 }
+
                 console.warn('Missing timeOnly or dateOnly:', transactionDetails);
                 return transactionDetails.timeOnly || 'Hora no disponible';
               } catch (e) {
                 console.error('Error processing date and time:', e);
-                return transactionDetails.timeOnly || 'Hora no disponible';
+                return 'Error al procesar la hora';
               }
             })()
           }</span>
