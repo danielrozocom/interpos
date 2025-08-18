@@ -225,17 +225,28 @@ export const GET: RequestHandler = async ({ url }) => {
       // Si es ISO 8601, conviértelo a Colombia para mostrar
       let colombiaDateObj;
       if (combinedDateTime && /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}/.test(combinedDateTime)) {
-        colombiaDateObj = new Date(new Date(combinedDateTime).toLocaleString("en-US", { timeZone: "America/Bogota" }));
+        // Los datos ya están en hora de Colombia, no necesitamos doble conversión
+        colombiaDateObj = new Date(combinedDateTime);
       } else {
         colombiaDateObj = new Date(combinedDateTime);
       }
+      
+      // Para timeOnly y dateOnly, usar directamente los valores de las columnas de Google Sheets
+      // ya que están guardados en hora de Colombia
+      const directTimeOnly = row[1] || ''; // Time directo de la columna B
+      const directDateOnly = row[0] ? new Date(row[0]).toLocaleDateString('es-CO', {
+        day: '2-digit',
+        month: '2-digit', 
+        year: 'numeric'
+      }) : '';
+      
       // Mapeo de columnas según el orden en Google Sheets:
       // 0: Date, 1: Time, 2: OrderID, 3: UserID, 4: Name, 5: Quantity, 6: Method (Saldo/Efectivo), 7: Product(s)
       const transaction = {
         rowIndex: index + 2,
         date: colombiaDateObj.toISOString(), // SIEMPRE en hora Colombia (ISO)
-        dateOnly: formatDateOnly(colombiaDateObj),
-        timeOnly: formatTimeOnly(colombiaDateObj),
+        dateOnly: directDateOnly,
+        timeOnly: directTimeOnly,
         orderID: row[2] || '',
         userID: row[3] || '',
         name: row[4] || '',
