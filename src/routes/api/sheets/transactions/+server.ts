@@ -21,6 +21,10 @@ const SPREADSHEET_ID = GOOGLE_SHEETS_ID;
 
 export const POST: RequestHandler = async ({ request }) => {
   try {
+    console.log('=== TRANSACTION ENDPOINT CALLED ===');
+    console.log('Timestamp:', new Date().toISOString());
+    console.log('Stack trace:', new Error().stack);
+    
     const { date, orderID, userID, userName, quantity, products, paymentMethod, cashReceived, cashChange } = await request.json();
 
     console.log('Received transaction data:', { date, orderID, userID, userName, quantity, products, paymentMethod, cashReceived, cashChange });
@@ -124,6 +128,34 @@ export const POST: RequestHandler = async ({ request }) => {
     ];
 
     console.log('Values to insert (Balance):', balanceValues);
+
+    // Update user balance ONLY if payment method is 'Saldo'
+    if (paymentMethod === 'Saldo') {
+      console.log('Updating user balance from', prevBalance, 'to', newBalance);
+      
+      // Find the user row in Users sheet
+      const usersSheet = await sheets.spreadsheets.values.get({
+        spreadsheetId: SPREADSHEET_ID,
+        range: 'Users!A:Z',
+      });
+      
+      const users = usersSheet.data.values?.slice(1) || [];
+      const userRowIndex = users.findIndex(row => row[0] === userID);
+      
+      if (userRowIndex !== -1) {
+        // Update balance in Users sheet (column C, index 2)
+        const sheetRow = userRowIndex + 2; // +2 because we skipped header and array is 0-indexed
+        await sheets.spreadsheets.values.update({
+          spreadsheetId: SPREADSHEET_ID,
+          range: `Users!C${sheetRow}`,
+          valueInputOption: 'USER_ENTERED',
+          requestBody: { values: [[newBalance]] }
+        });
+        console.log('User balance updated successfully');
+      } else {
+        console.error('User not found for balance update:', userID);
+      }
+    }
 
     // Add to "Transactions - Balance" sheet
     await sheets.spreadsheets.values.append({
