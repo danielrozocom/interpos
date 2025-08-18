@@ -750,7 +750,7 @@ let showCashModal = false;
               <input
                 type="text"
                 bind:value={quickAddId}
-                placeholder="Buscar por ID o nombre..."
+                placeholder="Buscar producto | ID o Nombre"
                 class="w-full px-3 sm:px-4 py-2 text-sm sm:text-base rounded-lg border border-gray-300 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                 autofocus
                 on:input={() => {
