@@ -119,18 +119,24 @@ async function fetchTransactionDetails() {
   loading = true;
   error = '';
   try {
-    // Use the existing transactions API with orderID filter
+    console.log('Fetching transaction details for orderId:', orderId); // Log para verificar el ID de la orden
+
     const res = await fetch(`/api/sheets/transactions?orderID=${orderId}`);
+    console.log('Response status:', res.status); // Log para verificar el estado de la respuesta
+
     if (!res.ok) throw new Error('No se pudo obtener las transacciones');
+
     const response = await res.json();
-    
+    console.log('Response data:', response); // Log para verificar los datos recibidos
+
     if (response.success && response.transactions && response.transactions.length > 0) {
-      // Get the first matching transaction
       transactionDetails = response.transactions[0];
+      console.log('Transaction details:', transactionDetails); // Log para verificar los detalles de la transacción
     } else {
       throw new Error('Transacción no encontrada');
     }
   } catch (e) {
+    console.error('Error fetching transaction details:', e); // Log para errores
     error = 'Transacción no encontrada o error al consultar los detalles.';
     transactionDetails = null;
   }

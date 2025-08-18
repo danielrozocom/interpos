@@ -316,6 +316,14 @@ let showCashModal = false;
       };
       
       // Registrar la transacción (esto actualizará el saldo si es pago con saldo)
+      console.log('=== SENDING TRANSACTION DATA ===');
+      console.log('Transaction data to send:', {
+        ...transactionData,
+        currentBalance: userBalance,
+        newBalance: paymentMethod === 'saldo' ? newBalance : userBalance
+      });
+      console.log('===================================');
+      
       const transactionResponse = await fetch('/api/sheets/transactions', {
         method: 'POST',
         headers: {
@@ -494,12 +502,8 @@ let showCashModal = false;
       <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 2xl:grid-cols-7 gap-2 sm:gap-3 w-full" style="margin:0;">
         {#if (selectedCategory ? products[selectedCategory] : Object.values(products).flat()).length > 0}
           {#each (selectedCategory ? products[selectedCategory] : Object.values(products).flat()).sort((a, b) => {
-            const numA = parseInt(a.id);
-            const numB = parseInt(b.id);
-            if (!isNaN(numA) && !isNaN(numB)) {
-              return numA - numB;
-            }
-            return String(a.id).localeCompare(String(b.id));
+            // Ordenar alfabéticamente por nombre
+            return a.name.localeCompare(b.name, 'es', { sensitivity: 'base' });
           }) as product}
             <div
               class="bg-white rounded-lg shadow-sm hover:shadow-md transition-all duration-200 cursor-pointer p-2 sm:p-3 relative group border border-primary"

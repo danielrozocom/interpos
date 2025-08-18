@@ -25,9 +25,9 @@ export const POST: RequestHandler = async ({ request }) => {
     console.log('Timestamp:', new Date().toISOString());
     console.log('Stack trace:', new Error().stack);
     
-    const { date, orderID, userID, userName, quantity, products, paymentMethod, cashReceived, cashChange } = await request.json();
+    const { date, orderID, userID, userName, quantity, products, paymentMethod, cashReceived, cashChange, currentBalance, newBalance } = await request.json();
 
-    console.log('Received transaction data:', { date, orderID, userID, userName, quantity, products, paymentMethod, cashReceived, cashChange });
+    console.log('Received transaction data:', { date, orderID, userID, userName, quantity, products, paymentMethod, cashReceived, cashChange, currentBalance, newBalance });
 
     // Validate required fields
     if (!date || !orderID || !userID || !quantity || !products || !paymentMethod) {
@@ -72,7 +72,7 @@ export const POST: RequestHandler = async ({ request }) => {
     });
 
     // Get current user balance for the transaction
-    let currentBalance = 0;
+    let actualCurrentBalance = 0;
     try {
       const usersSheet = await sheets.spreadsheets.values.get({
         spreadsheetId: SPREADSHEET_ID,
@@ -84,8 +84,8 @@ export const POST: RequestHandler = async ({ request }) => {
       
       if (user) {
         // El saldo está en la columna C (índice 2) de la hoja Users
-        currentBalance = parseFloat(user[2] || '0');
-        console.log('Found user balance:', currentBalance, 'from column C (index 2)');
+        actualCurrentBalance = parseFloat(user[2] || '0');
+        console.log('Found user balance in sheet:', actualCurrentBalance, 'from column C (index 2)');
       } else {
         console.log('User not found in Users sheet');
       }
@@ -99,35 +99,48 @@ export const POST: RequestHandler = async ({ request }) => {
     
     console.log('=== BALANCE CALCULATION DEBUG ===');
     console.log('Received quantity:', quantity, 'Type:', typeof quantity);
-    console.log('Current balance:', currentBalance, 'Type:', typeof currentBalance);
+    console.log('Actual current balance (from sheet):', actualCurrentBalance, 'Type:', typeof actualCurrentBalance);
+    console.log('Frontend current balance:', currentBalance, 'Type:', typeof currentBalance);
+    console.log('Frontend new balance:', newBalance, 'Type:', typeof newBalance);
     console.log('Payment method:', paymentMethod);
     console.log('Is negative amount:', isNegativeAmount);
     console.log('Is cash payment:', isCashPayment);
     
-    // Initialize balances
-    let prevBalance = currentBalance;
-    let newBalance = currentBalance;
-    let transactionAmount = 0;
+    // Use values from frontend if payment method is Saldo, otherwise use current logic
+    let prevBalance, calculatedNewBalance, transactionAmount;
     
-    // Handle different transaction types
-    if (isCashPayment && isNegativeAmount) {
-      // Caso 1: Pago en efectivo con cantidad negativa (consumo pagado por fuera)
-      // No se modifica el saldo virtual
-      transactionAmount = quantity; // Mantener el valor negativo
-      // prevBalance y newBalance permanecen iguales
-      console.log('CASE 1: Cash payment with negative amount - No balance change');
-    } else {
-      // Caso 2: Cualquier otro caso (método distinto a efectivo o cantidad positiva)
-      transactionAmount = isNegativeAmount ? quantity : -Math.abs(quantity); // Negativo para consumos
+    if (paymentMethod === 'Saldo' && typeof currentBalance === 'number' && typeof newBalance === 'number') {
+      // Use values calculated in frontend
       prevBalance = currentBalance;
-      newBalance = currentBalance + transactionAmount; // Suma si es recarga, resta si es consumo
-      console.log('CASE 2: Balance will change');
+      calculatedNewBalance = newBalance;
+      transactionAmount = -Math.abs(quantity); // Always negative for purchases
+      console.log('USING FRONTEND VALUES');
+      console.log('Previous balance:', prevBalance);
+      console.log('New balance:', calculatedNewBalance);
+      console.log('Transaction amount:', transactionAmount);
+    } else {
+      // Fallback to current logic
+      console.log('USING BACKEND CALCULATION');
+      if (isCashPayment && isNegativeAmount) {
+        // Caso 1: Pago en efectivo con cantidad negativa (consumo pagado por fuera)
+        // No se modifica el saldo virtual
+        transactionAmount = quantity; // Mantener el valor negativo
+        prevBalance = actualCurrentBalance;
+        calculatedNewBalance = actualCurrentBalance;
+        console.log('CASE 1: Cash payment with negative amount - No balance change');
+      } else {
+        // Caso 2: Cualquier otro caso (método distinto a efectivo o cantidad positiva)
+        transactionAmount = isNegativeAmount ? quantity : -Math.abs(quantity); // Negativo para consumos
+        prevBalance = actualCurrentBalance;
+        calculatedNewBalance = actualCurrentBalance + transactionAmount; // Suma si es recarga, resta si es consumo
+        console.log('CASE 2: Balance will change');
+      }
     }
     
     console.log('FINAL CALCULATION:');
     console.log('Transaction amount:', transactionAmount);
     console.log('Previous balance:', prevBalance);
-    console.log('New balance:', newBalance);
+    console.log('New balance:', calculatedNewBalance);
     console.log('=====================================');
     
     // Prepare data for "Transactions - Balance" sheet with correct structure
@@ -139,7 +152,7 @@ export const POST: RequestHandler = async ({ request }) => {
         userName || '',              // Name (columna D)
         transactionAmount,           // Quantity (always negative for purchases)
         prevBalance,                 // PrevBalance (columna F) - Saldo anterior
-        newBalance,                  // NewBalance (columna G) - Nuevo saldo (solo cambia si es Saldo)
+        calculatedNewBalance,        // NewBalance (columna G) - Nuevo saldo (solo cambia si es Saldo)
         paymentMethod,               // Method - Saldo o Efectivo (columna H)
         `Compra #${orderID}`         // Observation(s) - Formato: Compra #000005 (columna I)
       ]
@@ -149,7 +162,7 @@ export const POST: RequestHandler = async ({ request }) => {
 
     // Update user balance ONLY if payment method is 'Saldo'
     if (paymentMethod === 'Saldo') {
-      console.log('Updating user balance from', prevBalance, 'to', newBalance);
+      console.log('Updating user balance from', prevBalance, 'to', calculatedNewBalance);
       
       // Find the user row in Users sheet
       const usersSheet = await sheets.spreadsheets.values.get({
@@ -167,12 +180,12 @@ export const POST: RequestHandler = async ({ request }) => {
           spreadsheetId: SPREADSHEET_ID,
           range: `Users!C${sheetRow}`,
           valueInputOption: 'USER_ENTERED',
-          requestBody: { values: [[newBalance]] }
+          requestBody: { values: [[calculatedNewBalance]] }
         });
         console.log('✅ User balance updated successfully in Users sheet');
         console.log('   - Row:', sheetRow);
         console.log('   - Range: Users!C' + sheetRow);
-        console.log('   - New value written:', newBalance);
+        console.log('   - New value written:', calculatedNewBalance);
       } else {
         console.error('User not found for balance update:', userID);
       }
