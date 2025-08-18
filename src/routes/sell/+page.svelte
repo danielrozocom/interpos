@@ -838,7 +838,7 @@ let showCashModal = false;
                     >
                       <div class="flex-1">
                         <div class="font-medium text-gray-900 flex items-center gap-2">
-                          <span class="text-blue-600">ID: {suggestion.id}</span>
+                          <span class="product-id">ID: {suggestion.id}</span>
                           <span class="text-gray-400">|</span>
                           <span>{suggestion.name}</span>
                         </div>
@@ -1183,5 +1183,9 @@ let showCashModal = false;
       text-overflow: unset !important;
       line-height: 1.3;
     }
+  }
+
+  .product-id {
+    color: #35528C;
   }
 </style>
