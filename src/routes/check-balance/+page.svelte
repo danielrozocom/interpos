@@ -17,15 +17,20 @@
   // Convierte string o número a número limpio, manejando correctamente los negativos
   function cleanNumber(str: string | number): number {
     if (typeof str === 'number') return str;
-    if (!str) return 0;
+    if (!str && str !== 0) return 0;
+    
+    const strValue = String(str);
     
     // Verificar si el número es negativo
-    const isNegative = String(str).startsWith('-');
-    // Limpiar todo excepto números y punto decimal
-    const cleaned = String(str).replace(/[^\d.]/g, '');
+    const isNegative = strValue.includes('-');
     
-    // Convertir a número y aplicar el signo negativo si es necesario
+    // Limpiar todo excepto números y punto decimal
+    const cleaned = strValue.replace(/[^\d.]/g, '');
+    
+    // Convertir a número
     const num = parseFloat(cleaned) || 0;
+    
+    // Aplicar el signo negativo si es necesario
     return isNegative ? -Math.abs(num) : num;
   }
 
@@ -128,20 +133,37 @@
     name = '';
 
     try {
+      console.log('Iniciando consulta para userId:', userId);
+      
       // Obtener el saldo del usuario primero
       const balanceResponse = await fetch(`/api/sheets/users?userId=${encodeURIComponent(userId)}`);
-      if (!balanceResponse.ok) throw new Error('Error al obtener el saldo');
+      console.log('Balance response status:', balanceResponse.status, balanceResponse.ok);
+      
+      if (!balanceResponse.ok) {
+        console.log('Balance response not ok, throwing error');
+        throw new Error('Error al obtener el saldo');
+      }
+      
       const balanceData = await balanceResponse.json();
       console.log('Balance data received:', balanceData);
-      console.log('Raw balance value:', balanceData.balance, 'Type:', typeof balanceData.balance);
+      
+      // Asignar directamente sin procesamiento adicional
       balance = balanceData.balance;
       name = balanceData.name || '';
-      console.log('Processed balance:', balance, 'Name:', name);
+      console.log('Balance asignado:', balance, 'Name:', name);
 
       // Obtener el historial
+      console.log('Obteniendo historial...');
       const historyResponse = await fetch(`/api/sheets/history?userId=${encodeURIComponent(userId)}`);
-      if (!historyResponse.ok) throw new Error('Error al obtener el historial');
+      console.log('History response status:', historyResponse.status, historyResponse.ok);
+      
+      if (!historyResponse.ok) {
+        console.log('History response not ok, throwing error');
+        throw new Error('Error al obtener el historial');
+      }
+      
       const allTransactions = await historyResponse.json();
+      console.log('Transacciones recibidas:', allTransactions.length);
 
       // Si no tenemos nombre del balance, usar el del historial
       if (!name && allTransactions.length > 0) {
@@ -149,38 +171,68 @@
       }
 
       // Procesar y ordenar las transacciones (más reciente primero)
+      console.log('Datos de transacciones antes del procesamiento:', allTransactions);
+      
       transactions = allTransactions
         .map((t: any) => {
-          const date = new Date(`${t.dateOnly}T${t.timeOnly}`);
-          const gmt5Date = new Date(date.getTime() - (5 * 60 * 60 * 1000)); // Ajustar a GMT-5
-          return {
-            dateOnly: gmt5Date.toISOString().split('T')[0],
-            timeOnly: gmt5Date.toISOString().split('T')[1].slice(0, 8),
-            amount: cleanNumber(t.Quantity),
-            method: t.Method,
-            notes: t['Observation(s)'],
-            orderID: t.orderID
-          };
+          console.log('Procesando transacción:', t);
+          try {
+            // Verificar si los campos necesarios existen
+            if (!t.dateOnly || !t.timeOnly) {
+              console.warn('Transacción sin fecha/hora completa:', t);
+              return {
+                dateOnly: t.dateOnly || new Date().toISOString().split('T')[0],
+                timeOnly: t.timeOnly || '00:00:00',
+                amount: cleanNumber(t.Quantity),
+                method: t.Method || 'N/A',
+                notes: t['Observation(s)'] || '',
+                orderID: t.orderID || ''
+              };
+            }
+            
+            const date = new Date(`${t.dateOnly}T${t.timeOnly}`);
+            const gmt5Date = new Date(date.getTime() - (5 * 60 * 60 * 1000));
+            const processed = {
+              dateOnly: gmt5Date.toISOString().split('T')[0],
+              timeOnly: gmt5Date.toISOString().split('T')[1].slice(0, 8),
+              amount: cleanNumber(t.Quantity),
+              method: t.Method || 'N/A',
+              notes: t['Observation(s)'] || '',
+              orderID: t.orderID || ''
+            };
+            console.log('Transacción procesada:', processed);
+            return processed;
+          } catch (mapError) {
+            console.error('Error procesando transacción:', mapError, t);
+            // En lugar de devolver null, devolver una versión simplificada
+            return {
+              dateOnly: new Date().toISOString().split('T')[0],
+              timeOnly: '00:00:00',
+              amount: cleanNumber(t.Quantity),
+              method: t.Method || 'N/A',
+              notes: t['Observation(s)'] || 'Error al procesar',
+              orderID: t.orderID || ''
+            };
+          }
         })
+        .filter(t => t !== null)
         .sort((a: any, b: any) => {
-          // Combina fecha y hora para comparar
           const aDate = new Date(`${a.dateOnly}T${a.timeOnly}`);
           const bDate = new Date(`${b.dateOnly}T${b.timeOnly}`);
           return bDate.getTime() - aDate.getTime();
         })
-        .slice(0, 10); // Obtener solo las últimas 10
+        .slice(0, 10);
+      
+      console.log('Transacciones después del procesamiento:', transactions.length, transactions);
 
-      console.log('Processed transactions:', transactions.map(t => ({
-        dateOnly: t.dateOnly,
-        timeOnly: t.timeOnly,
-        amount: t.amount
-      })));
+      console.log('Consulta completada exitosamente. Balance:', balance, 'Transacciones procesadas:', transactions.length);
+      console.log('Transacciones finales:', transactions);
+      
     } catch (err) {
-      console.error('Error:', err);
+      console.error('Error en checkBalance:', err);
       error = 'No existe un usuario con ese ID';
       balance = null;
       transactions = [];
-      // No limpiar el nombre para mantenerlo visible al editar ID
     } finally {
       loading = false;
     }
@@ -273,8 +325,21 @@
         </div>
 
         <!-- Transacciones -->
-        {#if transactions.length > 0}
+        {#if loading}
+          <!-- Indicador de carga -->
+          <div class="bg-white rounded-2xl shadow-lg border border-[#35528C]/10 p-8">
+            <div class="text-center py-12">
+              <svg class="animate-spin h-12 w-12 text-[#35528C] mx-auto mb-4" viewBox="0 0 24 24">
+                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" fill="none"/>
+                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"/>
+              </svg>
+              <h3 class="text-lg font-medium text-gray-900 mb-2">Cargando transacciones...</h3>
+              <p class="text-gray-500">Por favor, espere mientras obtenemos su historial.</p>
+            </div>
+          </div>
+        {:else if transactions.length > 0}
           <div class="bg-white rounded-2xl shadow-lg border border-[#35528C]/10 overflow-hidden">
+            <!-- Encabezado del historial -->
             <div class="p-6 border-b border-gray-100">
               <h3 class="text-xl font-semibold text-[#35528C]">Últimos 10 Movimientos</h3>
               <p class="text-sm text-gray-600 mt-1">Mostrando las últimas 10 transacciones de tu cuenta</p>
@@ -336,6 +401,13 @@
                 </tbody>
               </table>
             </div>
+          </div>
+        {:else}
+          <!-- Mensaje cuando no hay transacciones -->
+          <div class="text-center py-12 s-WmfxB9smyTUP bg-white rounded-2xl shadow-lg border border-[#35528C]/10">
+            <span class="text-6xl s-WmfxB9smyTUP">📋</span>
+            <h3 class="text-lg font-medium text-gray-900 mt-4 s-WmfxB9smyTUP">Sin transacciones</h3>
+            <p class="text-gray-500 mt-2 s-WmfxB9smyTUP">Usted usuario no tiene transacciones registradas.</p>
           </div>
         {/if}
       </div>
