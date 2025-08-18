@@ -354,7 +354,14 @@ onMount(() => {
         </div>
         <div class="receipt-line">
           <span class="line-label">HORA:</span>
-          <span class="line-value">{transactionDetails.timeOnly || ''}</span>
+          <span class="line-value">{
+            transactionDetails.timeOnly
+              ? new Date(new Date(`${transactionDetails.dateOnly}T${transactionDetails.timeOnly}`).getTime() - (5 * 60 * 60 * 1000))
+                  .toISOString()
+                  .split('T')[1]
+                  .slice(0, 8)
+              : ''
+          }</span>
         </div>
         
         <div class="receipt-line">

@@ -151,9 +151,11 @@
       // Procesar y ordenar las transacciones (más reciente primero)
       transactions = allTransactions
         .map((t: any) => {
+          const date = new Date(`${t.dateOnly}T${t.timeOnly}`);
+          const gmt5Date = new Date(date.getTime() - (5 * 60 * 60 * 1000)); // Ajustar a GMT-5
           return {
-            dateOnly: t.dateOnly || '',
-            timeOnly: t.timeOnly || '',
+            dateOnly: gmt5Date.toISOString().split('T')[0],
+            timeOnly: gmt5Date.toISOString().split('T')[1].slice(0, 8),
             amount: cleanNumber(t.Quantity),
             method: t.Method,
             notes: t['Observation(s)'],
