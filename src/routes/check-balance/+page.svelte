@@ -9,6 +9,7 @@
   let balance: number | null = null;
   let error = '';
   let loading = false;
+  let initialLoading = true;
   let name = '';
 
 
@@ -17,19 +18,19 @@
   // Convierte string o número a número limpio, manejando correctamente los negativos
   function cleanNumber(str: string | number): number {
     if (typeof str === 'number') return str;
-    if (!str && str !== 0) return 0;
-    
+    if (str === undefined || str === null || str === '') return 0;
+
     const strValue = String(str);
-    
+
     // Verificar si el número es negativo
     const isNegative = strValue.includes('-');
-    
+
     // Limpiar todo excepto números y punto decimal
     const cleaned = strValue.replace(/[^\d.]/g, '');
-    
+
     // Convertir a número
     const num = parseFloat(cleaned) || 0;
-    
+
     // Aplicar el signo negativo si es necesario
     return isNegative ? -Math.abs(num) : num;
   }
@@ -215,7 +216,7 @@
             };
           }
         })
-        .filter(t => t !== null)
+        .filter((t: any) => t !== null)
         .sort((a: any, b: any) => {
           const aDate = new Date(`${a.dateOnly}T${a.timeOnly}`);
           const bDate = new Date(`${b.dateOnly}T${b.timeOnly}`);
@@ -235,8 +236,13 @@
       transactions = [];
     } finally {
       loading = false;
+      initialLoading = false; // Marcar que la carga inicial ha terminado
     }
   }
+
+  onMount(() => {
+    initialLoading = false; // Asegurar que no haya flash al cargar la página
+  });
 </script>
 
 <svelte:head>
@@ -392,8 +398,6 @@
                           {:else}
                             {transaction.notes || '-'}
                           {/if}
-                        {:else}
-                          {transaction.notes || '-'}
                         {/if}
                       </td>
                     </tr>
@@ -404,12 +408,24 @@
           </div>
         {:else}
           <!-- Mensaje cuando no hay transacciones -->
-          <div class="text-center py-12 s-WmfxB9smyTUP bg-white rounded-2xl shadow-lg border border-[#35528C]/10">
+          <div class="text-center py-12 bg-white rounded-2xl shadow-lg border border-[#35528C]/10 s-WmfxB9smyTUP">
             <span class="text-6xl s-WmfxB9smyTUP">📋</span>
             <h3 class="text-lg font-medium text-gray-900 mt-4 s-WmfxB9smyTUP">Sin transacciones</h3>
-            <p class="text-gray-500 mt-2 s-WmfxB9smyTUP">Usted usuario no tiene transacciones registradas.</p>
+            <p class="text-gray-500 mt-2 s-WmfxB9smyTUP">Usted no tiene transacciones registradas.</p>
           </div>
         {/if}
+      </div>
+    {/if}
+
+    {#if initialLoading}
+      <!-- Indicador de carga inicial -->
+      <div class="text-center py-12 bg-white rounded-2xl shadow-lg border border-[#35528C]/10">
+        <svg class="animate-spin h-12 w-12 text-[#35528C] mx-auto mb-4" viewBox="0 0 24 24">
+          <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" fill="none"/>
+          <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"/>
+        </svg>
+        <h3 class="text-lg font-medium text-gray-900 mb-2">Cargando...</h3>
+        <p class="text-gray-500">Por favor, espere mientras se cargan los datos.</p>
       </div>
     {/if}
   </div>

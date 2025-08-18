@@ -220,6 +220,18 @@ async function fetchTransactions() {
   loading = true;
   error = '';
   try {
+    // Primero obtener el nombre del usuario
+    try {
+      const userRes = await fetch(`/api/sheets/users?userId=${encodeURIComponent(userId)}`);
+      if (userRes.ok) {
+        const userData = await userRes.json();
+        userName = userData.name || '';
+      }
+    } catch (userErr) {
+      console.log('No se pudo obtener el nombre del usuario:', userErr);
+    }
+
+    // Luego obtener las transacciones
     const res = await fetch(`/api/sheets/history?userId=${encodeURIComponent(userId)}`);
     if (!res.ok) {
       const errData = await res.json().catch(() => ({}));
@@ -227,8 +239,12 @@ async function fetchTransactions() {
     }
     const data = await res.json();
     transactions = data;
-    // Set userName from first transaction if available
-    userName = (data.length > 0 && data[0].Name) ? data[0].Name : '';
+    
+    // Si no obtuvimos el nombre del endpoint de usuarios, usar el de las transacciones
+    if (!userName && data.length > 0 && data[0].Name) {
+      userName = data[0].Name;
+    }
+    
     step = 2;
   } catch (err) {
     if (typeof err === 'object' && err !== null && 'message' in err && typeof (err as any).message === 'string') {
@@ -379,7 +395,7 @@ async function refreshTransactions() {
       <div class="space-y-8 animate-fadeIn">
         <div class="flex flex-col md:flex-row items-start md:items-center justify-between mb-4">
           <div class="text-left mb-4 md:mb-0">
-            <h2 class="text-xl font-semibold text-[#35528C]">Historial de {userName}</h2>
+            <h2 class="text-xl font-semibold text-[#35528C]">Historial de {userName || 'Usuario'}</h2>
             <p class="text-[#35528C]/80">ID: {userId}</p>
           </div>
           <!-- Botones debajo del título en móviles -->
