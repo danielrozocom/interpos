@@ -43,7 +43,8 @@ export const POST: RequestHandler = async ({ request }) => {
     // Crear Date y Time separados en zona horaria de Colombia (GMT-5)
     const colombiaDate = new Date(now.toLocaleString("en-US", {timeZone: "America/Bogota"}));
     const dateStr = colombiaDate.toLocaleDateString('en-CA'); // YYYY-MM-DD format
-    const timeStr = colombiaDate.toLocaleTimeString('en-GB', { hour12: false }); // HH:MM:SS format
+    // Asegurar que timeStr esté en formato HH:MM:SS
+    const timeStr = formatTime(colombiaDate.toLocaleTimeString('en-GB', { hour12: false })); // HH:MM:SS format
 
     // Prepare the row data for Google Sheets - Orders
     const ordersValues = [
@@ -306,6 +307,9 @@ export const GET: RequestHandler = async ({ url }) => {
         year: 'numeric'
       }) : '';
       
+      // Asegurar que timeOnly se devuelva correctamente
+      const timeOnly = timeStr || '00:00:00';
+
       // Mapeo de columnas según el orden en Google Sheets:
       // 0: Date, 1: Time, 2: OrderID, 3: UserID, 4: Name, 5: Quantity, 6: Method (Saldo/Efectivo), 7: Product(s)
       const transaction = {
@@ -320,6 +324,18 @@ export const GET: RequestHandler = async ({ url }) => {
         paymentMethod: row[6] || 'Saldo', // Method (columna G)
         products: row[7] || '' // Product(s) (columna H)
       };
+      
+      console.log('Processed transaction:', {
+        dateOnly: dateStr,
+        timeOnly: timeOnly,
+        combinedDateTime,
+        amount,
+        orderID: row[2] || '',
+        userID: row[3] || '',
+        name: row[4] || '',
+        method: row[6] || '',
+        products: row[7] || ''
+      });
       
       if (index < 3) {
         console.log(`Transaction ${index + 1}:`, transaction);

@@ -184,6 +184,13 @@ function formatCurrency(val: number): string {
     loading = false;
   }
 
+  function selectUser(user: { id: string; name: string }) {
+    userId = user.id;
+    userName = user.name;
+    userSuggestions = []; // Limpiar las sugerencias después de seleccionar
+    fetchBalance();
+  }
+
   // Observadores reactivos actualizados
 $: userSuggestions = userId
   ? allUsers.filter(u => u.id.startsWith(userId))
@@ -195,6 +202,7 @@ $: {
     userName = user ? user.name ?? '' : '';
     if (userExists) {
       fetchBalance();
+      userSuggestions = []; // Asegurar que las sugerencias se limpien
     } else {
       currentBalance = null;
     }
@@ -283,14 +291,7 @@ $: {
             {#each userSuggestions as u}
               <button 
                 type="button"
-                on:click={() => {
-                  userId = u.id;
-                  // Eliminamos el auto-submit
-                  const found = allUsers.find(x => x.id === u.id);
-                  if (found) {
-                    userExists = true;
-                  }
-                }}
+                on:click={() => selectUser(u)}
                 class="w-full text-left p-3 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors duration-200"
               >
                 <span class="font-medium text-gray-900">ID: {u.id}</span>

@@ -2,6 +2,7 @@
 import { page } from '$app/stores';
 import { onMount } from 'svelte';
 import { siteName, formatDate } from '../../../lib/config';
+import { formatTimeOnly } from '../../../lib/date-utils';
 
 let orderId: string;
 let transactionDetails: any = null;
@@ -144,7 +145,7 @@ async function fetchTransactionDetails() {
 }
 
 onMount(() => {
-  orderId = $page.params.id;
+  orderId = $page.params.id || 'ID no proporcionado';
   if (orderId) {
     fetchTransactionDetails().then(() => {
       console.log('Transaction Details Received:', transactionDetails); // Log received data
@@ -370,23 +371,19 @@ onMount(() => {
           <span class="line-label">HORA:</span>
           <span class="line-value">{
             (() => {
-              try {
-                console.log('Full transaction details for time processing:', transactionDetails); // Log all details
-                
-                if (transactionDetails.timeOnly) {
-                  console.log('Using timeOnly directly:', transactionDetails.timeOnly);
-                  
-                  // Simply return the timeOnly value as-is, without any Date object manipulation
-                  // This should preserve the original time from the server
-                  return transactionDetails.timeOnly;
-                }
-
-                console.warn('No timeOnly found in transaction details');
-                return 'Hora no disponible';
-              } catch (e) {
-                console.error('Error processing time:', e);
-                return 'Error al procesar la hora';
+              // Función para formatear la hora a HH:mm:ss
+              function formatTime(timeStr) {
+                if (!timeStr) return '00:00:00';
+                const parts = timeStr.split(':');
+                const hours = parts[0]?.padStart(2, '0') || '00';
+                const minutes = parts[1]?.padStart(2, '0') || '00';
+                const seconds = parts[2]?.padStart(2, '0') || '00';
+                return `${hours}:${minutes}:${seconds}`;
               }
+              
+              return transactionDetails.timeOnly 
+                ? formatTime(transactionDetails.timeOnly) 
+                : 'Hora no disponible';
             })()
           }</span>
         </div>

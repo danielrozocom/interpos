@@ -15,6 +15,16 @@
 
   $: if (userId === '') name = '';
 
+  // Función para formatear la hora a HH:mm:ss
+  function formatTime(timeStr: string): string {
+    if (!timeStr) return '00:00:00';
+    const parts = timeStr.split(':');
+    const hours = parts[0]?.padStart(2, '0') || '00';
+    const minutes = parts[1]?.padStart(2, '0') || '00';
+    const seconds = parts[2]?.padStart(2, '0') || '00';
+    return `${hours}:${minutes}:${seconds}`;
+  }
+
   // Convierte string o número a número limpio, manejando correctamente los negativos
   function cleanNumber(str: string | number): number {
     if (typeof str === 'number') return str;
@@ -176,33 +186,30 @@
       
       transactions = allTransactions
         .map((t: any) => {
-          console.log('Procesando transacción:', t);
           try {
             // Verificar si los campos necesarios existen
             if (!t.dateOnly || !t.timeOnly) {
               console.warn('Transacción sin fecha/hora completa:', t);
               return {
                 dateOnly: t.dateOnly || new Date().toISOString().split('T')[0],
-                timeOnly: t.timeOnly || '00:00:00',
+                timeOnly: formatTime(t.timeOnly || '00:00:00'),
                 amount: cleanNumber(t.Quantity),
                 method: t.Method || 'N/A',
                 notes: t['Observation(s)'] || '',
                 orderID: t.orderID || ''
               };
             }
-            
-            const date = new Date(`${t.dateOnly}T${t.timeOnly}`);
+
+            const date = new Date(`${t.dateOnly}T${formatTime(t.timeOnly)}`);
             const gmt5Date = new Date(date.getTime() - (5 * 60 * 60 * 1000));
-            const processed = {
+            return {
               dateOnly: gmt5Date.toISOString().split('T')[0],
-              timeOnly: gmt5Date.toISOString().split('T')[1].slice(0, 8),
+              timeOnly: formatTime(gmt5Date.toISOString().split('T')[1].slice(0, 8)),
               amount: cleanNumber(t.Quantity),
               method: t.Method || 'N/A',
               notes: t['Observation(s)'] || '',
               orderID: t.orderID || ''
             };
-            console.log('Transacción procesada:', processed);
-            return processed;
           } catch (mapError) {
             console.error('Error procesando transacción:', mapError, t);
             // En lugar de devolver null, devolver una versión simplificada
@@ -239,6 +246,12 @@
       initialLoading = false; // Marcar que la carga inicial ha terminado
     }
   }
+
+  // Asegurar que todos los usos de timeOnly pasen por formatTime
+  $: transactions = transactions.map(t => ({
+    ...t,
+    timeOnly: formatTime(t.timeOnly || '00:00:00')
+  }));
 
   onMount(() => {
     initialLoading = false; // Asegurar que no haya flash al cargar la página
@@ -318,7 +331,11 @@
         <div class="bg-gradient-to-br from-[#35528C] to-[#2A4170] rounded-2xl shadow-lg p-8 text-white">
           <div class="text-center">
             <h2 class="text-xl font-medium mb-2 opacity-90">
-              {#if name}¡Hola, {name}!{:else}Tu saldo actual{/if}
+              {#if name}
+                ¡Hola, {name}!
+              {:else}
+                Tu saldo actual
+              {/if}
             </h2>
             <p class="text-5xl font-bold mb-2">{formatCurrency(balance)}</p>
             <div class="inline-flex items-center gap-2 bg-white/10 px-3 py-1 rounded-full">
@@ -369,7 +386,7 @@
                         {transaction.dateOnly}
                       </td>
                       <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
-                        {transaction.timeOnly}
+                        {formatTime(transaction.timeOnly)}
                       </td>
                       <td class="px-6 py-4 whitespace-nowrap">
                         <span class={transaction.amount >= 0 ? 

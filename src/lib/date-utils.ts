@@ -58,22 +58,13 @@ export function formatTimeOnly(dateString: string | Date): string {
   try {
     const date = typeof dateString === 'string' ? new Date(dateString) : dateString;
     if (isNaN(date.getTime())) {
-      return '-';
+      return '00:00:00';
     }
-    
-    // Convert to Colombia timezone (GMT-5) and format as time only
-    const options: Intl.DateTimeFormatOptions = {
-      timeZone: 'America/Bogota',
-      hour: '2-digit',
-      minute: '2-digit',
-      second: '2-digit',
-      hour12: false
-    };
-    
-    return date.toLocaleTimeString('es-CO', options);
+    const timeStr = date.toLocaleTimeString('en-GB', { hour12: false });
+    return formatTime(timeStr);
   } catch (error) {
     console.error('Error formatting time only:', error);
-    return '-';
+    return '00:00:00';
   }
 }
 

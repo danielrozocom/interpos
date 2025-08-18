@@ -52,9 +52,19 @@ $: filteredTransactions = (() => {
   
   // Ordenar de más reciente a más vieja
   const sorted = filtered.sort((a, b) => {
-    // Combinar fecha y hora para comparación completa
-    const dateTimeA = new Date(`${a.Date}T${a.Time || '00:00:00'}`);
-    const dateTimeB = new Date(`${b.Date}T${b.Time || '00:00:00'}`);
+    // Función para formatear la hora a HH:mm:ss antes de la comparación
+    function formatTime(timeStr) {
+      if (!timeStr) return '00:00:00';
+      const parts = timeStr.split(':');
+      const hours = parts[0]?.padStart(2, '0') || '00';
+      const minutes = parts[1]?.padStart(2, '0') || '00';
+      const seconds = parts[2]?.padStart(2, '0') || '00';
+      return `${hours}:${minutes}:${seconds}`;
+    }
+    
+    // Combinar fecha y hora para comparación completa usando los campos correctos
+    const dateTimeA = new Date(`${a.dateOnly}T${formatTime(a.timeOnly || '00:00:00')}`);
+    const dateTimeB = new Date(`${b.dateOnly}T${formatTime(b.timeOnly || '00:00:00')}`);
     
     // Ordenar descendente (más reciente primero)
     return dateTimeB.getTime() - dateTimeA.getTime();
@@ -551,7 +561,19 @@ async function refreshTransactions() {
                         {transaction.dateOnly || '-'}
                       </td>
                       <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
-                        {transaction.timeOnly || '-'}
+                        {(() => {
+                          // Función para formatear la hora a HH:mm:ss
+                          function formatTime(timeStr) {
+                            if (!timeStr) return '00:00:00';
+                            const parts = timeStr.split(':');
+                            const hours = parts[0]?.padStart(2, '0') || '00';
+                            const minutes = parts[1]?.padStart(2, '0') || '00';
+                            const seconds = parts[2]?.padStart(2, '0') || '00';
+                            return `${hours}:${minutes}:${seconds}`;
+                          }
+                          
+                          return transaction.timeOnly ? formatTime(transaction.timeOnly) : '-';
+                        })()}
                       </td>
                       <td class="px-6 py-4 whitespace-nowrap text-sm font-medium">
                         <span class="{cleanNumber(transaction.Quantity) >= 0 ? 'text-green-600 font-bold' : 'text-red-600 font-bold'}">
