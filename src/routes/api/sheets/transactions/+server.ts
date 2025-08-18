@@ -94,6 +94,13 @@ export const POST: RequestHandler = async ({ request }) => {
     const isNegativeAmount = quantity < 0;
     const isCashPayment = paymentMethod === 'Efectivo';
     
+    console.log('=== BALANCE CALCULATION DEBUG ===');
+    console.log('Received quantity:', quantity, 'Type:', typeof quantity);
+    console.log('Current balance:', currentBalance, 'Type:', typeof currentBalance);
+    console.log('Payment method:', paymentMethod);
+    console.log('Is negative amount:', isNegativeAmount);
+    console.log('Is cash payment:', isCashPayment);
+    
     // Initialize balances
     let prevBalance = currentBalance;
     let newBalance = currentBalance;
@@ -105,12 +112,20 @@ export const POST: RequestHandler = async ({ request }) => {
       // No se modifica el saldo virtual
       transactionAmount = quantity; // Mantener el valor negativo
       // prevBalance y newBalance permanecen iguales
+      console.log('CASE 1: Cash payment with negative amount - No balance change');
     } else {
       // Caso 2: Cualquier otro caso (método distinto a efectivo o cantidad positiva)
       transactionAmount = isNegativeAmount ? quantity : -Math.abs(quantity); // Negativo para consumos
       prevBalance = currentBalance;
       newBalance = currentBalance + transactionAmount; // Suma si es recarga, resta si es consumo
+      console.log('CASE 2: Balance will change');
     }
+    
+    console.log('FINAL CALCULATION:');
+    console.log('Transaction amount:', transactionAmount);
+    console.log('Previous balance:', prevBalance);
+    console.log('New balance:', newBalance);
+    console.log('=====================================');
     
     // Prepare data for "Transactions - Balance" sheet with correct structure
     const balanceValues = [

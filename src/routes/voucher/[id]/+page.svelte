@@ -400,7 +400,7 @@ onMount(() => {
         <div class="receipt-line">
           <span class="line-label">MÉTODO DE PAGO:</span>
           <span class="line-value {transactionDetails.paymentMethod === 'Saldo' ? 'text-blue-600' : 'text-green-600'} font-semibold">
-            {transactionDetails.paymentMethod === 'Saldo' ? '💳 Saldo' : '💵 Efectivo'}
+            {transactionDetails.paymentMethod === 'Saldo' ? 'Saldo' : 'Efectivo'}
           </span>
         </div>
         
