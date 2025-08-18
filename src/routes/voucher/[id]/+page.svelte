@@ -350,17 +350,32 @@ onMount(() => {
       <div class="receipt-body">
         <div class="receipt-line">
           <span class="line-label">FECHA:</span>
-          <span class="line-value">{transactionDetails.dateOnly || (transactionDetails.date ? formatDate(transactionDetails.date) : 'Fecha no disponible')}</span>
+          <span class="line-value">{
+            transactionDetails.dateOnly
+              ? transactionDetails.dateOnly
+              : transactionDetails.date
+              ? formatDate(transactionDetails.date)
+              : 'Fecha no disponible'
+          }</span>
         </div>
         <div class="receipt-line">
           <span class="line-label">HORA:</span>
           <span class="line-value">{
-            transactionDetails.timeOnly
-              ? new Date(new Date(`${transactionDetails.dateOnly}T${transactionDetails.timeOnly}`).getTime() - (5 * 60 * 60 * 1000))
-                  .toISOString()
-                  .split('T')[1]
-                  .slice(0, 8)
-              : ''
+            (() => {
+              try {
+                if (transactionDetails.timeOnly && transactionDetails.dateOnly) {
+                  const originalDate = new Date(`${transactionDetails.dateOnly}T${transactionDetails.timeOnly}`);
+                  if (isNaN(originalDate.getTime())) {
+                    return transactionDetails.timeOnly;
+                  }
+                  const adjustedDate = new Date(originalDate.getTime() - (5 * 60 * 60 * 1000));
+                  return adjustedDate.toLocaleTimeString('es-CO', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false });
+                }
+                return transactionDetails.timeOnly || 'Hora no disponible';
+              } catch (e) {
+                return transactionDetails.timeOnly || 'Hora no disponible';
+              }
+            })()
           }</span>
         </div>
         
