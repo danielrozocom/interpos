@@ -365,14 +365,19 @@ onMount(() => {
               try {
                 if (transactionDetails.timeOnly && transactionDetails.dateOnly) {
                   const originalDate = new Date(`${transactionDetails.dateOnly}T${transactionDetails.timeOnly}`);
+                  console.log('Original Date:', originalDate.toISOString()); // Log original date
                   if (isNaN(originalDate.getTime())) {
+                    console.warn('Invalid Date:', transactionDetails.dateOnly, transactionDetails.timeOnly);
                     return transactionDetails.timeOnly;
                   }
                   const adjustedDate = new Date(originalDate.getTime() - (5 * 60 * 60 * 1000));
+                  console.log('Adjusted Date:', adjustedDate.toISOString()); // Log adjusted date
                   return adjustedDate.toLocaleTimeString('es-CO', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false });
                 }
+                console.warn('Missing timeOnly or dateOnly:', transactionDetails);
                 return transactionDetails.timeOnly || 'Hora no disponible';
               } catch (e) {
+                console.error('Error processing date and time:', e);
                 return transactionDetails.timeOnly || 'Hora no disponible';
               }
             })()
