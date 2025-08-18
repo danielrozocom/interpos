@@ -83,8 +83,11 @@ export const POST: RequestHandler = async ({ request }) => {
       const user = users.find(row => row[0] === userID);
       
       if (user) {
-        // Asumiendo que el saldo está en la columna 6 (índice 5) de la hoja Users
-        currentBalance = parseFloat(user[5] || '0');
+        // El saldo está en la columna C (índice 2) de la hoja Users
+        currentBalance = parseFloat(user[2] || '0');
+        console.log('Found user balance:', currentBalance, 'from column C (index 2)');
+      } else {
+        console.log('User not found in Users sheet');
       }
     } catch (error) {
       console.error('Error getting user balance:', error);
