@@ -29,6 +29,10 @@ let successMsg = '';
 let mobileView = 'products'; // 'products' or 'cart' for mobile view switching
 let showAddedNotification = false;
 
+// Cargar preferencia de ordenamiento desde localStorage
+let sortByAlphabetical = typeof window !== 'undefined' ? 
+  localStorage.getItem('sortByAlphabetical') !== 'false' : true; // true = alfabético, false = por ID
+
 // Payment method variables
 let paymentMethod = 'saldo'; // 'saldo' or 'efectivo'
 let cashReceived = 0;
@@ -434,6 +438,11 @@ let showCashModal = false;
   $: if (userId.length > 0 && !userName && !error) {
     fetchUserSuggestions(userId);
   }
+
+  // Guardar preferencia de ordenamiento en localStorage
+  $: if (typeof window !== 'undefined') {
+    localStorage.setItem('sortByAlphabetical', sortByAlphabetical.toString());
+  }
 </script>
 
 <svelte:head>
@@ -480,7 +489,7 @@ let showCashModal = false;
     <div class="flex-1 p-1 sm:p-2 overflow-auto" class:hidden={mobileView !== 'products'} class:md:block={true}>
       <!-- Filtro por categorías -->
       <div class="mb-2 px-1 sm:px-2">
-        <div class="flex flex-wrap gap-1 sm:gap-2">
+        <div class="flex flex-wrap gap-1 sm:gap-2 items-center">
           <button
             class="px-2 sm:px-4 py-2 rounded-lg border font-semibold shadow-sm focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 transition-all duration-150 text-sm sm:text-base"
             style="background-color: {selectedCategory === null ? '#35528C' : '#f3f4f6'}; color: {selectedCategory === null ? 'white' : '#35528C'}; border-color: {selectedCategory === null ? '#35528C' : '#d1d5db'};"
@@ -497,13 +506,36 @@ let showCashModal = false;
               {cat}
             </button>
           {/each}
+          
+          <!-- Separador y switch para ordenamiento -->
+          <span class="text-gray-300 mx-1">|</span>
+          <button
+            on:click={() => sortByAlphabetical = !sortByAlphabetical}
+            class="flex items-center gap-2 px-2 py-2 rounded-lg hover:bg-gray-100 transition-colors duration-200 text-xs sm:text-sm text-gray-600"
+            title="Cambiar ordenamiento"
+          >
+            <span>{sortByAlphabetical ? 'A-Z' : 'ID'}</span>
+            <div class="relative inline-flex h-5 w-9 items-center rounded-full transition-colors duration-200 {sortByAlphabetical ? 'bg-primary' : 'bg-gray-300'}">
+              <span class="inline-block h-4 w-4 transform rounded-full bg-white transition-transform duration-200 {sortByAlphabetical ? 'translate-x-5' : 'translate-x-0.5'}"></span>
+            </div>
+          </button>
         </div>
       </div>
       <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 2xl:grid-cols-7 gap-2 sm:gap-3 w-full" style="margin:0;">
         {#if (selectedCategory ? products[selectedCategory] : Object.values(products).flat()).length > 0}
           {#each (selectedCategory ? products[selectedCategory] : Object.values(products).flat()).sort((a, b) => {
-            // Ordenar alfabéticamente por nombre
-            return a.name.localeCompare(b.name, 'es', { sensitivity: 'base' });
+            if (sortByAlphabetical) {
+              // Ordenar alfabéticamente por nombre
+              return a.name.localeCompare(b.name, 'es', { sensitivity: 'base' });
+            } else {
+              // Ordenar por ID numérico
+              const numA = parseInt(a.id);
+              const numB = parseInt(b.id);
+              if (!isNaN(numA) && !isNaN(numB)) {
+                return numA - numB;
+              }
+              return String(a.id).localeCompare(String(b.id));
+            }
           }) as product}
             <div
               class="bg-white rounded-lg shadow-sm hover:shadow-md transition-all duration-200 cursor-pointer p-2 sm:p-3 relative group border border-primary"
