@@ -365,38 +365,20 @@ onMount(() => {
           <span class="line-value">{
             (() => {
               try {
-                if (transactionDetails.timeOnly && transactionDetails.dateOnly) {
-                  console.log('DateOnly:', transactionDetails.dateOnly, 'TimeOnly:', transactionDetails.timeOnly); // Log inputs
-
-                  // Validate dateOnly and timeOnly
-                  const dateRegex = /^\d{2}\/\d{2}\/\d{4}$/; // DD/MM/YYYY format
-                  const timeRegex = /^\d{2}:\d{2}:\d{2}$/; // HH:MM:SS format
-
-                  if (!dateRegex.test(transactionDetails.dateOnly) || !timeRegex.test(transactionDetails.timeOnly)) {
-                    console.warn('Invalid dateOnly or timeOnly format:', transactionDetails);
-                    return transactionDetails.timeOnly || 'Hora no disponible';
-                  }
-
-                  // Reformat dateOnly to YYYY-MM-DD
-                  const [day, month, year] = transactionDetails.dateOnly.split('/');
-                  const reformattedDateOnly = `${year}-${month}-${day}`;
-
-                  const originalDate = new Date(`${reformattedDateOnly}T${transactionDetails.timeOnly}`); // No UTC assumption
-                  console.log('Original Date:', originalDate.toISOString()); // Log original date
-
-                  if (isNaN(originalDate.getTime())) {
-                    console.warn('Invalid Date:', reformattedDateOnly, transactionDetails.timeOnly);
-                    return transactionDetails.timeOnly;
-                  }
-
-                  // Return the original time without timezone adjustment
-                  return originalDate.toLocaleTimeString('es-CO', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false });
+                console.log('Full transaction details for time processing:', transactionDetails); // Log all details
+                
+                if (transactionDetails.timeOnly) {
+                  console.log('Using timeOnly directly:', transactionDetails.timeOnly);
+                  
+                  // Simply return the timeOnly value as-is, without any Date object manipulation
+                  // This should preserve the original time from the server
+                  return transactionDetails.timeOnly;
                 }
 
-                console.warn('Missing timeOnly or dateOnly:', transactionDetails);
-                return transactionDetails.timeOnly || 'Hora no disponible';
+                console.warn('No timeOnly found in transaction details');
+                return 'Hora no disponible';
               } catch (e) {
-                console.error('Error processing date and time:', e);
+                console.error('Error processing time:', e);
                 return 'Error al procesar la hora';
               }
             })()
