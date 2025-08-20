@@ -235,22 +235,18 @@ let showCashModal = false;
       return;
     }
 
-    // Validar ID de usuario (solo para pagos con saldo)
-    if (paymentMethod === 'saldo' && !userId?.trim()) {
+    // Validar ID de usuario SIEMPRE, incluso para pagos en efectivo
+    if (!userId?.trim()) {
       const userIdInput = document.getElementById('userId');
       userIdInput?.focus();
       userIdInput?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      error = 'Debes ingresar un ID de usuario.';
       return;
     }
 
-    // Validar si el usuario existe
-    if (!userId) {
-      alert('Por favor ingrese un ID de usuario válido');
-      return;
-    }
-
+    // Validar si el usuario existe (siempre)
     if (!userName) {
-      alert('No se encontró el usuario con el ID proporcionado');
+      error = 'No se encontró el usuario con el ID proporcionado';
       return;
     }
 
@@ -310,8 +306,8 @@ let showCashModal = false;
       const transactionData = {
         date: gmt5Date,
         orderID: orderID,
-        userID: userId, // Siempre usamos el ID del cliente
-        userName: userName, // Siempre usamos el nombre del cliente
+        userID: userId, // SIEMPRE usar el ID ingresado
+        userName: userName, // SIEMPRE usar el nombre encontrado
         quantity: cartTotal,
         products: cart.map(item => `${item.name} (ID: ${item.id}) x${item.quantity} - $${(item.price * item.quantity).toLocaleString('es-CO')}`).join('; '),
         paymentMethod: paymentMethod === 'saldo' ? 'Saldo' : 'Efectivo',
@@ -335,10 +331,10 @@ let showCashModal = false;
         },
         body: JSON.stringify({
           ...transactionData,
-          // Incluir el saldo actual para validación en el servidor
-          currentBalance: userBalance,
-          // Incluir el nuevo saldo calculado
-          newBalance: paymentMethod === 'saldo' ? newBalance : userBalance
+          // Incluir el saldo actual para validación en el servidor (solo para pagos con saldo)
+          currentBalance: paymentMethod === 'saldo' ? userBalance : 0,
+          // Incluir el nuevo saldo calculado (solo para pagos con saldo)
+          newBalance: paymentMethod === 'saldo' ? newBalance : 0
         })
       });
 
@@ -352,9 +348,12 @@ let showCashModal = false;
       // Clear data for new transaction using tick to ensure reactive context
       await tick();
       clearCart();
-      userId = ''; // Clear userId for new transaction
-      userName = ''; // Clear userName as well
-      userBalance = 0; // Reset balance display
+      
+      // Limpiar todos los datos del usuario después de completar cualquier venta
+      userId = '';
+      userName = '';
+      userBalance = 0;
+      
       posType = '';
       error = '';
       successMsg = 'Venta exitosa';
@@ -636,13 +635,14 @@ let showCashModal = false;
             autocomplete="off"
             spellcheck="false"
             aria-label="ID de Cliente"
+            autofocus
           />
         </div>
         {#if userName}
           <div class="mt-2 flex flex-col gap-1">
             <p class="text-sm md:text-base text-gray-600">Cliente: <span class="font-medium text-gray-900">{userName}</span></p>
             <p class="text-sm md:text-base text-gray-600">Saldo: <span class="font-medium text-primary">${userBalance.toLocaleString('es-CO')}</span></p>
-            {#if cartTotal > 0}
+            {#if cartTotal > 0 && paymentMethod === 'saldo'}
               <p class="text-sm text-primary mt-1">Saldo tras la compra: <span class="font-bold text-primary">${(userBalance - cartTotal).toLocaleString('es-CO')}</span></p>
             {/if}
           </div>

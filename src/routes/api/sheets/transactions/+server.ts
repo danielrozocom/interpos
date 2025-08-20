@@ -4,6 +4,20 @@ import type { RequestHandler } from '@sveltejs/kit';
 import { json } from '@sveltejs/kit';
 import { getCurrentDateInTimezone, formatDate, formatDateOnly, formatTimeOnly } from '$lib/date-utils';
 
+// Función para formatear tiempo a HH:mm:ss
+function formatTime(timeStr: string): string {
+  // Si ya está en formato HH:mm:ss, retornarlo
+  if (/^\d{2}:\d{2}:\d{2}$/.test(timeStr)) {
+    return timeStr;
+  }
+  // Si está en formato HH:mm, agregar :00
+  if (/^\d{2}:\d{2}$/.test(timeStr)) {
+    return timeStr + ':00';
+  }
+  // Si está en formato H:mm o H:mm:ss, agregar cero al inicio
+  return timeStr.padStart(8, '0');
+}
+
 // Autenticación
 const auth = new google.auth.GoogleAuth({
   // En desarrollo usa el archivo, en producción usa variables de entorno
@@ -30,12 +44,16 @@ export const POST: RequestHandler = async ({ request }) => {
     console.log('Received transaction data:', { date, orderID, userID, userName, quantity, products, paymentMethod, cashReceived, cashChange, currentBalance, newBalance });
 
     // Validate required fields
-    if (!date || !orderID || !userID || !quantity || !products || !paymentMethod) {
+    if (!date || !orderID || !quantity || !products || !paymentMethod) {
       return json({ 
         success: false, 
-        error: 'Faltan campos requeridos: date, orderID, userID, quantity (valor de compra), products, paymentMethod' 
+        error: 'Faltan campos requeridos: date, orderID, quantity (valor de compra), products, paymentMethod' 
       }, { status: 400 });
     }
+
+    // Para ventas en efectivo sin usuario, usar valores por defecto
+    const finalUserID = userID || 'EFECTIVO';
+    const finalUserName = userName || 'Venta en Efectivo';
 
     // Crear fecha y hora actual en zona horaria de Colombia
     const now = new Date();
@@ -52,8 +70,8 @@ export const POST: RequestHandler = async ({ request }) => {
         dateStr,         // Date en formato YYYY-MM-DD (columna A)
         timeStr,         // Time en formato HH:MM:SS (columna B)
         orderID,         // OrderID como número de 6 dígitos, sin apóstrofe (columna C)
-        userID,          // UserID (columna D)
-        userName || '',  // Name (columna E)
+        finalUserID,     // UserID (columna D)
+        finalUserName,   // Name (columna E)
         quantity,        // Quantity - valor total de la compra (columna F)
         paymentMethod,   // Method - Saldo o Efectivo (columna G)
         products         // Product(s) - formatted string (columna H)
@@ -74,24 +92,30 @@ export const POST: RequestHandler = async ({ request }) => {
 
     // Get current user balance for the transaction
     let actualCurrentBalance = 0;
-    try {
-      const usersSheet = await sheets.spreadsheets.values.get({
-        spreadsheetId: SPREADSHEET_ID,
-        range: 'Users!A:Z',
-      });
-      
-      const users = usersSheet.data.values?.slice(1) || [];
-      const user = users.find(row => row[0] === userID);
-      
-      if (user) {
-        // El saldo está en la columna C (índice 2) de la hoja Users
-        actualCurrentBalance = parseFloat(user[2] || '0');
-        console.log('Found user balance in sheet:', actualCurrentBalance, 'from column C (index 2)');
-      } else {
-        console.log('User not found in Users sheet');
+    
+    // Solo obtener saldo si hay un userID real (no es venta en efectivo sin usuario)
+    if (userID && userID !== 'EFECTIVO') {
+      try {
+        const usersSheet = await sheets.spreadsheets.values.get({
+          spreadsheetId: SPREADSHEET_ID,
+          range: 'Users!A:Z',
+        });
+        
+        const users = usersSheet.data.values?.slice(1) || [];
+        const user = users.find(row => row[0] === userID);
+        
+        if (user) {
+          // El saldo está en la columna C (índice 2) de la hoja Users
+          actualCurrentBalance = parseFloat(user[2] || '0');
+          console.log('Found user balance in sheet:', actualCurrentBalance, 'from column C (index 2)');
+        } else {
+          console.log('User not found in Users sheet');
+        }
+      } catch (error) {
+        console.error('Error getting user balance:', error);
       }
-    } catch (error) {
-      console.error('Error getting user balance:', error);
+    } else {
+      console.log('Cash payment without user - using balance 0');
     }
 
     // Calculate transaction amount and handle balance based on payment method
@@ -106,36 +130,33 @@ export const POST: RequestHandler = async ({ request }) => {
     console.log('Payment method:', paymentMethod);
     console.log('Is negative amount:', isNegativeAmount);
     console.log('Is cash payment:', isCashPayment);
+    console.log('Final UserID:', finalUserID);
+    console.log('Final UserName:', finalUserName);
     
-    // Use values from frontend if payment method is Saldo, otherwise use current logic
+    // Calculate balance values
     let prevBalance, calculatedNewBalance, transactionAmount;
     
     if (paymentMethod === 'Saldo' && typeof currentBalance === 'number' && typeof newBalance === 'number') {
-      // Use values calculated in frontend
+      // Use values calculated in frontend for balance payments
       prevBalance = currentBalance;
       calculatedNewBalance = newBalance;
       transactionAmount = -Math.abs(quantity); // Always negative for purchases
-      console.log('USING FRONTEND VALUES');
-      console.log('Previous balance:', prevBalance);
-      console.log('New balance:', calculatedNewBalance);
+      console.log('USING FRONTEND VALUES FOR BALANCE PAYMENT');
+    } else if (paymentMethod === 'Efectivo') {
+      // For cash payments, record the transaction but don't change the user's balance
+      transactionAmount = -Math.abs(quantity); // Always negative for purchases
+      prevBalance = actualCurrentBalance; // Current balance at time of transaction
+      calculatedNewBalance = actualCurrentBalance; // Same balance (no change for cash payments)
+      console.log('CASH PAYMENT - NO BALANCE CHANGE');
       console.log('Transaction amount:', transactionAmount);
+      console.log('Previous balance (unchanged):', prevBalance);
+      console.log('New balance (same as previous):', calculatedNewBalance);
     } else {
-      // Fallback to current logic
+      // Fallback logic
       console.log('USING BACKEND CALCULATION');
-      if (isCashPayment && isNegativeAmount) {
-        // Caso 1: Pago en efectivo con cantidad negativa (consumo pagado por fuera)
-        // No se modifica el saldo virtual
-        transactionAmount = quantity; // Mantener el valor negativo
-        prevBalance = actualCurrentBalance;
-        calculatedNewBalance = actualCurrentBalance;
-        console.log('CASE 1: Cash payment with negative amount - No balance change');
-      } else {
-        // Caso 2: Cualquier otro caso (método distinto a efectivo o cantidad positiva)
-        transactionAmount = isNegativeAmount ? quantity : -Math.abs(quantity); // Negativo para consumos
-        prevBalance = actualCurrentBalance;
-        calculatedNewBalance = actualCurrentBalance + transactionAmount; // Suma si es recarga, resta si es consumo
-        console.log('CASE 2: Balance will change');
-      }
+      transactionAmount = -Math.abs(quantity); // Always negative for purchases
+      prevBalance = actualCurrentBalance;
+      calculatedNewBalance = actualCurrentBalance + transactionAmount;
     }
     
     console.log('FINAL CALCULATION:');
@@ -149,11 +170,11 @@ export const POST: RequestHandler = async ({ request }) => {
       [
         dateStr,                     // Date (columna A)
         timeStr,                     // Time (columna B)
-        userID,                      // UserID (columna C)
-        userName || '',              // Name (columna D)
+        finalUserID,                 // UserID (columna C)
+        finalUserName,               // Name (columna D)
         transactionAmount,           // Quantity (always negative for purchases)
         prevBalance,                 // PrevBalance (columna F) - Saldo anterior
-        calculatedNewBalance,        // NewBalance (columna G) - Nuevo saldo (solo cambia si es Saldo)
+        calculatedNewBalance,        // NewBalance (columna G) - Nuevo saldo (mismo para efectivo)
         paymentMethod,               // Method - Saldo o Efectivo (columna H)
         `Compra #${orderID}`         // Observation(s) - Formato: Compra #000005 (columna I)
       ]
@@ -161,8 +182,8 @@ export const POST: RequestHandler = async ({ request }) => {
 
     console.log('Values to insert (Balance):', balanceValues);
 
-    // Update user balance ONLY if payment method is 'Saldo'
-    if (paymentMethod === 'Saldo') {
+    // Update user balance ONLY if payment method is 'Saldo' AND there's a real user
+    if (paymentMethod === 'Saldo' && userID && userID !== 'EFECTIVO') {
       console.log('Updating user balance from', prevBalance, 'to', calculatedNewBalance);
       
       // Find the user row in Users sheet
@@ -190,6 +211,8 @@ export const POST: RequestHandler = async ({ request }) => {
       } else {
         console.error('User not found for balance update:', userID);
       }
+    } else {
+      console.log('Skipping balance update - Cash payment or no real user');
     }
 
     // Add to "Transactions - Balance" sheet
@@ -203,6 +226,12 @@ export const POST: RequestHandler = async ({ request }) => {
     });
 
     console.log('Transaction recorded successfully:', result.data);
+
+    // Clear the previous user ID, name, and balance after processing the transaction
+    const clearedUserID = null;
+    const clearedUserName = null;
+    const clearedBalance = 0;
+    console.log('Cleared previous user data:', { clearedUserID, clearedUserName, clearedBalance });
 
     return json({ 
       success: true, 
