@@ -50,6 +50,7 @@
 
   // Debugging and device selection helpers
   let lastRaw: string | null = null;
+  let lastWasRawOnly: boolean = false;
   let lastError: string | null = null;
   let _deviceList: MediaDeviceInfo[] = [];
   let _activeLabel: string | null = null;
@@ -364,8 +365,15 @@
             }
 
             if (!userId) {
-              dispatch('error', 'No se encontró un ID válido en el código leído');
+              // marcar que el último resultado fue sólo raw (sin un ID derivable)
+              lastWasRawOnly = true;
+              // indicar al usuario que se leyó algo, pero no contiene un ID válido
+              playBeepNow();
+              dispatch('error', 'Se leyó un código pero no contiene un ID válido');
+              dispatch('status', 'Leído (sin ID válido)');
               return;
+            } else {
+              lastWasRawOnly = false;
             }
 
             // Manejar emisión según continuous y debounce
@@ -379,6 +387,7 @@
               // emitir y establecer debounce
                 // reproducir beep primero para minimizar latencia perceptual
                 playBeepNow();
+                lastWasRawOnly = false;
                 dispatch('scanned', { userId, raw, payload });
                 _lastEmitted = userId;
 
@@ -390,6 +399,7 @@
             } else {
                 // reproducir beep primero, luego emitir y detener
                 playBeepNow();
+                lastWasRawOnly = false;
                 dispatch('scanned', { userId, raw, payload });
                 dispatch('status', 'Lectura completada');
                 // detener ZXing y cámara
@@ -605,9 +615,18 @@
     border-radius: 6px;
     z-index: 100;
     max-width: calc(100% - 16px);
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: normal; /* allow line breaks so we can place camera on its own line */
+  overflow-wrap: anywhere;
+  }
+
+  .debug-camera {
+    margin-top: 6px;
+    font-size: 12px;
+    color: #e5e7eb;
+    opacity: 0.95;
+    word-break: break-word;
   }
 
   /* style for select in header to look decent */
@@ -738,7 +757,11 @@
             Cargando cámara...
           {:else if isScanning}
             {#if lastRaw}
-              Último raw: {lastRaw} {#if lastError} | Error: {lastError}{/if}
+              {#if lastWasRawOnly}
+                Código leído (sin ID válido): {lastRaw} {#if lastError} | Error: {lastError}{/if}
+              {:else}
+                Último raw: {lastRaw} {#if lastError} | Error: {lastError}{/if}
+              {/if}
             {:else}
               Escaneando...
             {/if}
@@ -748,11 +771,12 @@
         </span>
 
         {#if _activeLabel}
-          <span class="debug-sep"> · </span><span class="debug-label">Cámara: {_activeLabel}</span>
+          <div class="debug-camera">Cámara: {_activeLabel}</div>
         {/if}
 
-        {#if isRequestingPermission}
-          <span class="spinner" aria-hidden="true" style="display:inline-block; vertical-align:middle;"></span>
+        {#if isRequestingPermission || isInitializing}
+          <!-- show spinner only when requesting permission or initializing the camera -->
+          <span class="spinner" aria-hidden="true" style="display:inline-block; vertical-align:middle; margin-left:6px;"></span>
         {/if}
       </div>
     </div>
