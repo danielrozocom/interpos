@@ -10,6 +10,8 @@
   import { onMount, onDestroy } from 'svelte';
   import { createEventDispatcher } from 'svelte';
 
+  const PREF_KEY = 'scannerPreferredDeviceId';
+
   const dispatch = createEventDispatcher();
 
   // Props
@@ -43,6 +45,35 @@
   let lastError: string | null = null;
   let _deviceList: MediaDeviceInfo[] = [];
   let _activeLabel: string | null = null;
+
+  const STORAGE_KEY = 'scanner.preferredDeviceId';
+
+  function savePreferredDevice(deviceId: string | null) {
+    try {
+      if (deviceId) window.localStorage.setItem(STORAGE_KEY, deviceId);
+      else window.localStorage.removeItem(STORAGE_KEY);
+    } catch (e) {
+      console.warn('No se pudo guardar preferencia de cámara', e);
+    }
+  }
+
+  function loadPreferredDevice(): string | null {
+    try {
+      return window.localStorage.getItem(STORAGE_KEY);
+    } catch (e) {
+      return null;
+    }
+  }
+
+  async function onSelectChange() {
+    // persist and reinit scanner with selected device
+    try {
+      savePreferredDevice(_activeDeviceId);
+      await reinit(_activeDeviceId || undefined);
+    } catch (e) {
+      console.warn('Error cambiando cámara', e);
+    }
+  }
 
   async function listCameras() {
     try {
@@ -82,6 +113,12 @@
     _activeLabel = next.label || `Cámara ${(_deviceList.indexOf(next) + 1)}`;
     // restart scanner with new device
     await reinit(_activeDeviceId || undefined);
+    // guardar preferencia en localStorage
+    try {
+      localStorage.setItem(PREF_KEY, _activeDeviceId);
+    } catch (e) {
+      console.warn('No se pudo guardar la preferencia de cámara', e);
+    }
   }
 
   // Helpers SSR-safe: no usar nada de navigator/window fuera de onMount/start
@@ -299,7 +336,7 @@
     try {
       // reset ZXing
       try { _codeReader?.reset(); } catch (e) {}
-      _codeReader = _codeReader; // keep reference if needed
+      _codeReader = _codeReader; // keep reference
     } catch (e) {
       // ignore
     }
@@ -354,51 +391,93 @@
 </script>
 
 <style>
-  .modal-backdrop { position: fixed; inset: 0; background: rgba(0,0,0,0.7); display:flex; align-items:center; justify-content:center; z-index:50; }
-  .modal-box { width: 420px; background: white; border-radius: 10px; overflow: hidden; box-shadow: 0 10px 30px rgba(0,0,0,0.4); }
-  .modal-header { display:flex; align-items:center; justify-content:space-between; padding:12px 16px; background:#f3f4f6; border-bottom:1px solid #e5e7eb; }
-  .modal-title { font-weight:600; color:#111827; }
-  .modal-body { background:black; height:320px; display:flex; align-items:center; justify-content:center; }
-  video { width:100%; height:100%; object-fit:contain; }
-  .close-btn { background:transparent; border:0; font-size:18px; cursor:pointer; }
-  .icon-btn { background:transparent; border:0; padding:6px; border-radius:6px; cursor:pointer; color:#374151; }
-  .icon-btn:hover { background: rgba(0,0,0,0.04); }
+  /* backdrop con padding para dejar margen en móviles */
+  .modal-backdrop {
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.7);
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    z-index:50;
+    padding: 16px; /* espacio lateral en móviles */
+    box-sizing: border-box;
+  }
 
+  /* caja responsiva: no superar 92% del ancho de la pantalla */
+  .modal-box {
+    width: min(92vw, 420px); /* ajusta automáticamente a pantallas pequeñas */
+    max-width: 100%;
+    margin: 0 auto;
+    background: white;
+    border-radius: 10px;
+    overflow: hidden;
+    box-shadow: 0 10px 30px rgba(0,0,0,0.4);
+    box-sizing: border-box;
+  }
+
+  .modal-header {
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    padding:12px 16px;
+    background:#f3f4f6;
+    border-bottom:1px solid #e5e7eb;
+  }
+
+  .modal-title { font-weight:600; color:#111827; }
+
+  .modal-body {
+    background:black;
+    height: min(56vh, 360px); /* altura responsiva */
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    position:relative;
+    overflow: hidden; /* importante: recortar el video al contenedor */
+  }
+
+  /* el video ocupa todo el contenedor y se recorta (no permite salirse) */
+  video {
+    width: 100%;
+    height: 100%;
+    object-fit: cover; /* cover mejor para lecturas de barras */
+    display: block;
+    max-height: 100%;
+  }
+
+  .close-btn { background:transparent; border:0; font-size:18px; cursor:pointer; }
+
+  /* debug reducido: menos intrusivo y abajo a la izquierda */
   .debug-info {
     position: absolute;
-    top: 0;
-    left: 0;
-    right: 0;
-    padding: 8px;
-    font-size: 14px;
+    bottom: 8px;
+    left: 8px;
+    padding: 6px 10px;
+    font-size: 12px;
     color: white;
-    background: rgba(0, 0, 0, 0.7);
-    border-bottom: 1px solid rgba(255, 255, 255, 0.3);
+    background: rgba(0, 0, 0, 0.55);
+    border-radius: 6px;
     z-index: 100;
+    max-width: calc(100% - 16px);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
   }
 
-  /* New styles for the icon button */
-  .icon-btn {
-    background: transparent;
-    border: 0;
-    cursor: pointer;
-    padding: 0;
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    width: 36px;
-    height: 36px;
-    border-radius: 50%;
-    transition: background 0.2s;
+  /* style for select in header to look decent */
+  select[aria-label="Seleccionar cámara"] {
+    padding: 6px 8px;
+    border-radius: 6px;
+    border: 1px solid #d1d5db;
+    background: white;
+    color: #111827;
+    font-size: 14px;
   }
 
-  .icon-btn:hover {
-    background: rgba(0, 0, 0, 0.1);
-  }
-
-  .icon-btn:focus {
-    outline: none;
-    box-shadow: 0 0 0 3px rgba(66, 153, 225, 0.6);
+  @media (min-width: 900px) {
+    .modal-box { width: 560px; }
+    .modal-body { height: 420px; }
   }
 </style>
 
@@ -408,15 +487,11 @@
       <div style="display:flex;align-items:center;gap:8px;">
         <div class="modal-title">Escanear código</div>
         {#if _deviceList && _deviceList.length > 1}
-          <button class="icon-btn" on:click={cycleCamera} aria-label="Cambiar cámara" title="Cambiar cámara">
-            <!-- camera switch SVG icon -->
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
-              <path d="M4 7H6L7 5H17L18 7H20C21.1 7 22 7.9 22 9V17C22 18.1 21.1 19 20 19H4C2.9 19 2 18.1 2 17V9C2 7.9 2.9 7 4 7Z" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/>
-              <path d="M12 15A3 3 0 1 0 12 9A3 3 0 0 0 12 15Z" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/>
-              <path d="M21 15V13" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
-              <path d="M21 15C21 11.6863 18.3137 9 15 9" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
-            </svg>
-          </button>
+          <select on:change={onSelectChange} bind:value={_activeDeviceId} aria-label="Seleccionar cámara">
+            {#each _deviceList as d, i}
+              <option value={d.deviceId}>{d.label || `Cámara ${i + 1}`}</option>
+            {/each}
+          </select>
         {/if}
       </div>
       <button class="close-btn" aria-label="Cerrar escáner" on:click={closeModal}>✕</button>
