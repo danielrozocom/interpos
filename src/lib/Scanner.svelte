@@ -87,6 +87,32 @@
   let permissionDenied: boolean = false;
   let permissionMessage: string | null = null;
 
+  // Scroll lock helpers: prevent background scroll while modal is open
+  let _prevBodyOverflow: string | null = null;
+  let _prevBodyPaddingRight: string | null = null;
+  function lockScroll() {
+    try {
+      const body = document.body;
+      _prevBodyOverflow = body.style.overflow || null;
+      _prevBodyPaddingRight = body.style.paddingRight || null;
+      // compensate for scrollbar width to avoid layout shift
+      const scrollBarWidth = window.innerWidth - document.documentElement.clientWidth;
+      if (scrollBarWidth > 0) body.style.paddingRight = `${scrollBarWidth}px`;
+      body.style.overflow = 'hidden';
+    } catch (e) {
+      // ignore
+    }
+  }
+
+  function unlockScroll() {
+    try {
+      const body = document.body;
+      if (_prevBodyOverflow !== null) body.style.overflow = _prevBodyOverflow; else body.style.overflow = '';
+      if (_prevBodyPaddingRight !== null) body.style.paddingRight = _prevBodyPaddingRight; else body.style.paddingRight = '';
+      _prevBodyOverflow = null; _prevBodyPaddingRight = null;
+    } catch (e) {}
+  }
+
   // Preload audio element to reduce playback latency
   let beepAudio: HTMLAudioElement | null = null;
   function initBeep() {
@@ -518,7 +544,8 @@
   }
 
   function closeModal() {
-    try { stop(); } catch(e) {}
+  try { stop(); } catch(e) {}
+  try { unlockScroll(); } catch(e) {}
     dispatch('close');
   }
 
@@ -528,7 +555,8 @@
       const pref = loadPreferredDevice();
       if (pref) _activeDeviceId = pref;
       try { initBeep(); } catch(e) { /* ignore */ }
-      start();
+  try { lockScroll(); } catch(e) {}
+  start();
     }
 
     // cerrar con Escape
@@ -539,7 +567,8 @@
 
   // limpiar al destruir componente
   onDestroy(() => {
-    try { stop(); } catch (e) {}
+  try { stop(); } catch (e) {}
+  try { unlockScroll(); } catch (e) {}
   });
 </script>
 
