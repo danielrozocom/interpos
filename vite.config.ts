@@ -5,5 +5,11 @@ export default defineConfig({
   plugins: [
     sveltekit()
   ],
-  base: process.env.NODE_ENV === 'production' ? '/interpos/' : '/'
+  base: process.env.NODE_ENV === 'production' ? '/interpos/' : '/',
+  optimizeDeps: {
+    include: ['@zxing/browser', '@zxing/library']
+  },
+  ssr: {
+    noExternal: ['@zxing/browser', '@zxing/library']
+  }
 });

@@ -3,45 +3,73 @@
   import { formatDate } from '../../lib/date-utils';
 
   let showScanner = false;
-  let videoEl: HTMLVideoElement | null = null;
-  let scannerStream: MediaStream | null = null;
-  let barcodeDetector: any = null;
-  let scannerInterval: any = null;
   let scannerError = '';
+  let Scanner: any = null;
+
+  // Cargar el componente Scanner solo en el cliente
+  onMount(async () => {
+    try {
+      const module = await import('../../lib/Scanner.svelte');
+      Scanner = module.default;
+    } catch (err) {
+      console.error('Error loading Scanner component:', err);
+    }
+  });
 
   function closeScanner() {
     showScanner = false;
     scannerError = '';
-    if (scannerInterval) {
-      clearInterval(scannerInterval);
-      scannerInterval = null;
-    }
-    if (scannerStream) {
-      scannerStream.getTracks().forEach(t => t.stop());
-      scannerStream = null;
-    }
-    if (videoEl) {
-      videoEl.srcObject = null;
-    }
   }
 
-  async function openScanner() {
-    scannerError = '';
+  function openScanner() {
+    // Si el componente no está cargado aún, cargarlo bajo demanda
+    if (!Scanner) {
+      scannerError = '';
+      // intentar carga dinámica sin bloquear UI
+      import('../../lib/Scanner.svelte').then(m => {
+        Scanner = m.default;
+        showScanner = true;
+      }).catch(err => {
+        console.error('Error cargando Scanner dinámicamente', err);
+        scannerError = 'Escáner no disponible';
+      });
+      return;
+    }
+
+    // Mostrar el modal; el componente inicia automáticamente al montarse
     showScanner = true;
-    try {
-      scannerStream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } });
-      if (videoEl) videoEl.srcObject = scannerStream;
-    } catch (err) {
-      console.error('Error opening scanner', err);
-      scannerError = 'No se pudo acceder a la cámara';
-    }
   }
 
-  function handleScannedCode(code: string) {
-    const digits = code.replace(/[^0-9]/g, '');
-    const useVal = digits.length > 0 ? digits : code;
-    userId = useVal;
-    closeScanner();
+  function handleScannedCode(event: CustomEvent) {
+    // Compatibilidad: algunos emitters mandan { value }, otros { userId, raw, payload }
+    console.log('Scanner scanned event', event.detail);
+    const detail = event.detail || {};
+    let raw: string | undefined;
+    let derivedUserId: string | null = null;
+
+    if (detail.value) {
+      raw = String(detail.value);
+    } else if (detail.raw) {
+      raw = String(detail.raw);
+    }
+
+    if (detail.userId) {
+      derivedUserId = String(detail.userId);
+    }
+
+    if (!derivedUserId && raw) {
+      const digits = raw.replace(/[^0-9]/g, '');
+      derivedUserId = digits.length > 0 ? digits : raw;
+    }
+
+    if (!derivedUserId) {
+      scannerError = 'Código leído, pero no se pudo extraer un ID válido';
+      console.warn('Scanned but no userId derived', detail);
+      return;
+    }
+
+    userId = derivedUserId;
+    showScanner = false;
     checkBalance();
   }
 
@@ -512,49 +540,16 @@
     {/if}
   </div>
 
-  {#if showScanner}
-    <div class="fixed inset-0 z-50 flex items-center justify-center" role="dialog" aria-modal="true" aria-label="Escáner de códigos">
-      <!-- dark overlay behind everything -->
-      <div class="absolute inset-0 bg-black/70" aria-hidden="true"></div>
-
-      <!-- single box containing header and video -->
-      <div class="relative z-50 w-[420px] rounded-lg overflow-hidden shadow-2xl bg-white">
-        <!-- header inside the box -->
-        <div class="bg-gray-100 px-4 py-3 flex items-center justify-between border-b border-gray-300">
-          <span class="text-gray-900 font-semibold text-lg">Escanear código</span>
-          <button
-            class="text-gray-600 hover:text-gray-900 rounded-full p-1 focus:outline-none focus:ring-2 focus:ring-gray-400"
-            on:click={() => { if (videoEl) { try { videoEl.pause(); } catch(e){} } closeScanner(); }}
-            aria-label="Cerrar escáner"
-            title="Cerrar"
-          >
-            <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
-              <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
-            </svg>
-          </button>
-        </div>
-
-        <!-- video box inside the same container -->
-        <div class="relative w-full h-[280px] bg-black flex items-center justify-center">
-          <video
-            bind:this={videoEl}
-            autoplay
-            playsinline
-            muted
-            class="w-full h-full object-contain"
-          ></video>
-
-          <!-- border guide inside video box -->
-          <div class="absolute inset-0 pointer-events-none border-4 border-white/60 rounded-lg"></div>
-        </div>
-
-        {#if scannerError}
-          <div class="text-red-700 text-sm bg-red-100 px-4 py-2 rounded-b border-t border-red-300">
-            {scannerError}
-          </div>
-        {/if}
-      </div>
-    </div>
+  {#if showScanner && Scanner}
+    <svelte:component
+      this={Scanner}
+      on:close={closeScanner}
+      on:scanned={handleScannedCode}
+      on:status={(e) => { console.log('Scanner status', e.detail); scannerError = e.detail; }}
+      on:error={(e) => { console.error('Scanner error', e.detail); scannerError = e.detail; }}
+      continuous={false}
+      debounceMs={800}
+    />
   {/if}
 </div>
 
