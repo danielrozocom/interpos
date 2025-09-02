@@ -10,7 +10,8 @@
   import { onMount, onDestroy } from 'svelte';
   import { createEventDispatcher } from 'svelte';
 
-  const PREF_KEY = 'scannerPreferredDeviceId';
+  // single storage key for preferred camera
+  const PREF_KEY = 'scanner.preferredDeviceId';
 
   const dispatch = createEventDispatcher();
 
@@ -46,12 +47,10 @@
   let _deviceList: MediaDeviceInfo[] = [];
   let _activeLabel: string | null = null;
 
-  const STORAGE_KEY = 'scanner.preferredDeviceId';
-
   function savePreferredDevice(deviceId: string | null) {
     try {
-      if (deviceId) window.localStorage.setItem(STORAGE_KEY, deviceId);
-      else window.localStorage.removeItem(STORAGE_KEY);
+      if (deviceId) window.localStorage.setItem(PREF_KEY, deviceId);
+      else window.localStorage.removeItem(PREF_KEY);
     } catch (e) {
       console.warn('No se pudo guardar preferencia de cámara', e);
     }
@@ -59,7 +58,7 @@
 
   function loadPreferredDevice(): string | null {
     try {
-      return window.localStorage.getItem(STORAGE_KEY);
+      return window.localStorage.getItem(PREF_KEY);
     } catch (e) {
       return null;
     }
@@ -114,11 +113,7 @@
     // restart scanner with new device
     await reinit(_activeDeviceId || undefined);
     // guardar preferencia en localStorage
-    try {
-      localStorage.setItem(PREF_KEY, _activeDeviceId);
-    } catch (e) {
-      console.warn('No se pudo guardar la preferencia de cámara', e);
-    }
+    try { savePreferredDevice(_activeDeviceId); } catch (e) { console.warn('No se pudo guardar la preferencia de cámara', e); }
   }
 
   // Helpers SSR-safe: no usar nada de navigator/window fuera de onMount/start
@@ -376,7 +371,11 @@
 
   // iniciar automáticamente cuando se monta en cliente
   onMount(() => {
-    if (typeof window !== 'undefined') start();
+    if (typeof window !== 'undefined') {
+      const pref = loadPreferredDevice();
+      if (pref) _activeDeviceId = pref;
+      start();
+    }
 
     // cerrar con Escape
     const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') closeModal(); };
@@ -427,6 +426,8 @@
 
   .modal-title { font-weight:600; color:#111827; }
 
+  .header-left { display:flex; align-items:center; gap:12px; flex:1; }
+
   .modal-body {
     background:black;
     height: min(56vh, 360px); /* altura responsiva */
@@ -446,7 +447,7 @@
     max-height: 100%;
   }
 
-  .close-btn { background:transparent; border:0; font-size:18px; cursor:pointer; }
+  .close-btn { background:transparent; border:0; font-size:18px; cursor:pointer; margin-left: 12px; }
 
   /* debug reducido: menos intrusivo y abajo a la izquierda */
   .debug-info {
@@ -475,6 +476,16 @@
     font-size: 14px;
   }
 
+  /* nuevo estilo para el header del modal: mayor separación y alineación */
+  .modal-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 12px 16px;
+    background: #f3f4f6;
+    border-bottom: 1px solid #e5e7eb;
+  }
+
   @media (min-width: 900px) {
     .modal-box { width: 560px; }
     .modal-body { height: 420px; }
@@ -484,7 +495,7 @@
 <div class="modal-backdrop" role="dialog" aria-modal="true" aria-label="Escáner de códigos">
   <div class="modal-box">
     <div class="modal-header">
-      <div style="display:flex;align-items:center;gap:8px;">
+      <div class="header-left">
         <div class="modal-title">Escanear código</div>
         {#if _deviceList && _deviceList.length > 1}
           <select on:change={onSelectChange} bind:value={_activeDeviceId} aria-label="Seleccionar cámara">
