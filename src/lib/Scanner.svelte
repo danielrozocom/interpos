@@ -54,10 +54,21 @@
   let _deviceList: MediaDeviceInfo[] = [];
   let _activeLabel: string | null = null;
 
+  // toast for small confirmations
+  let toastMessage: string | null = null;
+  let _toastTimer: any = null;
+  function showToast(msg: string, ms = 1800) {
+    toastMessage = msg;
+    try { if (_toastTimer) clearTimeout(_toastTimer); } catch(e) {}
+    _toastTimer = setTimeout(() => { toastMessage = null; _toastTimer = null; }, ms);
+  }
+
   function savePreferredDevice(deviceId: string | null) {
     try {
       if (deviceId) window.localStorage.setItem(PREF_KEY, deviceId);
       else window.localStorage.removeItem(PREF_KEY);
+      // show confirmation toast
+      try { showToast('Preferencia de cámara guardada'); } catch(e){}
     } catch (e) {
       console.warn('No se pudo guardar preferencia de cámara', e);
     }
@@ -74,6 +85,19 @@
   // Permission handling: track when permission is denied or stream becomes inactive
   let permissionDenied: boolean = false;
   let permissionMessage: string | null = null;
+
+  // Play the static beep file from the app's static folder
+  function playBeepFile()
+    try {
+      const audio = new Audio('/Beep.mp3');
+      audio.volume = 0.9;
+      // start playback (may return a promise)
+      const p = audio.play();
+      if (p && typeof p.catch === 'function') p.catch((e) => console.warn('Beep playback failed', e));
+    } catch (e) {
+      console.warn('Beep playback error', e);
+    }
+  }
 
   async function requestCameraPermission(constraints: any = { video: true }) {
     // Try to trigger permission prompt and immediately close stream
@@ -316,6 +340,7 @@
 
               // emitir y establecer debounce
               dispatch('scanned', { userId, raw, payload });
+              playBeepFile();
               _lastEmitted = userId;
 
               // limpiar _lastEmitted después de debounceMs
@@ -326,6 +351,7 @@
             } else {
               // emitir y detener
               dispatch('scanned', { userId, raw, payload });
+              playBeepFile();
               dispatch('status', 'Lectura completada');
               // detener ZXing y cámara
               try {
@@ -599,6 +625,41 @@
   .permission-panel button:hover {
     background: rgba(255, 255, 255, 0.2);
   }
+
+  /* nuevo estilo para el toast de confirmación */
+  .toast {
+    position: fixed;
+    top: 20px;
+    right: 20px;
+    background: rgba(0, 0, 0, 0.8);
+    color: white;
+    padding: 10px 16px;
+    border-radius: 8px;
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.3);
+    z-index: 300;
+    transition: opacity 0.3s;
+  }
+
+  .toast.hidden {
+    opacity: 0;
+    pointer-events: none;
+  }
+
+  /* spinner style */
+  .spinner {
+    border: 2px solid rgba(255, 255, 255, 0.3);
+    border-top: 2px solid rgba(255, 255, 255, 0.9);
+    border-radius: 50%;
+    width: 16px;
+    height: 16px;
+    animation: spin 0.6s linear infinite;
+    margin-left: 8px;
+  }
+
+  @keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+  }
 </style>
 
 <div class="modal-backdrop" role="dialog" aria-modal="true" aria-label="Escáner de códigos">
@@ -631,14 +692,14 @@
         {#if permissionDenied}
           {permissionMessage || 'Permiso de cámara denegado o cámara inactiva'}
         {:else if isRequestingPermission}
-          Solicitando permiso de cámara... | Por favor permita el acceso.
+          Solicitando permiso de cámara...
         {:else if isInitializing}
-          Cargando cámara...  | Un momento por favor.
+          Cargando cámara...
         {:else if isScanning}
           {#if lastRaw}
             Último raw: {lastRaw} {#if lastError} | Error: {lastError}{/if}
           {:else}
-            Escaneando...  | Apunta la cámara al código.
+            Escaneando...
           {/if}
         {:else}
           Esperando escaneo...
@@ -646,7 +707,15 @@
         {#if _activeLabel}
           <br>Cámara: {_activeLabel}
         {/if}
+        {#if isRequestingPermission}
+          <div class="spinner" aria-hidden="true"></div>
+        {/if}
       </div>
     </div>
   </div>
+  {#if toastMessage}
+    <div class="toast {toastMessage ? '' : 'hidden'}">
+      {toastMessage}
+    </div>
+  {/if}
 </div>
