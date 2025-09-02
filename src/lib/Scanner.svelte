@@ -361,6 +361,9 @@
   .modal-body { background:black; height:320px; display:flex; align-items:center; justify-content:center; }
   video { width:100%; height:100%; object-fit:contain; }
   .close-btn { background:transparent; border:0; font-size:18px; cursor:pointer; }
+  .icon-btn { background:transparent; border:0; padding:6px; border-radius:6px; cursor:pointer; color:#374151; }
+  .icon-btn:hover { background: rgba(0,0,0,0.04); }
+
   .debug-info {
     position: absolute;
     top: 0;
@@ -373,6 +376,30 @@
     border-bottom: 1px solid rgba(255, 255, 255, 0.3);
     z-index: 100;
   }
+
+  /* New styles for the icon button */
+  .icon-btn {
+    background: transparent;
+    border: 0;
+    cursor: pointer;
+    padding: 0;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    transition: background 0.2s;
+  }
+
+  .icon-btn:hover {
+    background: rgba(0, 0, 0, 0.1);
+  }
+
+  .icon-btn:focus {
+    outline: none;
+    box-shadow: 0 0 0 3px rgba(66, 153, 225, 0.6);
+  }
 </style>
 
 <div class="modal-backdrop" role="dialog" aria-modal="true" aria-label="Escáner de códigos">
@@ -381,7 +408,15 @@
       <div style="display:flex;align-items:center;gap:8px;">
         <div class="modal-title">Escanear código</div>
         {#if _deviceList && _deviceList.length > 1}
-          <button on:click={cycleCamera} title="Cambiar cámara">📷</button>
+          <button class="icon-btn" on:click={cycleCamera} aria-label="Cambiar cámara" title="Cambiar cámara">
+            <!-- camera switch SVG icon -->
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+              <path d="M4 7H6L7 5H17L18 7H20C21.1 7 22 7.9 22 9V17C22 18.1 21.1 19 20 19H4C2.9 19 2 18.1 2 17V9C2 7.9 2.9 7 4 7Z" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/>
+              <path d="M12 15A3 3 0 1 0 12 9A3 3 0 0 0 12 15Z" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/>
+              <path d="M21 15V13" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
+              <path d="M21 15C21 11.6863 18.3137 9 15 9" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+          </button>
         {/if}
       </div>
       <button class="close-btn" aria-label="Cerrar escáner" on:click={closeModal}>✕</button>
