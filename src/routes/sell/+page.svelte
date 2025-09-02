@@ -29,6 +29,62 @@ let successMsg = '';
 let mobileView = 'products'; // 'products' or 'cart' for mobile view switching
 let showAddedNotification = false;
 
+// Scanner modal state (dynamic import to keep SSR-safe)
+let showScanner = false;
+let Scanner: any = null;
+
+onMount(async () => {
+  // load scanner lazily to avoid SSR issues
+  try {
+    const mod = await import('../../lib/Scanner.svelte');
+    Scanner = mod.default;
+  } catch (e) {
+    // ignore; will try dynamic load on open
+  }
+});
+
+function openScanner() {
+  if (!Scanner) {
+    // attempt dynamic import and then open
+    import('../../lib/Scanner.svelte').then(m => { Scanner = m.default; showScanner = true; }).catch(err => { console.error('Error loading Scanner', err); error = 'Escáner no disponible'; });
+    return;
+  }
+  showScanner = true;
+}
+
+function closeScanner() { showScanner = false; }
+
+function handleScannedSell(ev: Event) {
+  const e = ev as CustomEvent;
+  const detail = e.detail || {};
+  let raw: string | undefined = undefined;
+  let derivedUserId: string | null = null;
+
+  if (detail.value) raw = String(detail.value);
+  else if (detail.raw) raw = String(detail.raw);
+
+  if (detail.userId) derivedUserId = String(detail.userId);
+
+  if (!derivedUserId && raw) {
+    const digits = raw.replace(/[^0-9]/g, '');
+    derivedUserId = digits.length > 0 ? digits : raw;
+  }
+
+  if (derivedUserId) {
+    userId = derivedUserId;
+    // Load balance immediately and close scanner
+    loadUserBalance(true);
+    showScanner = false;
+    // focus input after a tick
+    tick().then(() => { const el = document.getElementById('userId') as HTMLInputElement | null; if (el) el.focus(); });
+    return;
+  }
+
+  // If nothing could be derived, still close and show an error
+  showScanner = false;
+  error = 'Se leyó un código pero no se pudo extraer un ID';
+}
+
 // Cargar preferencia de ordenamiento desde localStorage
 let sortByAlphabetical = typeof window !== 'undefined' ? 
   localStorage.getItem('sortByAlphabetical') !== 'false' : true; // true = alfabético, false = por ID
@@ -637,7 +693,28 @@ let showCashModal = false;
             aria-label="ID de Cliente"
             autofocus
           />
+          <button
+            type="button"
+            class="h-10 w-10 p-1 rounded-lg flex items-center justify-center bg-primary text-white shadow-sm hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-primary/40"
+            aria-label="Escanear código de cliente"
+            title="Escanear código"
+            on:click={openScanner}
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-white" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M3 7h3l2-2h6l2 2h3v11a2 2 0 01-2 2H5a2 2 0 01-2-2z" />
+              <circle cx="12" cy="13" r="3.5" stroke-linecap="round" stroke-linejoin="round" />
+            </svg>
+          </button>
         </div>
+    {#if showScanner && Scanner}
+      <svelte:component
+        this={Scanner}
+        on:close={closeScanner}
+        on:scanned={handleScannedSell}
+        continuous={false}
+        debounceMs={800}
+      />
+    {/if}
         {#if userName}
           <div class="mt-2 flex flex-col gap-1">
             <p class="text-sm md:text-base text-gray-600">Cliente: <span class="font-medium text-gray-900">{userName}</span></p>
