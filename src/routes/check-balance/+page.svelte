@@ -73,6 +73,19 @@
     checkBalance();
   }
 
+  // Handlers referenced from template to avoid inline implicit-any errors
+  function handleScannerStatus(ev: Event) {
+    const e = ev as CustomEvent;
+    console.log('Scanner status', e.detail);
+    scannerError = e.detail;
+  }
+
+  function handleScannerError(ev: Event) {
+    const e = ev as CustomEvent;
+    console.error('Scanner error', e.detail);
+    scannerError = e.detail;
+  }
+
   let userId = '';
   let userSuggestions: any[] = [];
   let transactions: any[] = [];
@@ -346,55 +359,62 @@
         <label class="block text-lg font-semibold text-[#35528C] mb-3" for="userId">
           ID de Usuario
         </label>
-        <div class="flex flex-col sm:flex-row gap-4 items-center">
-          <div class="flex-1 min-w-0">
-            <input
-            type="tel"
-            id="userId"
-            bind:value={userId}
-            on:keydown={validateNumericInput}
-            on:paste={handlePaste}
-              class="h-12 rounded-xl border-2 border-gray-200 shadow-sm focus:border-[#35528C] focus:ring-2 focus:ring-[#35528C]/20 text-lg px-4 w-full min-w-0"
-            placeholder="Ingresa tu ID"
-            inputmode="numeric"
-            pattern="[0-9]*"
-            autocomplete="off"
-          />
+        <div class="flex flex-col sm:flex-row gap-4 items-start">
+          <!-- left group: input + camera button (stay on same row even on mobile) -->
+          <div class="w-full flex items-center gap-2">
+            <div class="flex-1 min-w-0">
+              <input
+                type="tel"
+                id="userId"
+                bind:value={userId}
+                on:keydown={validateNumericInput}
+                on:paste={handlePaste}
+                class="h-12 rounded-xl border-2 border-gray-200 shadow-sm focus:border-[#35528C] focus:ring-2 focus:ring-[#35528C]/20 text-lg px-4 w-full min-w-0"
+                placeholder="Ingresa tu ID"
+                inputmode="numeric"
+                pattern="[0-9]*"
+                autocomplete="off"
+              />
+            </div>
+            <!-- Camera scanner button (stays next to input on mobile) -->
+            <div class="flex items-center flex-shrink-0">
+              <button
+                type="button"
+                class="h-10 w-10 p-1 rounded-lg flex items-center justify-center bg-[#35528C] text-white shadow-sm hover:bg-[#2A4170] focus:outline-none focus:ring-2 focus:ring-[#35528C]/40"
+                aria-label="Abrir escáner de código QR o código de barras"
+                title="Escanear código"
+                on:click={() => openScanner()}
+              >
+                <!-- camera icon (SVG) -->
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-white" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true">
+                  <path stroke-linecap="round" stroke-linejoin="round" d="M3 7h3l2-2h6l2 2h3v11a2 2 0 01-2 2H5a2 2 0 01-2-2z" />
+                  <circle cx="12" cy="13" r="3.5" stroke-linecap="round" stroke-linejoin="round" />
+                </svg>
+              </button>
+            </div>
           </div>
-          <!-- Camera scanner button (less prominent) -->
-          <div class="flex items-center flex-shrink-0 ml-2">
+
+          <!-- right group: action button (full width on mobile, auto on sm+ ) -->
+          <div class="w-full sm:w-auto">
             <button
               type="button"
-              class="h-10 w-10 p-1 rounded-lg flex items-center justify-center bg-[#35528C] text-white shadow-sm hover:bg-[#2A4170] focus:outline-none focus:ring-2 focus:ring-[#35528C]/40"
-              aria-label="Abrir escáner de código QR o código de barras"
-              title="Escanear código"
-              on:click={() => openScanner()}
+              on:click={checkBalance}
+              class="h-12 px-8 w-full sm:w-auto rounded-xl font-semibold text-white transition-all duration-200 transform hover:scale-105 active:scale-95 shadow-lg {loading || !userId ? 'bg-gray-400 cursor-not-allowed opacity-60' : 'bg-[#35528C] hover:bg-[#2A4170] hover:shadow-[#35528C]/20'}"
+              disabled={loading || !userId}
             >
-              <!-- camera icon (SVG) -->
-              <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-white" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true">
-                <path stroke-linecap="round" stroke-linejoin="round" d="M3 7h3l2-2h6l2 2h3v11a2 2 0 01-2 2H5a2 2 0 01-2-2z" />
-                <circle cx="12" cy="13" r="3.5" stroke-linecap="round" stroke-linejoin="round" />
-              </svg>
+              {#if loading}
+                <span class="flex items-center justify-center gap-2">
+                  <svg class="animate-spin h-5 w-5" viewBox="0 0 24 24">
+                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" fill="none"/>
+                    <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"/>
+                  </svg>
+                  Consultando
+                </span>
+              {:else}
+                Consultar
+              {/if}
             </button>
           </div>
-          <button
-            type="button"
-            on:click={checkBalance}
-            class="h-12 px-8 w-full sm:w-auto rounded-xl font-semibold text-white transition-all duration-200 transform hover:scale-105 active:scale-95 shadow-lg {loading || !userId ? 'bg-gray-400 cursor-not-allowed opacity-60' : 'bg-[#35528C] hover:bg-[#2A4170] hover:shadow-[#35528C]/20'}"
-            disabled={loading || !userId}
-          >
-            {#if loading}
-              <span class="flex items-center justify-center gap-2">
-                <svg class="animate-spin h-5 w-5" viewBox="0 0 24 24">
-                  <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" fill="none"/>
-                  <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"/>
-                </svg>
-                Consultando
-              </span>
-            {:else}
-              Consultar
-            {/if}
-          </button>
         </div>
       </div>
     </div>
@@ -543,10 +563,10 @@
   {#if showScanner && Scanner}
     <svelte:component
       this={Scanner}
-      on:close={closeScanner}
-      on:scanned={handleScannedCode}
-      on:status={(e) => { console.log('Scanner status', e.detail); scannerError = e.detail; }}
-      on:error={(e) => { console.error('Scanner error', e.detail); scannerError = e.detail; }}
+  on:close={closeScanner}
+  on:scanned={handleScannedCode}
+  on:status={handleScannerStatus}
+  on:error={handleScannerError}
       continuous={false}
       debounceMs={800}
     />
