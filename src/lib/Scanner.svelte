@@ -24,9 +24,9 @@
   ];
   export let transform: ((raw: string) => { userId: string | null; payload?: any }) | undefined = undefined;
   // Configurable validation for the numeric ID extracted from codes
-  // Defaults: accept between 2 and 13 digits (covers short codes like 777 and barcode EAN13)
+  // Defaults: accept between 2 and 15 digits (covers short codes like 777 and barcode EAN13)
   export let minIdDigits: number = 2;
-  export let maxIdDigits: number = 13;
+  export let maxIdDigits: number = 15;
 
   // Estado interno
   let videoEl: HTMLVideoElement | null = null;
@@ -35,6 +35,13 @@
   let _lastEmitted: string | null = null;
   let _debounceTimer: any = null;
   let _activeDeviceId: string | null = deviceId || null;
+  // explicit state flags to improve UI/status handling
+  let isInitializing: boolean = false;
+  let isRequestingPermission: boolean = false;
+  let isScanning: boolean = false;
+  // current stream and track listeners so we can detect ended events and clean up
+  let _currentStream: MediaStream | null = null;
+  const _trackListeners = new Map<MediaStreamTrack, EventListener>();
 
   // Si el prop deviceId cambia desde el padre, actualizar el device activo
   $: if (typeof window !== 'undefined' && deviceId) {
@@ -70,6 +77,7 @@
 
   async function requestCameraPermission(constraints: any = { video: true }) {
     // Try to trigger permission prompt and immediately close stream
+    isRequestingPermission = true;
     try {
       const stream = await navigator.mediaDevices.getUserMedia(constraints);
       // stop tracks immediately (we only wanted to request permission)
@@ -83,6 +91,8 @@
       permissionMessage = (permErr && (permErr as any).message) ? (permErr as any).message : String(permErr);
       console.warn('Permission request failed', permErr);
       return false;
+    } finally {
+      isRequestingPermission = false;
     }
   }
 
@@ -151,6 +161,7 @@
   // start(): inicia o reinicia con la cámara current
   export async function start(): Promise<void> {
     if (typeof window === 'undefined') return; // SSR safety
+    isInitializing = true;
     dispatch('status', 'Inicializando cámara...');
 
     try {
@@ -248,6 +259,9 @@
         // reset previo si existía
         try { _codeReader?.reset(); } catch(e) {}
 
+        // indicar que pedimos permiso (el navegador puede abrir prompt)
+        isRequestingPermission = true;
+
         // iniciar decodificación: callback cada vez que ZXing detecta algo
         await _codeReader.decodeFromVideoDevice(useDeviceId, videoEl, (result: any, error: any, controls?: any) => {
           // controls puede contener stop(), restart(), etc. Detener con controls.stop() si es necesario
@@ -333,13 +347,35 @@
           }
         });
 
+        // después de que decodeFromVideoDevice se resolvió, el videoEl.srcObject debe estar asignado
+        try {
+          const stream = (videoEl && (videoEl.srcObject as MediaStream)) || null;
+          if (stream) {
+            // store current stream
+            _currentStream = stream;
+            // attach ended listeners to every track
+            stream.getTracks().forEach(track => {
+              const listener = () => {
+                handleStreamInactive();
+              };
+              _trackListeners.set(track, listener);
+              try { track.addEventListener('ended', listener); } catch(e) { /* some browsers */ }
+            });
+          }
+        } catch(e) {}
+
         // populate device list and label for UI
         try { await listCameras(); } catch(e){}
+        isRequestingPermission = false;
+        isInitializing = false;
+        isScanning = true;
         dispatch('status', 'Escaneando...');
       } catch (startErr) {
         console.error('Error iniciando decodeFromVideoDevice', startErr);
         // detectar permiso denegado de forma segura
         if (startErr && typeof startErr === 'object' && 'name' in (startErr as any) && (startErr as any).name === 'NotAllowedError') {
+          permissionDenied = true;
+          permissionMessage = 'Permiso de cámara denegado';
           dispatch('error', 'Permiso de cámara denegado');
           dispatch('status', 'Permission denied');
           return;
@@ -370,7 +406,16 @@
     try {
       const stream = (videoEl && (videoEl.srcObject as MediaStream)) || null;
       if (stream) {
-        stream.getTracks().forEach(t => t.stop());
+        // remove listeners
+        stream.getTracks().forEach(t => {
+          try {
+            const l = _trackListeners.get(t);
+            if (l) t.removeEventListener('ended', l);
+            _trackListeners.delete(t);
+          } catch (e) {}
+          try { t.stop(); } catch (e) {}
+        });
+        _currentStream = null;
       }
       if (videoEl) videoEl.srcObject = null;
     } catch (e) {
@@ -381,6 +426,9 @@
     if (_debounceTimer) { clearTimeout(_debounceTimer); _debounceTimer = null; }
     _lastEmitted = null;
 
+    isInitializing = false;
+    isRequestingPermission = false;
+    isScanning = false;
     dispatch('status', 'Detenido');
   }
 
@@ -580,8 +628,18 @@
         </div>
       {/if}
       <div class="debug-info">
-        {#if lastRaw}
-          Último raw: {lastRaw} {#if lastError} | Error: {lastError}{/if}
+        {#if permissionDenied}
+          {permissionMessage || 'Permiso de cámara denegado o cámara inactiva'}
+        {:else if isRequestingPermission}
+          Solicitando permiso de cámara... | Por favor permita el acceso.
+        {:else if isInitializing}
+          Cargando cámara...  | Un momento por favor.
+        {:else if isScanning}
+          {#if lastRaw}
+            Último raw: {lastRaw} {#if lastError} | Error: {lastError}{/if}
+          {:else}
+            Escaneando...  | Apunta la cámara al código.
+          {/if}
         {:else}
           Esperando escaneo...
         {/if}
