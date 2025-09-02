@@ -1,4 +1,4 @@
-<script lang="ts">
+Al qu<script lang="ts">
   import { onMount, tick } from 'svelte';
   import { page } from '$app/stores';
   
@@ -72,11 +72,22 @@ function handleScannedSell(ev: Event) {
 
   if (derivedUserId) {
     userId = derivedUserId;
-    // Load balance immediately and close scanner
-    loadUserBalance(true);
+    // Simulate Enter key on the input so it behaves like pressing Enter
+    const el = document.getElementById('userId') as HTMLInputElement | null;
+    if (el) {
+      try {
+        const ev = new KeyboardEvent('keydown', { key: 'Enter', bubbles: true, cancelable: true });
+        el.dispatchEvent(ev);
+      } catch (e) {
+        // fallback: call loadUserBalance directly
+        loadUserBalance(true);
+      }
+    } else {
+      loadUserBalance(true);
+    }
     showScanner = false;
     // focus input after a tick
-    tick().then(() => { const el = document.getElementById('userId') as HTMLInputElement | null; if (el) el.focus(); });
+    tick().then(() => { const el2 = document.getElementById('userId') as HTMLInputElement | null; if (el2) el2.focus(); });
     return;
   }
 
@@ -695,7 +706,7 @@ let showCashModal = false;
           />
           <button
             type="button"
-            class="h-10 w-10 p-1 rounded-lg flex items-center justify-center bg-primary text-white shadow-sm hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-primary/40"
+            class="h-10 w-10 p-1 rounded-lg flex items-center justify-center bg-[#35528C] text-white shadow-sm hover:bg-[#2A4170] focus:outline-none focus:ring-2 focus:ring-[#35528C]/40"
             aria-label="Escanear código de cliente"
             title="Escanear código"
             on:click={openScanner}
