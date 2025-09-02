@@ -86,14 +86,52 @@
   let permissionDenied: boolean = false;
   let permissionMessage: string | null = null;
 
-  // Play the static beep file from the app's static folder
-  function playBeepFile()
+  // Preload audio element to reduce playback latency
+  let beepAudio: HTMLAudioElement | null = null;
+  function initBeep() {
     try {
-      const audio = new Audio('/Beep.mp3');
-      audio.volume = 0.9;
-      // start playback (may return a promise)
-      const p = audio.play();
-      if (p && typeof p.catch === 'function') p.catch((e) => console.warn('Beep playback failed', e));
+      beepAudio = document.createElement('audio');
+      beepAudio.src = '/Beep.mp3';
+      beepAudio.preload = 'auto';
+      beepAudio.volume = 0.9;
+      // load
+      beepAudio.load();
+    } catch (e) {
+      console.warn('Beep init failed', e);
+      beepAudio = null;
+    }
+  }
+
+  function playBeepNow() {
+    try {
+      if (beepAudio) {
+        // rewind and play; some browsers require setting currentTime
+        try { beepAudio.currentTime = 0; } catch (e) {}
+        const p = beepAudio.play();
+        if (p && typeof p.catch === 'function') p.catch(() => {/* ignore */});
+        return;
+      }
+      // fallback: create short oscillator if AudioContext allowed
+      try {
+        const AudioCtx = (window as any).AudioContext || (window as any).webkitAudioContext;
+        if (AudioCtx) {
+          const ctx = new AudioCtx();
+          const o = ctx.createOscillator();
+          const g = ctx.createGain();
+          o.type = 'sine';
+          o.frequency.value = 1000;
+          o.connect(g);
+          g.connect(ctx.destination);
+          const now = ctx.currentTime;
+          g.gain.setValueAtTime(0.0001, now);
+          g.gain.exponentialRampToValueAtTime(0.25, now + 0.005);
+          o.start(now);
+          g.gain.exponentialRampToValueAtTime(0.0001, now + 0.12);
+          o.stop(now + 0.13);
+          setTimeout(() => { try { ctx.close(); } catch (_) {} }, 500);
+          return;
+        }
+      } catch (e) {}
     } catch (e) {
       console.warn('Beep playback error', e);
     }
@@ -339,32 +377,33 @@
               }
 
               // emitir y establecer debounce
-              dispatch('scanned', { userId, raw, payload });
-              playBeepFile();
-              _lastEmitted = userId;
+                // reproducir beep primero para minimizar latencia perceptual
+                playBeepNow();
+                dispatch('scanned', { userId, raw, payload });
+                _lastEmitted = userId;
 
-              // limpiar _lastEmitted después de debounceMs
-              if (_debounceTimer) clearTimeout(_debounceTimer);
-              _debounceTimer = setTimeout(() => { _lastEmitted = null; _debounceTimer = null; }, debounceMs);
-              dispatch('status', 'Escaneando...');
-              // no detener
+                // limpiar _lastEmitted después de debounceMs
+                if (_debounceTimer) clearTimeout(_debounceTimer);
+                _debounceTimer = setTimeout(() => { _lastEmitted = null; _debounceTimer = null; }, debounceMs);
+                dispatch('status', 'Escaneando...');
+                // no detener
             } else {
-              // emitir y detener
-              dispatch('scanned', { userId, raw, payload });
-              playBeepFile();
-              dispatch('status', 'Lectura completada');
-              // detener ZXing y cámara
-              try {
-                // si controls existe y tiene stop, usarlo
-                if (controls && typeof controls.stop === 'function') {
-                  try { controls.stop(); } catch(e) {}
+                // reproducir beep primero, luego emitir y detener
+                playBeepNow();
+                dispatch('scanned', { userId, raw, payload });
+                dispatch('status', 'Lectura completada');
+                // detener ZXing y cámara
+                try {
+                  // si controls existe y tiene stop, usarlo
+                  if (controls && typeof controls.stop === 'function') {
+                    try { controls.stop(); } catch(e) {}
+                  }
+                  stop();
+                } catch (stopErr) {
+                  // fallback
+                  stop();
                 }
-                stop();
-              } catch (stopErr) {
-                // fallback
-                stop();
               }
-            }
           } else if (error) {
             // Log debug info for why decode failed on frames
             const msg = error && (error as any).message ? (error as any).message : String(error);
@@ -478,6 +517,7 @@
     if (typeof window !== 'undefined') {
       const pref = loadPreferredDevice();
       if (pref) _activeDeviceId = pref;
+      try { initBeep(); } catch(e) { /* ignore */ }
       start();
     }
 
@@ -689,26 +729,30 @@
         </div>
       {/if}
       <div class="debug-info">
-        {#if permissionDenied}
-          {permissionMessage || 'Permiso de cámara denegado o cámara inactiva'}
-        {:else if isRequestingPermission}
-          Solicitando permiso de cámara...
-        {:else if isInitializing}
-          Cargando cámara...
-        {:else if isScanning}
-          {#if lastRaw}
-            Último raw: {lastRaw} {#if lastError} | Error: {lastError}{/if}
+        <span class="debug-text">
+          {#if permissionDenied}
+            {permissionMessage || 'Permiso de cámara denegado o cámara inactiva'}
+          {:else if isRequestingPermission}
+            Solicitando permiso de cámara...
+          {:else if isInitializing}
+            Cargando cámara...
+          {:else if isScanning}
+            {#if lastRaw}
+              Último raw: {lastRaw} {#if lastError} | Error: {lastError}{/if}
+            {:else}
+              Escaneando...
+            {/if}
           {:else}
-            Escaneando...
+            Esperando escaneo...
           {/if}
-        {:else}
-          Esperando escaneo...
-        {/if}
+        </span>
+
         {#if _activeLabel}
-          <br>Cámara: {_activeLabel}
+          <span class="debug-sep"> · </span><span class="debug-label">Cámara: {_activeLabel}</span>
         {/if}
+
         {#if isRequestingPermission}
-          <div class="spinner" aria-hidden="true"></div>
+          <span class="spinner" aria-hidden="true" style="display:inline-block; vertical-align:middle;"></span>
         {/if}
       </div>
     </div>
