@@ -49,6 +49,11 @@
       const devices = await navigator.mediaDevices.enumerateDevices();
       _deviceList = devices.filter(d => d.kind === 'videoinput');
       if (_deviceList.length > 0) {
+        // Elegir la trasera por defecto si no hay _activeDeviceId
+        if (!_activeDeviceId) {
+          const rear = pickRearCamera(_deviceList);
+          if (rear) _activeDeviceId = rear;
+        }
         const active = _deviceList.find(d => d.deviceId === _activeDeviceId) || _deviceList[0];
         _activeLabel = active.label || `Cámara ${_deviceList.indexOf(active) + 1}`;
       } else {
@@ -57,6 +62,16 @@
     } catch (e) {
       console.warn('No se pudieron listar cámaras', e);
     }
+  }
+
+  function pickRearCamera(vids: MediaDeviceInfo[]): string | null {
+    if (!vids || vids.length === 0) return null;
+    // Prefer labels that indicate back/rear/environment (multi-language)
+    const re = /rear|back|environment|trasera|posterior|trase|trasero/i;
+    const match = vids.find(v => v.label && re.test(v.label));
+    if (match) return match.deviceId || null;
+    // Fallback: many mobile devices expose rear camera as the last device
+    return vids[vids.length - 1].deviceId || null;
   }
 
   async function cycleCamera() {
