@@ -64,6 +64,36 @@
     }
   }
 
+  // Permission handling: track when permission is denied or stream becomes inactive
+  let permissionDenied: boolean = false;
+  let permissionMessage: string | null = null;
+
+  async function requestCameraPermission(constraints: any = { video: true }) {
+    // Try to trigger permission prompt and immediately close stream
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia(constraints);
+      // stop tracks immediately (we only wanted to request permission)
+      try { stream.getTracks().forEach(t => t.stop()); } catch (_) {}
+      permissionDenied = false;
+      permissionMessage = null;
+      return true;
+    } catch (permErr) {
+      // mark as denied and store message
+      permissionDenied = true;
+      permissionMessage = (permErr && (permErr as any).message) ? (permErr as any).message : String(permErr);
+      console.warn('Permission request failed', permErr);
+      return false;
+    }
+  }
+
+  function handleStreamInactive() {
+    // Called when stream becomes inactive; try to surface UI to re-request permission
+    permissionDenied = true;
+    permissionMessage = 'La cámara se ha detenido o perdido. Reintente permisos.';
+    dispatch('status', 'Camera inactive');
+    dispatch('error', permissionMessage);
+  }
+
   async function onSelectChange() {
     // persist and reinit scanner with selected device
     try {
@@ -490,6 +520,34 @@
     .modal-box { width: 560px; }
     .modal-body { height: 420px; }
   }
+
+  /* nuevo estilo para el panel de permisos */
+  .permission-panel {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    z-index: 200;
+    padding: 12px;
+    background: rgba(0,0,0,0.6);
+    border-radius: 8px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+  }
+
+  .permission-panel button {
+    padding: 10px 14px;
+    border-radius: 6px;
+    font-size: 14px;
+    cursor: pointer;
+    border: none;
+    transition: background 0.3s;
+  }
+
+  .permission-panel button:hover {
+    background: rgba(255, 255, 255, 0.2);
+  }
 </style>
 
 <div class="modal-backdrop" role="dialog" aria-modal="true" aria-label="Escáner de códigos">
@@ -509,6 +567,15 @@
     </div>
     <div class="modal-body">
       <video bind:this={videoEl} autoplay playsinline muted></video>
+      {#if permissionDenied}
+        <div class="permission-panel" role="alert">
+          <div style="color:white; margin-bottom:8px;">{permissionMessage || 'Permiso de cámara denegado o cámara inactiva'}</div>
+          <div style="display:flex; gap:8px;">
+            <button on:click={async () => { const ok = await requestCameraPermission(); if (ok) { permissionDenied = false; start(); } }} style="padding:8px 10px; border-radius:6px; background:white; color:#111827;">Reintentar permisos</button>
+            <button on:click={() => { location.reload(); }} style="padding:8px 10px; border-radius:6px; background:transparent; border:1px solid #fff; color:#fff;">Recargar página</button>
+          </div>
+        </div>
+      {/if}
       <div class="debug-info">
         {#if lastRaw}
           Último raw: {lastRaw} {#if lastError} | Error: {lastError}{/if}
