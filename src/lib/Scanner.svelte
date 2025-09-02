@@ -524,16 +524,19 @@
   /* nuevo estilo para el panel de permisos */
   .permission-panel {
     position: absolute;
-    top: 50%;
-    left: 50%;
-    transform: translate(-50%, -50%);
-    z-index: 200;
-    padding: 12px;
-    background: rgba(0,0,0,0.6);
-    border-radius: 8px;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
     display: flex;
     flex-direction: column;
     align-items: center;
+    justify-content: center;
+    padding: 16px;
+    box-sizing: border-box;
+    z-index: 200;
+    background: rgba(0, 0, 0, 0.8);
+    border-radius: 10px;
   }
 
   .permission-panel button {
