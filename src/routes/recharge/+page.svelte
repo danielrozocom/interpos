@@ -1,14 +1,15 @@
 <script lang="ts">
-  import { onMount } from 'svelte';
+  import { onMount, tick } from 'svelte';
   import { siteName } from '../../lib/config';
   // Fetch balance per request
 
   let userId = '';
   let userName = '';
-  let quantity: number = 0;
+  let quantity: number | '' = '';
   let method = '';
   let customMethod = '';
   let observations = '';
+  let quantityInput: HTMLInputElement | null = null;
   let message = '';
   let loading = false;
   let currentBalance: number | null = null;
@@ -189,6 +190,20 @@ function formatCurrency(val: number): string {
     userName = user.name;
     userSuggestions = []; // Limpiar las sugerencias después de seleccionar
     fetchBalance();
+    // prepare amount input for typing
+    quantity = '';
+    // focus after DOM updates
+    tick().then(() => quantityInput?.focus());
+  }
+
+  async function focusQuantity() {
+    // ensure DOM updated
+    await tick();
+    if (quantityInput) {
+      quantityInput.focus();
+      // Select current content if any
+      try { (quantityInput as HTMLInputElement).select(); } catch (e) { /* ignore */ }
+    }
   }
 
   // Observadores reactivos actualizados
@@ -201,8 +216,11 @@ $: {
     userExists = !!user;
     userName = user ? user.name ?? '' : '';
     if (userExists) {
-      fetchBalance();
-      userSuggestions = []; // Asegurar que las sugerencias se limpien
+  fetchBalance();
+  userSuggestions = []; // Asegurar que las sugerencias se limpien
+  // Clear amount and focus it so user can type the monto inmediatamente
+  quantity = '';
+  focusQuantity();
     } else {
       currentBalance = null;
     }
@@ -267,7 +285,6 @@ $: {
           bind:value={userId} 
           required 
           class="input-field"
-          autofocus
           on:keydown={(e) => {
             // Permitir Ctrl+C, Ctrl+V, Ctrl+A
             if ((e.ctrlKey || e.metaKey) && ['c', 'v', 'a'].includes(e.key.toLowerCase())) {
@@ -324,16 +341,33 @@ $: {
             id="quantity" 
             type="number" 
             bind:value={quantity} 
+            bind:this={quantityInput}
             required 
-            class="input-field" 
+            class="input-field no-spinner" 
             step="1" 
-            placeholder="0.00"
+            placeholder="$"
+            inputmode="numeric"
+            on:wheel={(e) => e.preventDefault()}
+            on:keydown={(e) => {
+              // Prevent arrow up/down from changing the value
+              if (e.key === 'ArrowUp' || e.key === 'ArrowDown') {
+                e.preventDefault();
+              }
+            }}
             on:input={(e) => {
-              // Permitir números negativos y enteros
+              // Allow empty string to mean no value entered yet
               const value = e.currentTarget.value;
-              if (value) {
-                quantity = Math.round(Number(value));
+              if (value === '') {
+                quantity = '';
+                return;
+              }
+              // Permitir números negativos y enteros
+              const num = Number(value);
+              if (!Number.isNaN(num)) {
+                quantity = Math.round(num);
                 e.currentTarget.value = quantity.toString();
+              } else {
+                quantity = '';
               }
             }}
           />
@@ -349,7 +383,6 @@ $: {
               <select id="method" bind:value={method} required class="input-field">
                 <option value="">Selecciona método</option>
                 <option value="Efectivo">Efectivo</option>
-                <option value="QR Redeban">QR Redeban</option>
                 <option value="Otro">Otro</option>
               </select>
               {#if method === 'Otro'}

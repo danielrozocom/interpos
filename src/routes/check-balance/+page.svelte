@@ -1,7 +1,49 @@
 <script lang="ts">
   import { onMount } from 'svelte';
-  // Solo mantenemos formatDate para casos especiales, los campos dateOnly y timeOnly vienen del servidor
   import { formatDate } from '../../lib/date-utils';
+
+  let showScanner = false;
+  let videoEl: HTMLVideoElement | null = null;
+  let scannerStream: MediaStream | null = null;
+  let barcodeDetector: any = null;
+  let scannerInterval: any = null;
+  let scannerError = '';
+
+  function closeScanner() {
+    showScanner = false;
+    scannerError = '';
+    if (scannerInterval) {
+      clearInterval(scannerInterval);
+      scannerInterval = null;
+    }
+    if (scannerStream) {
+      scannerStream.getTracks().forEach(t => t.stop());
+      scannerStream = null;
+    }
+    if (videoEl) {
+      videoEl.srcObject = null;
+    }
+  }
+
+  async function openScanner() {
+    scannerError = '';
+    showScanner = true;
+    try {
+      scannerStream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } });
+      if (videoEl) videoEl.srcObject = scannerStream;
+    } catch (err) {
+      console.error('Error opening scanner', err);
+      scannerError = 'No se pudo acceder a la cámara';
+    }
+  }
+
+  function handleScannedCode(code: string) {
+    const digits = code.replace(/[^0-9]/g, '');
+    const useVal = digits.length > 0 ? digits : code;
+    userId = useVal;
+    closeScanner();
+    checkBalance();
+  }
 
   let userId = '';
   let userSuggestions: any[] = [];
@@ -11,7 +53,6 @@
   let loading = false;
   let initialLoading = true;
   let name = '';
-
 
   $: if (userId === '') name = '';
 
@@ -277,19 +318,37 @@
         <label class="block text-lg font-semibold text-[#35528C] mb-3" for="userId">
           ID de Usuario
         </label>
-        <div class="flex flex-col sm:flex-row gap-4">
-          <input
+        <div class="flex flex-col sm:flex-row gap-4 items-center">
+          <div class="flex-1 min-w-0">
+            <input
             type="tel"
             id="userId"
             bind:value={userId}
             on:keydown={validateNumericInput}
             on:paste={handlePaste}
-            class="flex-1 h-12 rounded-xl border-2 border-gray-200 shadow-sm focus:border-[#35528C] focus:ring-2 focus:ring-[#35528C]/20 text-lg px-4"
+              class="h-12 rounded-xl border-2 border-gray-200 shadow-sm focus:border-[#35528C] focus:ring-2 focus:ring-[#35528C]/20 text-lg px-4 w-full min-w-0"
             placeholder="Ingresa tu ID"
             inputmode="numeric"
             pattern="[0-9]*"
             autocomplete="off"
           />
+          </div>
+          <!-- Camera scanner button (less prominent) -->
+          <div class="flex items-center flex-shrink-0 ml-2">
+            <button
+              type="button"
+              class="h-10 w-10 p-1 rounded-lg flex items-center justify-center bg-[#35528C] text-white shadow-sm hover:bg-[#2A4170] focus:outline-none focus:ring-2 focus:ring-[#35528C]/40"
+              aria-label="Abrir escáner de código QR o código de barras"
+              title="Escanear código"
+              on:click={() => openScanner()}
+            >
+              <!-- camera icon (SVG) -->
+              <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-white" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M3 7h3l2-2h6l2 2h3v11a2 2 0 01-2 2H5a2 2 0 01-2-2z" />
+                <circle cx="12" cy="13" r="3.5" stroke-linecap="round" stroke-linejoin="round" />
+              </svg>
+            </button>
+          </div>
           <button
             type="button"
             on:click={checkBalance}
@@ -406,15 +465,21 @@
                         </span>
                       </td>
                       <td class="px-6 py-4 text-sm text-gray-600 max-w-xs truncate">
-                        {#if transaction.notes && transaction.notes.includes('Compra #')}
-                          {@const orderNumber = transaction.notes.match(/Compra #(\d+)/)?.[1]}
-                          {#if orderNumber}
-                            <a href={`/voucher/${orderNumber}`} target="_blank" class="text-blue-600 underline hover:text-blue-800">
+                        {#if transaction.notes}
+                          {#if transaction.notes.includes('Compra #')}
+                            {@const orderNumber = transaction.notes.match(/Compra #(\d+)/)?.[1]}
+                            {#if orderNumber}
+                              <a href={`/voucher/${orderNumber}`} target="_blank" class="text-blue-600 underline hover:text-blue-800">
+                                {transaction.notes}
+                              </a>
+                            {:else}
                               {transaction.notes}
-                            </a>
+                            {/if}
                           {:else}
-                            {transaction.notes || '-'}
+                            {transaction.notes}
                           {/if}
+                        {:else}
+                          -
                         {/if}
                       </td>
                     </tr>
@@ -446,6 +511,51 @@
       </div>
     {/if}
   </div>
+
+  {#if showScanner}
+    <div class="fixed inset-0 z-50 flex items-center justify-center" role="dialog" aria-modal="true" aria-label="Escáner de códigos">
+      <!-- dark overlay behind everything -->
+      <div class="absolute inset-0 bg-black/70" aria-hidden="true"></div>
+
+      <!-- single box containing header and video -->
+      <div class="relative z-50 w-[420px] rounded-lg overflow-hidden shadow-2xl bg-white">
+        <!-- header inside the box -->
+        <div class="bg-gray-100 px-4 py-3 flex items-center justify-between border-b border-gray-300">
+          <span class="text-gray-900 font-semibold text-lg">Escanear código</span>
+          <button
+            class="text-gray-600 hover:text-gray-900 rounded-full p-1 focus:outline-none focus:ring-2 focus:ring-gray-400"
+            on:click={() => { if (videoEl) { try { videoEl.pause(); } catch(e){} } closeScanner(); }}
+            aria-label="Cerrar escáner"
+            title="Cerrar"
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </button>
+        </div>
+
+        <!-- video box inside the same container -->
+        <div class="relative w-full h-[280px] bg-black flex items-center justify-center">
+          <video
+            bind:this={videoEl}
+            autoplay
+            playsinline
+            muted
+            class="w-full h-full object-contain"
+          ></video>
+
+          <!-- border guide inside video box -->
+          <div class="absolute inset-0 pointer-events-none border-4 border-white/60 rounded-lg"></div>
+        </div>
+
+        {#if scannerError}
+          <div class="text-red-700 text-sm bg-red-100 px-4 py-2 rounded-b border-t border-red-300">
+            {scannerError}
+          </div>
+        {/if}
+      </div>
+    </div>
+  {/if}
 </div>
 
 <style>
