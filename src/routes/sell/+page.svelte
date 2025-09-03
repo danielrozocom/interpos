@@ -1,4 +1,4 @@
-Al qu<script lang="ts">
+<script lang="ts">
   import { onMount, tick } from 'svelte';
   import { page } from '$app/stores';
   
