@@ -72,28 +72,32 @@ function handleScannedSell(ev: Event) {
 
   if (derivedUserId) {
     userId = derivedUserId;
-    // Simulate Enter key on the input so it behaves like pressing Enter
-    const el = document.getElementById('userId') as HTMLInputElement | null;
-    if (el) {
-      try {
-        const ev = new KeyboardEvent('keydown', { key: 'Enter', bubbles: true, cancelable: true });
-        el.dispatchEvent(ev);
-      } catch (e) {
-        // fallback: call loadUserBalance directly
-        loadUserBalance(true);
-      }
-    } else {
-      loadUserBalance(true);
-    }
-    showScanner = false;
-    // focus input after a tick
-    tick().then(() => { const el2 = document.getElementById('userId') as HTMLInputElement | null; if (el2) el2.focus(); });
+  // clear suggestions so the lookup is immediate
+  userSuggestions = [];
+  // behave exactly like pressing Enter
+  performEnterLookup();
+  showScanner = false;
+  // focus input after a tick
+  tick().then(() => { const el2 = document.getElementById('userId') as HTMLInputElement | null; if (el2) el2.focus(); });
     return;
   }
 
   // If nothing could be derived, still close and show an error
   showScanner = false;
   error = 'Se leyó un código pero no se pudo extraer un ID';
+}
+
+// Central helper: perform the lookup that Enter would perform
+function performEnterLookup() {
+  // if empty, show message and clear suggestions
+  if (!userId || String(userId).trim() === '') {
+    userSuggestions = [];
+    error = 'No se encontraron usuarios';
+    return;
+  }
+  // otherwise clear suggestions and load
+  userSuggestions = [];
+  loadUserBalance(true);
 }
 
 // Cargar preferencia de ordenamiento desde localStorage
@@ -146,7 +150,7 @@ let showCashModal = false;
         userBalance = 0;
         userName = '';
         if (showErrors) {
-          throw new Error('Usuario no encontrado');
+          throw new Error('No se encontraron usuarios');
         }
       }
     } catch (err: any) {
@@ -689,6 +693,14 @@ let showCashModal = false;
             bind:value={userId}
             on:keydown={(e) => {
               if (e.key === 'Enter') {
+                // si está vacío, mostrar mensaje inmediato
+                if (!userId || String(userId).trim() === '') {
+                  error = 'No se encontraron usuarios';
+                  userSuggestions = [];
+                  return;
+                }
+                // limpiar sugerencias para que la consulta sea inmediata
+                userSuggestions = [];
                 loadUserBalance(true);
               }
             }}
