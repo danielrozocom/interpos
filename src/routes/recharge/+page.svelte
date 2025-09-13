@@ -16,6 +16,8 @@
   let userExists: boolean = false;
   let allUsers: Array<{id: string, name: string}> = [];
   let userSuggestions: Array<{id: string, name: string}> = [];
+  let showScanner = false;
+  let ScannerComponent: any = null;
 
   // Función para validar que solo se ingresen números en el ID
   function validateNumericInput(event: KeyboardEvent) {
@@ -34,6 +36,43 @@
     const pastedText = event.clipboardData?.getData('text') || '';
     const numericOnly = pastedText.replace(/[^0-9]/g, '');
     userId = numericOnly;
+  }
+
+  async function openScanner() {
+    showScanner = true;
+    if (!ScannerComponent) {
+      const mod = await import('../../lib/Scanner.svelte');
+      ScannerComponent = mod.default;
+    }
+  }
+
+  function closeScanner() {
+    showScanner = false;
+  }
+
+  function handleScannerScanned(ev: CustomEvent) {
+    const { userId: scannedId, raw } = ev.detail || {};
+    if (scannedId) {
+      userId = scannedId;
+      userSuggestions = [];
+      // behave like pressing Enter: fetch balance immediately
+      fetchBalance();
+      closeScanner();
+      tick().then(() => { const el = document.getElementById('userId') as HTMLInputElement | null; if (el) el.focus(); });
+    } else if (raw) {
+      userId = raw;
+      userSuggestions = [];
+      message = 'Leído (sin ID válido)';
+    }
+  }
+
+  function handleScannerStatus(ev: CustomEvent) {
+    console.log('Scanner status', ev.detail);
+  }
+
+  function handleScannerError(ev: CustomEvent) {
+    console.error('Scanner error', ev.detail);
+    message = String(ev.detail || 'Error del escáner');
   }
 
 function formatCurrency(val: number): string {
@@ -160,8 +199,8 @@ function formatCurrency(val: number): string {
         throw new Error(errorData?.error || `Error ${response.status}: No se pudo procesar la recarga`);
       }
 
-      // Mostrar mensaje de éxito y limpiar el formulario
-      const successMessage = 'Transacción completada con éxito';
+  // Mostrar mensaje de éxito y limpiar el formulario
+  const successMessage = 'Transacción completada con éxito';
       // Primero limpiar todos los campos
       userId = '';
       userName = '';
@@ -174,6 +213,8 @@ function formatCurrency(val: number): string {
       userSuggestions = [];
       // Mostrar el mensaje después de limpiar todo
       message = successMessage;
+      // desplazar al top para que el usuario vea el mensaje
+      try { if (typeof window !== 'undefined') window.scrollTo({ top: 0, behavior: 'smooth' }); } catch (e) {}
       // Esperar un momento antes de limpiar el mensaje
       setTimeout(() => {
         message = '';
@@ -181,6 +222,8 @@ function formatCurrency(val: number): string {
     } catch (error: any) {
       console.error('Error en la transacción:', error);
       message = '❌ ' + (error.message || 'Error al registrar la transacción. Por favor, intente nuevamente.');
+      // desplazar al top para que el usuario vea el error
+      try { if (typeof window !== 'undefined') window.scrollTo({ top: 0, behavior: 'smooth' }); } catch (e) {}
     }
     loading = false;
   }
@@ -275,29 +318,37 @@ $: {
       }} 
       class="space-y-6"
     >
-      <div>
-        <label for="userId" class="block text-sm font-medium text-gray-700 mb-2">
-          ID de Usuario
-        </label>
-        <input 
-          id="userId"
-          type="tel" 
-          bind:value={userId} 
-          required 
-          class="input-field"
-          on:keydown={(e) => {
-            // Permitir Ctrl+C, Ctrl+V, Ctrl+A
-            if ((e.ctrlKey || e.metaKey) && ['c', 'v', 'a'].includes(e.key.toLowerCase())) {
-              return;
-            }
-            // Prevenir el envío del formulario al presionar Enter
-            if (e.key === 'Enter') {
-              e.preventDefault();
-            }
-          }}
-          placeholder="Ingrese ID del usuario"
-        />
-      </div>
+        <div>
+          <label for="userId" class="block text-sm font-medium text-gray-700 mb-2">
+            ID de Usuario
+          </label>
+          <div class="flex items-center gap-2">
+            <input 
+              id="userId"
+              type="tel" 
+              bind:value={userId} 
+              required 
+              class="input-field"
+              on:keydown={(e) => {
+                // Permitir Ctrl+C, Ctrl+V, Ctrl+A
+                if ((e.ctrlKey || e.metaKey) && ['c', 'v', 'a'].includes(e.key.toLowerCase())) {
+                  return;
+                }
+                // Prevenir el envío del formulario al presionar Enter
+                if (e.key === 'Enter') {
+                  e.preventDefault();
+                }
+              }}
+              placeholder="Ingrese ID del usuario"
+            />
+            <button type="button" class="h-10 w-10 p-1 rounded-lg flex items-center justify-center bg-[#35528C] text-white shadow-sm hover:bg-[#2A4170] focus:outline-none focus:ring-2 focus:ring-[#35528C]/40" aria-label="Abrir escáner" on:click={openScanner}>
+              <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-white" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M3 7h3l2-2h6l2 2h3v11a2 2 0 01-2 2H5a2 2 0 01-2-2z" />
+                <circle cx="12" cy="13" r="3.5" stroke-linecap="round" stroke-linejoin="round" />
+              </svg>
+            </button>
+          </div>
+        </div>
 
       {#if userSuggestions.length > 0}
         <div>
@@ -457,6 +508,10 @@ $: {
       {/if}
     </form>
   </div>
+
+  {#if showScanner && ScannerComponent}
+    <svelte:component this={ScannerComponent} on:scanned={handleScannerScanned} on:status={handleScannerStatus} on:error={handleScannerError} on:close={closeScanner} />
+  {/if}
 </div>
 
 <style>

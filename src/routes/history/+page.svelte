@@ -1,6 +1,7 @@
 <script lang="ts">
 import { onMount } from 'svelte';
 import { siteName } from '../../lib/config';
+import { tick } from 'svelte';
 // Ya no necesitamos formatDateOnly y formatTimeOnly porque vienen del servidor
 // import { formatDateOnly, formatTimeOnly } from '../../lib/date-utils';
 
@@ -13,6 +14,8 @@ let transactions: Array<any> = [];
 let error = '';
 let loading = false;
 let step = 1;
+let showScanner = false;
+let ScannerComponent: any = null;
 let dateFrom = '';
 let dateTo = '';
 let transactionType = 'all'; // 'all', 'positive', 'negative'
@@ -106,6 +109,48 @@ function validateNumericInput(event: KeyboardEvent) {
   if (!/[0-9]/.test(event.key)) {
     event.preventDefault();
   }
+}
+
+async function openScanner() {
+  showScanner = true;
+  if (!ScannerComponent) {
+    const mod = await import('../../lib/Scanner.svelte');
+    ScannerComponent = mod.default;
+  }
+}
+
+function closeScanner() {
+  showScanner = false;
+}
+
+function handleScannerScanned(ev: CustomEvent) {
+  const { userId: scannedId, raw } = ev.detail || {};
+  if (scannedId) {
+    userId = scannedId;
+    // limpiar sugerencias
+    userSuggestions = [];
+    // ejecutar la consulta como si se presionara Enter
+    fetchTransactions();
+    // cerrar modal
+    closeScanner();
+    // enfocar input
+    tick().then(() => { const el = document.getElementById('userId') as HTMLInputElement | null; if (el) el.focus(); });
+  } else if (raw) {
+    // si no se pudo derivar un ID, colocar raw para inspección
+    userId = raw;
+    userSuggestions = [];
+    // mostrar mensaje
+    error = 'Leído (sin ID válido)';
+  }
+}
+
+function handleScannerStatus(ev: CustomEvent) {
+  console.log('Scanner status', ev.detail);
+}
+
+function handleScannerError(ev: CustomEvent) {
+  console.error('Scanner error', ev.detail);
+  error = String(ev.detail || 'Error del escáner');
 }
 
 // Función para buscar usuarios y mostrar sugerencias
@@ -322,14 +367,15 @@ async function refreshTransactions() {
 
     {#if step === 1}
       <div class="bg-white rounded-2xl shadow-lg border border-[#35528C]/10 p-8 mb-8 transform transition-all duration-200 hover:shadow-xl animate-fadeIn">
-        <h2 class="text-xl font-semibold text-[#35528C] mb-6 text-left font-sans">Seleccionar Usuario</h2>
+  <!-- Título removido por solicitud del usuario -->
         <form on:submit|preventDefault={fetchTransactions} class="space-y-6">
           <div>
             <label for="userId" class="block text-lg font-semibold text-[#35528C] mb-3">ID de Usuario</label>
-            <input 
-              id="userId"
-              type="tel"
-              bind:value={userId}
+            <div class="flex items-center gap-2">
+              <input 
+                id="userId"
+                type="tel"
+                bind:value={userId}
               required
               autofocus
               class="flex-1 h-12 rounded-xl border-2 border-[#35528C] shadow-sm focus:border-[#35528C] focus:ring-2 focus:ring-[#35528C]/20 text-lg px-4 font-sans"
@@ -360,6 +406,13 @@ async function refreshTransactions() {
               placeholder="Ingrese ID del usuario"
               autocomplete="off"
             />
+              <button type="button" class="h-10 w-10 p-1 rounded-lg flex items-center justify-center bg-[#35528C] text-white shadow-sm hover:bg-[#2A4170] focus:outline-none focus:ring-2 focus:ring-[#35528C]/40" aria-label="Abrir escáner" on:click={openScanner}>
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-white" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true">
+                  <path stroke-linecap="round" stroke-linejoin="round" d="M3 7h3l2-2h6l2 2h3v11a2 2 0 01-2 2H5a2 2 0 01-2-2z" />
+                  <circle cx="12" cy="13" r="3.5" stroke-linecap="round" stroke-linejoin="round" />
+                </svg>
+              </button>
+            </div>
           </div>
 
           {#if userSuggestions.length > 0}
@@ -401,6 +454,10 @@ async function refreshTransactions() {
       </div>
     {/if}
 
+    {#if showScanner && ScannerComponent}
+      <svelte:component this={ScannerComponent} on:scanned={handleScannerScanned} on:status={handleScannerStatus} on:error={handleScannerError} on:close={closeScanner} />
+    {/if}
+
     {#if step === 2}
       <div class="space-y-8 animate-fadeIn">
         <div class="flex flex-col md:flex-row items-start md:items-center justify-between mb-4">
@@ -430,8 +487,12 @@ async function refreshTransactions() {
                 currentPage = 1;
                 userSuggestions = []; // Limpiar sugerencias de usuarios
               }} 
-              class="btn-primary px-4 py-2 rounded-xl text-white font-medium hover:bg-[#2A4170] transition-opacity"
+              class="btn-primary inline-flex items-center gap-2 px-4 py-2 rounded-xl text-white font-medium hover:bg-[#2A4170] transition-opacity"
             >
+              <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 text-white inline-block align-middle" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+                <circle cx="11" cy="11" r="7" stroke-linecap="round" stroke-linejoin="round" />
+                <path stroke-linecap="round" stroke-linejoin="round" d="M21 21l-4.35-4.35" />
+              </svg>
               Nueva consulta
             </button>
           </div>
