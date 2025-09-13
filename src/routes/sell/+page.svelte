@@ -91,6 +91,11 @@ function handleScannedSell(ev: Event) {
 // Central helper: perform the lookup that Enter would perform
 function performEnterLookup() {
   // if empty, show message and clear suggestions
+  // Normalize manual entry first
+  if (userId && String(userId).trim() !== '') {
+    userId = normalizeUserId(userId);
+  }
+
   if (!userId || String(userId).trim() === '') {
     userSuggestions = [];
     error = 'No se encontraron usuarios';

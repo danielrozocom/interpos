@@ -2,6 +2,7 @@
 import { onMount } from 'svelte';
 import { siteName } from '../../lib/config';
 import { tick } from 'svelte';
+import { normalizeUserId } from '../../lib/normalizeUserId';
 // Ya no necesitamos formatDateOnly y formatTimeOnly porque vienen del servidor
 // import { formatDateOnly, formatTimeOnly } from '../../lib/date-utils';
 
@@ -126,7 +127,7 @@ function closeScanner() {
 function handleScannerScanned(ev: CustomEvent) {
   const { userId: scannedId, raw } = ev.detail || {};
   if (scannedId) {
-    userId = scannedId;
+    userId = normalizeUserId(scannedId);
     // limpiar sugerencias
     userSuggestions = [];
     // ejecutar la consulta como si se presionara Enter
@@ -137,7 +138,7 @@ function handleScannerScanned(ev: CustomEvent) {
     tick().then(() => { const el = document.getElementById('userId') as HTMLInputElement | null; if (el) el.focus(); });
   } else if (raw) {
     // si no se pudo derivar un ID, colocar raw para inspección
-    userId = raw;
+    userId = normalizeUserId(String(raw));
     userSuggestions = [];
     // mostrar mensaje
     error = 'Leído (sin ID válido)';
@@ -212,7 +213,7 @@ function cleanPastedValue(event: ClipboardEvent) {
   event.preventDefault();
   const pastedText = event.clipboardData?.getData('text') || '';
   const numericOnly = pastedText.replace(/[^0-9]/g, '');
-  userId = numericOnly;
+  userId = normalizeUserId(numericOnly);
 }
 
 function cleanNumber(str: string | number): number {
@@ -275,6 +276,11 @@ async function fetchTransactions() {
   loading = true;
   error = '';
   try {
+      // Normalize manual input before performing the lookup
+      if (userId && String(userId).trim() !== '') {
+        userId = normalizeUserId(userId);
+      }
+
     // Primero obtener el nombre del usuario
     try {
       const userRes = await fetch(`/api/sheets/users?userId=${encodeURIComponent(userId)}`);

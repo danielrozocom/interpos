@@ -1,6 +1,7 @@
 <script lang="ts">
   import { onMount, tick } from 'svelte';
   import { siteName } from '../../lib/config';
+  import { normalizeUserId } from '../../lib/normalizeUserId';
   // Fetch balance per request
 
   let userId = '';
@@ -35,7 +36,7 @@
     event.preventDefault();
     const pastedText = event.clipboardData?.getData('text') || '';
     const numericOnly = pastedText.replace(/[^0-9]/g, '');
-    userId = numericOnly;
+    userId = normalizeUserId(numericOnly);
   }
 
   async function openScanner() {
@@ -53,14 +54,14 @@
   function handleScannerScanned(ev: CustomEvent) {
     const { userId: scannedId, raw } = ev.detail || {};
     if (scannedId) {
-      userId = scannedId;
+      userId = normalizeUserId(scannedId);
       userSuggestions = [];
       // behave like pressing Enter: fetch balance immediately
       fetchBalance();
       closeScanner();
       tick().then(() => { const el = document.getElementById('userId') as HTMLInputElement | null; if (el) el.focus(); });
     } else if (raw) {
-      userId = raw;
+      userId = normalizeUserId(String(raw));
       userSuggestions = [];
       message = 'Leído (sin ID válido)';
     }
@@ -113,6 +114,11 @@ function formatCurrency(val: number): string {
   }
 
   async function fetchBalance() {
+    // Normalize manual input before performing the lookup
+    if (userId && String(userId).trim() !== '') {
+      userId = normalizeUserId(userId);
+    }
+
     if (!userId) {
       currentBalance = null;
       return;

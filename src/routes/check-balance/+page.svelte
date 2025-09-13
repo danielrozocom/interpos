@@ -1,6 +1,7 @@
 <script lang="ts">
   import { onMount } from 'svelte';
   import { formatDate } from '../../lib/date-utils';
+  import { normalizeUserId } from '../../lib/normalizeUserId';
 
   let showScanner = false;
   let scannerError = '';
@@ -68,7 +69,7 @@
       return;
     }
 
-    userId = derivedUserId;
+    userId = normalizeUserId(derivedUserId);
     showScanner = false;
     checkBalance();
   }
@@ -208,11 +209,16 @@
     event.preventDefault();
     const paste = (event.clipboardData || (window as any).clipboardData).getData('text');
     const numericValue = paste.replace(/[^0-9]/g, '');
-    userId = numericValue;
+    userId = normalizeUserId(numericValue);
   }
 
 
   async function checkBalance() {
+    // Normalize manual input before performing the lookup
+    if (userId && String(userId).trim() !== '') {
+      userId = normalizeUserId(userId);
+    }
+
     if (!userId) {
       error = 'Por favor ingresa un ID de usuario';
       return;
