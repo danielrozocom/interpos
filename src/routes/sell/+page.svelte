@@ -29,6 +29,7 @@ let successMsg = '';
 let mobileView = 'products'; // 'products' or 'cart' for mobile view switching
 let showAddedNotification = false;
 
+import { normalizeUserId } from '../../lib/normalizeUserId';
 // Scanner modal state (dynamic import to keep SSR-safe)
 let showScanner = false;
 let Scanner: any = null;
@@ -71,7 +72,7 @@ function handleScannedSell(ev: Event) {
   }
 
   if (derivedUserId) {
-    userId = derivedUserId;
+    userId = normalizeUserId(derivedUserId);
   // clear suggestions so the lookup is immediate
   userSuggestions = [];
   // behave exactly like pressing Enter
