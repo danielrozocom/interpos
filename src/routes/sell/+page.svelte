@@ -111,7 +111,6 @@ function performEnterLookup() {
 // Cargar preferencia de ordenamiento desde localStorage
 let sortByAlphabetical = true; // true = alfabético, false = por ID
 
-import { onMount } from 'svelte';
 
 onMount(() => {
   if (typeof window !== 'undefined') {
