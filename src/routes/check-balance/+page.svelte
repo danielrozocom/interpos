@@ -41,7 +41,7 @@
     showScanner = true;
   }
 
-  function handleScannedCode(event: CustomEvent) {
+  async function handleScannedCode(event: CustomEvent) {
     // Compatibilidad: algunos emitters mandan { value }, otros { userId, raw, payload }
     console.log('Scanner scanned event', event.detail);
     const detail = event.detail || {};
@@ -69,7 +69,7 @@
       return;
     }
 
-    userId = normalizeUserId(derivedUserId);
+    userId = await normalizeUserId(derivedUserId);
     showScanner = false;
     checkBalance();
   }
@@ -205,18 +205,18 @@
   }
 
   // Limpia caracteres no numéricos al pegar
-  function cleanPastedValue(event: ClipboardEvent) {
+  async function cleanPastedValue(event: ClipboardEvent) {
     event.preventDefault();
     const paste = (event.clipboardData || (window as any).clipboardData).getData('text');
     const numericValue = paste.replace(/[^0-9]/g, '');
-    userId = normalizeUserId(numericValue);
+    userId = await normalizeUserId(numericValue);
   }
 
 
   async function checkBalance() {
     // Normalize manual input before performing the lookup
     if (userId && String(userId).trim() !== '') {
-      userId = normalizeUserId(userId);
+      userId = await normalizeUserId(userId);
     }
 
     if (!userId) {

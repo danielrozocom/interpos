@@ -55,7 +55,7 @@ function openScanner() {
 
 function closeScanner() { showScanner = false; }
 
-function handleScannedSell(ev: Event) {
+async function handleScannedSell(ev: Event) {
   const e = ev as CustomEvent;
   const detail = e.detail || {};
   let raw: string | undefined = undefined;
@@ -72,7 +72,7 @@ function handleScannedSell(ev: Event) {
   }
 
   if (derivedUserId) {
-    userId = normalizeUserId(derivedUserId);
+    userId = await normalizeUserId(derivedUserId);
   // clear suggestions so the lookup is immediate
   userSuggestions = [];
   // behave exactly like pressing Enter
@@ -91,11 +91,11 @@ function handleScannedSell(ev: Event) {
 }
 
 // Central helper: perform the lookup that Enter would perform
-function performEnterLookup() {
+async function performEnterLookup() {
   // if empty, show message and clear suggestions
   // Normalize manual entry first
   if (userId && String(userId).trim() !== '') {
-    userId = normalizeUserId(userId);
+    userId = await normalizeUserId(userId);
   }
 
   if (!userId || String(userId).trim() === '') {

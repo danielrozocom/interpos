@@ -124,10 +124,10 @@ function closeScanner() {
   showScanner = false;
 }
 
-function handleScannerScanned(ev: CustomEvent) {
+async function handleScannerScanned(ev: CustomEvent) {
   const { userId: scannedId, raw } = ev.detail || {};
   if (scannedId) {
-    userId = normalizeUserId(scannedId);
+    userId = await normalizeUserId(scannedId);
     // limpiar sugerencias
     userSuggestions = [];
     // ejecutar la consulta como si se presionara Enter
@@ -138,7 +138,7 @@ function handleScannerScanned(ev: CustomEvent) {
     tick().then(() => { const el = document.getElementById('userId') as HTMLInputElement | null; if (el) el.focus(); });
   } else if (raw) {
     // si no se pudo derivar un ID, colocar raw para inspección
-    userId = normalizeUserId(String(raw));
+    userId = await normalizeUserId(String(raw));
     userSuggestions = [];
     // mostrar mensaje
     error = 'Leído (sin ID válido)';
@@ -209,11 +209,11 @@ async function searchUsers(searchTerm: string) {
 }
 
 // Función para limpiar caracteres no numéricos del valor pegado
-function cleanPastedValue(event: ClipboardEvent) {
+async function cleanPastedValue(event: ClipboardEvent) {
   event.preventDefault();
   const pastedText = event.clipboardData?.getData('text') || '';
   const numericOnly = pastedText.replace(/[^0-9]/g, '');
-  userId = normalizeUserId(numericOnly);
+  userId = await normalizeUserId(numericOnly);
 }
 
 function cleanNumber(str: string | number): number {
@@ -319,7 +319,7 @@ async function fetchTransactions() {
   try {
       // Normalize manual input before performing the lookup
       if (userId && String(userId).trim() !== '') {
-        userId = normalizeUserId(userId);
+        userId = await normalizeUserId(userId);
       }
 
     // Primero obtener el nombre del usuario

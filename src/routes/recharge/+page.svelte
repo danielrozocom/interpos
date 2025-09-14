@@ -32,11 +32,11 @@
   }
 
   // Función para limpiar caracteres no numéricos del valor pegado
-  function cleanPastedValue(event: ClipboardEvent) {
+  async function cleanPastedValue(event: ClipboardEvent) {
     event.preventDefault();
     const pastedText = event.clipboardData?.getData('text') || '';
     const numericOnly = pastedText.replace(/[^0-9]/g, '');
-    userId = normalizeUserId(numericOnly);
+    userId = await normalizeUserId(numericOnly);
   }
 
   async function openScanner() {
@@ -51,17 +51,17 @@
     showScanner = false;
   }
 
-  function handleScannerScanned(ev: CustomEvent) {
+  async function handleScannerScanned(ev: CustomEvent) {
     const { userId: scannedId, raw } = ev.detail || {};
     if (scannedId) {
-      userId = normalizeUserId(scannedId);
+      userId = await normalizeUserId(scannedId);
       userSuggestions = [];
       // behave like pressing Enter: fetch balance immediately
       fetchBalance();
       closeScanner();
       tick().then(() => { const el = document.getElementById('userId') as HTMLInputElement | null; if (el) el.focus(); });
     } else if (raw) {
-      userId = normalizeUserId(String(raw));
+      userId = await normalizeUserId(String(raw));
       userSuggestions = [];
       message = 'Leído (sin ID válido)';
     }
@@ -116,7 +116,7 @@ function formatCurrency(val: number): string {
   async function fetchBalance() {
     // Normalize manual input before performing the lookup
     if (userId && String(userId).trim() !== '') {
-      userId = normalizeUserId(userId);
+      userId = await normalizeUserId(userId);
     }
 
     if (!userId) {
