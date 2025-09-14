@@ -44,7 +44,7 @@
   const _trackListeners = new Map<MediaStreamTrack, EventListener>();
 
   // Si el prop deviceId cambia desde el padre, actualizar el device activo
-  $: if (typeof window !== 'undefined' && deviceId) {
+  $: if (deviceId && typeof window !== 'undefined') {
     _activeDeviceId = deviceId;
   }
 
@@ -66,17 +66,20 @@
 
   function savePreferredDevice(deviceId: string | null) {
     try {
-      if (deviceId) window.localStorage.setItem(PREF_KEY, deviceId);
-      else window.localStorage.removeItem(PREF_KEY);
-      // show confirmation toast
-      try { showToast('Preferencia de cámara guardada'); } catch(e){}
-    } catch (e) {
-      console.warn('No se pudo guardar preferencia de cámara', e);
-    }
+        if (typeof window !== 'undefined') {
+          if (deviceId) window.localStorage.setItem(PREF_KEY, deviceId);
+          else window.localStorage.removeItem(PREF_KEY);
+        }
+        // show confirmation toast
+        try { showToast('Preferencia de cámara guardada'); } catch(e){}
+      } catch (e) {
+        console.warn('No se pudo guardar preferencia de cámara', e);
+      }
   }
 
   function loadPreferredDevice(): string | null {
     try {
+      if (typeof window === 'undefined') return null;
       return window.localStorage.getItem(PREF_KEY);
     } catch (e) {
       return null;
@@ -92,6 +95,7 @@
   let _prevBodyPaddingRight: string | null = null;
   function lockScroll() {
     try {
+      if (typeof document === 'undefined' || typeof window === 'undefined') return;
       const body = document.body;
       _prevBodyOverflow = body.style.overflow || null;
       _prevBodyPaddingRight = body.style.paddingRight || null;
@@ -106,6 +110,7 @@
 
   function unlockScroll() {
     try {
+      if (typeof document === 'undefined') return;
       const body = document.body;
       if (_prevBodyOverflow !== null) body.style.overflow = _prevBodyOverflow; else body.style.overflow = '';
       if (_prevBodyPaddingRight !== null) body.style.paddingRight = _prevBodyPaddingRight; else body.style.paddingRight = '';
@@ -117,6 +122,7 @@
   let beepAudio: HTMLAudioElement | null = null;
   function initBeep() {
     try {
+      if (typeof document === 'undefined') return;
       beepAudio = document.createElement('audio');
       beepAudio.src = '/Beep.mp3';
       beepAudio.preload = 'auto';

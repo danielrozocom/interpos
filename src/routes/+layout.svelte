@@ -1,7 +1,56 @@
 <script lang="ts">
   import '../app.css';
+  import { onMount, onDestroy } from 'svelte';
   let menuOpen = false;
   import { page } from '$app/stores';
+
+  // Global Ctrl-based shortcuts dispatcher
+  function globalKeyHandler(e: KeyboardEvent) {
+    if (typeof window === 'undefined') return;
+    if (!(e.ctrlKey || (navigator.platform && /Mac/.test(navigator.platform) && e.metaKey))) return;
+
+    const active = typeof document !== 'undefined' ? document.activeElement as HTMLElement | null : null;
+    const tag = active?.tagName?.toLowerCase();
+    const isInputLike = tag === 'input' || tag === 'textarea' || active?.isContentEditable;
+
+    // Don't interfere with common edit shortcuts inside inputs (Ctrl+A/C/V/X/Z/Y)
+    // But allow some global actions to work while typing: Enter (submit), K (open scanner), L (focus id), Backspace (clear id)
+    const keyLower = e.key.toLowerCase();
+    const editShortcuts = ['a', 'c', 'v', 'x', 'z', 'y'];
+    const allowedWhileInput = ['enter', 'k', 'l', 'backspace'];
+    if (isInputLike && !editShortcuts.includes(keyLower) && !allowedWhileInput.includes(keyLower === 'enter' ? 'enter' : keyLower)) {
+      return;
+    }
+
+    // Map keys to high-level actions and broadcast them so pages can react
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      window.dispatchEvent(new CustomEvent('global-shortcut', { detail: { action: 'submit' } }));
+      return;
+    }
+    if (e.key.toLowerCase() === 'k') {
+      e.preventDefault();
+      window.dispatchEvent(new CustomEvent('global-shortcut', { detail: { action: 'openScanner' } }));
+      return;
+    }
+    if (e.key.toLowerCase() === 'l') {
+      e.preventDefault();
+      window.dispatchEvent(new CustomEvent('global-shortcut', { detail: { action: 'focusId' } }));
+      return;
+    }
+    if (e.key === 'Backspace') {
+      e.preventDefault();
+      window.dispatchEvent(new CustomEvent('global-shortcut', { detail: { action: 'clearId' } }));
+      return;
+    }
+  }
+
+  onMount(() => {
+    if (typeof window !== 'undefined') window.addEventListener('keydown', globalKeyHandler);
+  });
+  onDestroy(() => {
+    if (typeof window !== 'undefined') window.removeEventListener('keydown', globalKeyHandler);
+  });
 </script>
 
 <div class="min-h-screen bg-gray-50">

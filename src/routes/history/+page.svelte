@@ -1,5 +1,5 @@
 <script lang="ts">
-import { onMount } from 'svelte';
+import { onMount, onDestroy } from 'svelte';
 import { siteName } from '../../lib/config';
 import { tick } from 'svelte';
 import { normalizeUserId } from '../../lib/normalizeUserId';
@@ -57,7 +57,7 @@ $: filteredTransactions = (() => {
   // Ordenar de más reciente a más vieja
   const sorted = filtered.sort((a, b) => {
     // Función para formatear la hora a HH:mm:ss antes de la comparación
-    function formatTime(timeStr) {
+    function formatTime(timeStr: string): string {
       if (!timeStr) return '00:00:00';
       const parts = timeStr.split(':');
       const hours = parts[0]?.padStart(2, '0') || '00';
@@ -238,6 +238,47 @@ async function fetchAllUsers() {
 
 onMount(fetchAllUsers);
 
+// Keyboard shortcuts (Ctrl-based)
+function handleGlobalShortcut(ev: CustomEvent) {
+  const action = ev.detail?.action;
+  if (!action) return;
+
+  if (action === 'submit') {
+    fetchTransactions();
+    return;
+  }
+  if (action === 'openScanner') {
+    openScanner();
+    return;
+  }
+  if (action === 'focusId') {
+    const el = document.getElementById('userId') as HTMLInputElement | null;
+    if (el) {
+      el.focus();
+      el.select();
+    }
+    return;
+  }
+  if (action === 'clearId') {
+    userId = '';
+    userSuggestions = [];
+    error = '';
+    return;
+  }
+}
+
+onMount(() => {
+  if (typeof window !== 'undefined') {
+    window.addEventListener('global-shortcut', handleGlobalShortcut as any);
+  }
+});
+
+onDestroy(() => {
+  if (typeof window !== 'undefined') {
+    window.removeEventListener('global-shortcut', handleGlobalShortcut as any);
+  }
+});
+
 function updateSuggestions() {
   if (!userId) {
     userSuggestions = [];
@@ -284,10 +325,20 @@ async function fetchTransactions() {
     // Primero obtener el nombre del usuario
     try {
       const userRes = await fetch(`/api/sheets/users?userId=${encodeURIComponent(userId)}`);
-      if (userRes.ok) {
-        const userData = await userRes.json();
-        userName = userData.name || '';
+      if (!userRes.ok) {
+        let body: any = null;
+        try { body = await userRes.json(); } catch (e) { /* ignore */ }
+        const serverMsg = body?.error || body?.message || 'No existe un usuario con ese ID';
+        console.warn('User not found or server error for userId', userId, serverMsg);
+        // Keep the user on the search view (step 1) and show the error under the search box
+        error = serverMsg;
+        transactions = [];
+        userName = '';
+        loading = false;
+        return;
       }
+      const userData = await userRes.json();
+      userName = userData.name || '';
     } catch (userErr) {
       console.log('No se pudo obtener el nombre del usuario:', userErr);
     }
@@ -315,6 +366,8 @@ async function fetchTransactions() {
     }
     transactions = [];
     userName = '';
+    // Stay on the search view so the error appears under the search box
+    step = 1;
   } finally {
     loading = false;
   }
@@ -377,13 +430,13 @@ async function refreshTransactions() {
         <form on:submit|preventDefault={fetchTransactions} class="space-y-6">
           <div>
             <label for="userId" class="block text-lg font-semibold text-[#35528C] mb-3">ID de Usuario</label>
-            <div class="flex items-center gap-2">
+            <div class="flex flex-wrap items-center gap-2 min-w-0">
               <input 
                 id="userId"
                 type="tel"
                 bind:value={userId}
               required
-              autofocus
+              
               class="flex-1 h-12 rounded-xl border-2 border-[#35528C] shadow-sm focus:border-[#35528C] focus:ring-2 focus:ring-[#35528C]/20 text-lg px-4 font-sans"
               on:keydown={(e) => {
                 validateNumericInput(e);
@@ -398,6 +451,8 @@ async function refreshTransactions() {
                 }
               }}
               on:input={() => {
+                // Clear any previous error as the user edits the input
+                error = '';
                 // Limpiar sugerencias inmediatamente si el campo está vacío
                 if (!userId || userId.trim().length === 0) {
                   userSuggestions = [];
@@ -412,7 +467,7 @@ async function refreshTransactions() {
               placeholder="Ingrese ID del usuario"
               autocomplete="off"
             />
-              <button type="button" class="h-10 w-10 p-1 rounded-lg flex items-center justify-center bg-[#35528C] text-white shadow-sm hover:bg-[#2A4170] focus:outline-none focus:ring-2 focus:ring-[#35528C]/40" aria-label="Abrir escáner" on:click={openScanner}>
+              <button type="button" class="h-10 w-10 p-1 rounded-lg flex items-center justify-center bg-[#35528C] text-white shadow-sm hover:bg-[#2A4170] focus:outline-none focus:ring-2 focus:ring-[#35528C]/40 shrink-0" aria-label="Abrir escáner" on:click={openScanner}>
                 <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-white" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true">
                   <path stroke-linecap="round" stroke-linejoin="round" d="M3 7h3l2-2h6l2 2h3v11a2 2 0 01-2 2H5a2 2 0 01-2-2z" />
                   <circle cx="12" cy="13" r="3.5" stroke-linecap="round" stroke-linejoin="round" />
@@ -458,6 +513,18 @@ async function refreshTransactions() {
           </button>
         </form>
       </div>
+      {#if error}
+        <div class="max-w-4xl mx-auto mt-4 mb-6 transform animate-fadeIn">
+          <div class="bg-red-50 border-l-4 border-red-400 p-4 rounded-r-xl">
+            <div class="flex items-center">
+              <svg class="h-5 w-5 text-red-400 mr-3" viewBox="0 0 20 20" fill="currentColor">
+                <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clip-rule="evenodd"/>
+              </svg>
+              <p class="text-red-700 font-medium">{error}</p>
+            </div>
+          </div>
+        </div>
+      {/if}
     {/if}
 
     {#if showScanner && ScannerComponent}
@@ -505,12 +572,14 @@ async function refreshTransactions() {
         </div>
 
         {#if error}
-          <div class="bg-red-50 border-l-4 border-red-400 p-4 rounded-r-xl">
-            <div class="flex items-center">
-              <svg class="h-5 w-5 text-red-400 mr-3" viewBox="0 0 20 20" fill="currentColor">
-                <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clip-rule="evenodd"/>
-              </svg>
-              <p class="text-red-700 font-medium">{error}</p>
+          <div class="max-w-xl mx-auto mb-8 transform animate-fadeIn">
+            <div class="bg-red-50 border-l-4 border-red-400 p-4 rounded-r-xl">
+              <div class="flex items-center">
+                <svg class="h-5 w-5 text-red-400 mr-3" viewBox="0 0 20 20" fill="currentColor">
+                  <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clip-rule="evenodd"/>
+                </svg>
+                <p class="text-red-700 font-medium">{error}</p>
+              </div>
             </div>
           </div>
         {:else if transactions.length === 0}
@@ -630,7 +699,7 @@ async function refreshTransactions() {
                       <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
                         {(() => {
                           // Función para formatear la hora a HH:mm:ss
-                          function formatTime(timeStr) {
+                          function formatTime(timeStr: string): string {
                             if (!timeStr) return '00:00:00';
                             const parts = timeStr.split(':');
                             const hours = parts[0]?.padStart(2, '0') || '00';

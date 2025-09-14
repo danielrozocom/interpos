@@ -237,15 +237,25 @@
       // Obtener el saldo del usuario primero
       const balanceResponse = await fetch(`/api/sheets/users?userId=${encodeURIComponent(userId)}`);
       console.log('Balance response status:', balanceResponse.status, balanceResponse.ok);
-      
+
       if (!balanceResponse.ok) {
-        console.log('Balance response not ok, throwing error');
-        throw new Error('Error al obtener el saldo');
+        // Try to parse server error message and show a clear alert
+        let body: any = null;
+        try { body = await balanceResponse.json(); } catch (e) { /* ignore */ }
+        const serverMsg = body?.error || body?.message || null;
+        console.warn('User not found or server error for userId', userId, serverMsg);
+        error = serverMsg || 'No existe un usuario con ese ID';
+        // Ensure UI shows the alert and not the empty-transactions state
+        balance = null;
+        transactions = [];
+        loading = false;
+        initialLoading = false;
+        return;
       }
-      
+
       const balanceData = await balanceResponse.json();
       console.log('Balance data received:', balanceData);
-      
+
       // Asignar directamente sin procesamiento adicional
       balance = balanceData.balance;
       name = balanceData.name || '';

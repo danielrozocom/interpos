@@ -1,4 +1,4 @@
-<script>
+<script lang="ts">
   import { page } from '$app/stores';
   import { siteName } from '../lib/config';
 
@@ -42,6 +42,7 @@
   }
 
   function handleAction() {
+    if (typeof window === 'undefined') return;
     if (errorCode === 500) {
       window.location.reload();
     } else {
@@ -50,10 +51,12 @@
   }
 
   function goHome() {
+    if (typeof window === 'undefined') return;
     window.location.href = '/';
   }
 
   function goBack() {
+    if (typeof window === 'undefined') return;
     if (window.history.length > 1) {
       window.history.back();
     } else {

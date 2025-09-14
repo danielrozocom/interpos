@@ -79,7 +79,9 @@ function handleScannedSell(ev: Event) {
   performEnterLookup();
   showScanner = false;
   // focus input after a tick
-  tick().then(() => { const el2 = document.getElementById('userId') as HTMLInputElement | null; if (el2) el2.focus(); });
+  if (typeof window !== 'undefined') {
+    tick().then(() => { const el2 = document.getElementById('userId') as HTMLInputElement | null; if (el2) el2.focus(); });
+  }
     return;
   }
 
@@ -107,8 +109,20 @@ function performEnterLookup() {
 }
 
 // Cargar preferencia de ordenamiento desde localStorage
-let sortByAlphabetical = typeof window !== 'undefined' ? 
-  localStorage.getItem('sortByAlphabetical') !== 'false' : true; // true = alfabético, false = por ID
+let sortByAlphabetical = true; // true = alfabético, false = por ID
+
+import { onMount } from 'svelte';
+
+onMount(() => {
+  if (typeof window !== 'undefined') {
+    try {
+      const v = localStorage.getItem('sortByAlphabetical');
+      if (v !== null) sortByAlphabetical = v !== 'false';
+    } catch (e) {
+      // ignore
+    }
+  }
+});
 
 // Payment method variables
 let paymentMethod = 'saldo'; // 'saldo' or 'efectivo'
@@ -314,7 +328,10 @@ let showCashModal = false;
 
     // Validar ID de usuario SIEMPRE, incluso para pagos en efectivo
     if (!userId?.trim()) {
-      const userIdInput = document.getElementById('userId');
+      let userIdInput: HTMLInputElement | null = null;
+      if (typeof window !== 'undefined') {
+        userIdInput = document.getElementById('userId') as HTMLInputElement | null;
+      }
       userIdInput?.focus();
       userIdInput?.scrollIntoView({ behavior: 'smooth', block: 'center' });
       error = 'Debes ingresar un ID de usuario.';
@@ -337,7 +354,10 @@ let showCashModal = false;
                              `📉 Nuevo saldo: $${newBalance.toLocaleString('es-CO')}\n\n` +
                              `❓ ¿Acepta asumir la deuda?`;
         
-        const proceed = window.confirm(confirmMessage);
+        let proceed = true;
+        if (typeof window !== 'undefined') {
+          proceed = window.confirm(confirmMessage);
+        }
         if (!proceed) {
           return;
         }
@@ -436,7 +456,9 @@ let showCashModal = false;
       successMsg = 'Venta exitosa';
       
       // Scroll to top of the page
-      window.scrollTo({ top: 0, behavior: 'smooth' });
+      if (typeof window !== 'undefined') {
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+      }
       
       setTimeout(() => { successMsg = ''; }, 2000);
         
@@ -632,7 +654,7 @@ let showCashModal = false;
                 cartTotal = cart.reduce((sum, item) => sum + (item.price * item.quantity), 0);
                 
                 // Show mobile notification
-                if (window.innerWidth < 768) {
+                if (typeof window !== 'undefined' && window.innerWidth < 768) {
                   showAddedNotification = true;
                   setTimeout(() => showAddedNotification = false, 1500);
                 }
@@ -695,7 +717,8 @@ let showCashModal = false;
           </div>
           <input
             id="userId"
-            type="text"
+            type="tel"
+            inputmode="numeric"
             bind:value={userId}
             on:keydown={(e) => {
               if (e.key === 'Enter') {
