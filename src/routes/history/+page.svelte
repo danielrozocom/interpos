@@ -430,14 +430,14 @@ async function refreshTransactions() {
         <form on:submit|preventDefault={fetchTransactions} class="space-y-6">
           <div>
             <label for="userId" class="block text-lg font-semibold text-[#35528C] mb-3">ID de Usuario</label>
-            <div class="flex flex-wrap items-center gap-2 min-w-0">
+            <div class="flex items-center gap-2 min-w-0 flex-nowrap">
               <input 
                 id="userId"
                 type="tel"
                 bind:value={userId}
               required
               
-              class="flex-1 h-12 rounded-xl border-2 border-[#35528C] shadow-sm focus:border-[#35528C] focus:ring-2 focus:ring-[#35528C]/20 text-lg px-4 font-sans"
+              class="flex-1 min-w-0 h-12 rounded-xl border-2 border-[#35528C] shadow-sm focus:border-[#35528C] focus:ring-2 focus:ring-[#35528C]/20 text-lg px-4 font-sans"
               on:keydown={(e) => {
                 validateNumericInput(e);
                 if (e.key === 'Enter') {
@@ -467,7 +467,7 @@ async function refreshTransactions() {
               placeholder="Ingrese ID del usuario"
               autocomplete="off"
             />
-              <button type="button" class="h-10 w-10 p-1 rounded-lg flex items-center justify-center bg-[#35528C] text-white shadow-sm hover:bg-[#2A4170] focus:outline-none focus:ring-2 focus:ring-[#35528C]/40 shrink-0" aria-label="Abrir escáner" on:click={openScanner}>
+              <button type="button" class="h-10 w-10 p-1 rounded-lg flex items-center justify-center bg-[#35528C] text-white shadow-sm hover:bg-[#2A4170] focus:outline-none focus:ring-2 focus:ring-[#35528C]/40 flex-none shrink-0" aria-label="Abrir escáner" on:click={openScanner}>
                 <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-white" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true">
                   <path stroke-linecap="round" stroke-linejoin="round" d="M3 7h3l2-2h6l2 2h3v11a2 2 0 01-2 2H5a2 2 0 01-2-2z" />
                   <circle cx="12" cy="13" r="3.5" stroke-linecap="round" stroke-linejoin="round" />
