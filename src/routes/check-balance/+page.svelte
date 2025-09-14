@@ -384,7 +384,8 @@
                 id="userId"
                 bind:value={userId}
                 on:keydown={validateNumericInput}
-                on:paste={handlePaste}
+                  on:paste={handlePaste}
+                  on:input={(e) => { const v = e.currentTarget.value.replace(/[^0-9]/g, ''); if (v !== userId) userId = v; }}
                 class="h-12 rounded-xl border-2 border-gray-200 shadow-sm focus:border-[#35528C] focus:ring-2 focus:ring-[#35528C]/20 text-lg px-4 w-full min-w-0"
                 placeholder="Ingresa tu ID"
                 inputmode="numeric"

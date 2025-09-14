@@ -34,6 +34,52 @@ import { normalizeUserId } from '../../lib/normalizeUserId';
 let showScanner = false;
 let Scanner: any = null;
 
+// Validate numeric-only input for user IDs (allow navigation keys and Ctrl shortcuts)
+function validateNumericInput(event: KeyboardEvent) {
+  const allowedKeys = ['Backspace', 'Delete', 'Tab', 'Escape', 'Enter', 'ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown', 'Home', 'End'];
+  if (allowedKeys.includes(event.key)) return;
+  // Allow common Ctrl/Cmd shortcuts inside input (copy/paste/select all/cut)
+  if ((event.ctrlKey || event.metaKey) && ['c', 'v', 'a', 'x'].includes(event.key.toLowerCase())) return;
+  // Only allow digits
+  if (!/^[0-9]$/.test(event.key)) {
+    event.preventDefault();
+  }
+}
+
+function handleUserIdKeydown(e: KeyboardEvent) {
+  validateNumericInput(e);
+  if (e.key === 'Enter') {
+    // if empty, show immediate message
+    if (!userId || String(userId).trim() === '') {
+      error = 'No se encontraron usuarios';
+      userSuggestions = [];
+      return;
+    }
+    // clear suggestions so lookup is immediate
+    userSuggestions = [];
+    loadUserBalance(true);
+  }
+}
+
+function handleUserIdPaste(event: ClipboardEvent) {
+  event.preventDefault();
+  const pasted = event.clipboardData?.getData('text') || '';
+  const digits = pasted.replace(/\D/g, '');
+  const input = event.target as HTMLInputElement;
+  const start = input.selectionStart || 0;
+  const end = input.selectionEnd || 0;
+  const newValue = input.value.substring(0, start) + digits + input.value.substring(end);
+  // Update bound value
+  userId = newValue;
+  // move cursor after inserted digits
+  const pos = start + digits.length;
+  setTimeout(() => { try { input.setSelectionRange(pos, pos); } catch (e) {} }, 0);
+  // clear error and fetch suggestions if appropriate
+  error = '';
+  userSuggestions = [];
+  if (userId && userId.trim().length >= 2) fetchUserSuggestions(userId);
+}
+
 onMount(async () => {
   // load scanner lazily to avoid SSR issues
   try {
@@ -718,25 +764,15 @@ let showCashModal = false;
             id="userId"
             type="tel"
             inputmode="numeric"
+            pattern="[0-9]*"
             bind:value={userId}
-            on:keydown={(e) => {
-              if (e.key === 'Enter') {
-                // si está vacío, mostrar mensaje inmediato
-                if (!userId || String(userId).trim() === '') {
-                  error = 'No se encontraron usuarios';
-                  userSuggestions = [];
-                  return;
-                }
-                // limpiar sugerencias para que la consulta sea inmediata
-                userSuggestions = [];
-                loadUserBalance(true);
-              }
-            }}
+            on:keydown={handleUserIdKeydown}
             on:input={() => {
               error = '';
               userSuggestions = [];
               fetchUserSuggestions(userId);
             }}
+            on:paste={handleUserIdPaste}
             class="flex-1 px-3 py-2 border border-primary rounded-lg text-base focus:ring-2 focus:ring-primary focus:border-primary bg-white placeholder-[#35528C] transition-all duration-150 shadow-sm"
             placeholder="ID de Cliente"
             autocomplete="off"

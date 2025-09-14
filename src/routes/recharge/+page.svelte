@@ -2,25 +2,23 @@
   import { onMount, tick } from 'svelte';
   import { siteName } from '../../lib/config';
   import { normalizeUserId } from '../../lib/normalizeUserId';
-  // Fetch balance per request
-
-  let userId = '';
-  let userName = '';
-  let quantity: number | '' = '';
-  let method = '';
-  let customMethod = '';
-  let observations = '';
-  let quantityInput: HTMLInputElement | null = null;
-  let message = '';
-  let loading = false;
-  let currentBalance: number | null = null;
+  // Reactive state needed by the template and handlers
+  let userId: string = '';
+  let allUsers: Array<{ id: string; name?: string; balance?: number | string }> = [];
+  let userSuggestions: Array<{ id: string; name?: string }> = [];
   let userExists: boolean = false;
-  let allUsers: Array<{id: string, name: string}> = [];
-  let userSuggestions: Array<{id: string, name: string}> = [];
-  let showScanner = false;
+  let userName: string = '';
+  let currentBalance: number | null = null;
+  let quantity: number | string = '';
+  let method: string = '';
+  let customMethod: string = '';
+  let observations: string = '';
+  let loading: boolean = false;
+  let message: string = '';
+  let showScanner: boolean = false;
   let ScannerComponent: any = null;
-
-  // Función para validar que solo se ingresen números en el ID
+  let quantityInput: HTMLInputElement | null = null;
+  // Fetch balance per request
   function validateNumericInput(event: KeyboardEvent) {
     const allowedKeys = ['Backspace', 'Delete', 'Tab', 'Enter', 'ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown'];
     if (allowedKeys.includes(event.key)) {
@@ -332,18 +330,17 @@ $: {
             <input 
               id="userId"
               type="tel" 
+              inputmode="numeric"
+              pattern="[0-9]*"
               bind:value={userId} 
               required 
               class="input-field"
-              on:keydown={(e) => {
-                // Permitir Ctrl+C, Ctrl+V, Ctrl+A
-                if ((e.ctrlKey || e.metaKey) && ['c', 'v', 'a'].includes(e.key.toLowerCase())) {
-                  return;
-                }
-                // Prevenir el envío del formulario al presionar Enter
-                if (e.key === 'Enter') {
-                  e.preventDefault();
-                }
+              on:keydown={validateNumericInput}
+              on:paste={cleanPastedValue}
+              on:input={(e) => {
+                // sanitize any non-digit char (helps mobile IME and composition)
+                const v = e.currentTarget.value.replace(/[^0-9]/g, '');
+                if (v !== userId) userId = v;
               }}
               placeholder="Ingrese ID del usuario"
             />
@@ -440,6 +437,7 @@ $: {
               <select id="method" bind:value={method} required class="input-field">
                 <option value="">Selecciona método</option>
                 <option value="Efectivo">Efectivo</option>
+                <option value="Operación Interna">Operación Interna</option>
                 <option value="Otro">Otro</option>
               </select>
               {#if method === 'Otro'}

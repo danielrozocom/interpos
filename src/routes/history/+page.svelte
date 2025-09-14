@@ -112,6 +112,24 @@ function validateNumericInput(event: KeyboardEvent) {
   }
 }
 
+// Handler that centralizes numeric validation and Enter behavior
+function handleUserIdKeydown(e: KeyboardEvent) {
+  // First enforce numeric-only keys
+  validateNumericInput(e);
+
+  // If Enter pressed, trigger search (if valid) and prevent default
+  if (e.key === 'Enter') {
+    // If a suggestion exactly matches, prefer it; otherwise if there's any input, search by it
+    if (userSuggestions.length > 0 && userSuggestions.some(u => u.id === userId)) {
+      fetchTransactions();
+      e.preventDefault();
+    } else if (userId && userId.trim()) {
+      fetchTransactions();
+      e.preventDefault();
+    }
+  }
+}
+
 async function openScanner() {
   showScanner = true;
   if (!ScannerComponent) {
@@ -434,39 +452,32 @@ async function refreshTransactions() {
               <input 
                 id="userId"
                 type="tel"
+                inputmode="numeric"
+                pattern="[0-9]*"
                 bind:value={userId}
-              required
-              
-              class="flex-1 min-w-0 h-12 rounded-xl border-2 border-[#35528C] shadow-sm focus:border-[#35528C] focus:ring-2 focus:ring-[#35528C]/20 text-lg px-4 font-sans"
-              on:keydown={(e) => {
-                validateNumericInput(e);
-                if (e.key === 'Enter') {
-                  if (userSuggestions.length > 0 && userSuggestions.some(u => u.id === userId)) {
-                    fetchTransactions();
-                    e.preventDefault();
-                  } else if (userId.trim()) {
-                    fetchTransactions();
-                    e.preventDefault();
+                required
+                class="flex-1 min-w-0 h-12 rounded-xl border-2 border-[#35528C] shadow-sm focus:border-[#35528C] focus:ring-2 focus:ring-[#35528C]/20 text-lg px-4 font-sans"
+                on:keydown={handleUserIdKeydown}
+                on:paste={cleanPastedValue}
+                on:input={(e) => { 
+                  // Sanitize to digits only
+                  const v = e.currentTarget.value.replace(/[^0-9]/g, ''); 
+                  if (v !== userId) userId = v;
+                  // Clear any previous error as the user edits the input
+                  error = '';
+                  // Limpiar sugerencias inmediatamente si el campo está vacío
+                  if (!v || v.trim().length === 0) {
+                    userSuggestions = [];
+                  } else if (v.trim().length >= 2) {
+                    // Solo mostrar sugerencias si hay al menos 2 caracteres
+                    searchUsers(v);
+                  } else {
+                    userSuggestions = [];
                   }
-                }
-              }}
-              on:input={() => {
-                // Clear any previous error as the user edits the input
-                error = '';
-                // Limpiar sugerencias inmediatamente si el campo está vacío
-                if (!userId || userId.trim().length === 0) {
-                  userSuggestions = [];
-                } else if (userId.trim().length >= 2) {
-                  // Solo mostrar sugerencias si hay al menos 2 caracteres
-                  searchUsers(userId);
-                } else {
-                  userSuggestions = [];
-                }
-              }}
-              on:paste={cleanPastedValue}
-              placeholder="Ingrese ID del usuario"
-              autocomplete="off"
-            />
+                }}
+                placeholder="Ingrese ID del usuario"
+                autocomplete="off"
+              />
               <button type="button" class="h-10 w-10 p-1 rounded-lg flex items-center justify-center bg-[#35528C] text-white shadow-sm hover:bg-[#2A4170] focus:outline-none focus:ring-2 focus:ring-[#35528C]/40 flex-none shrink-0" aria-label="Abrir escáner" on:click={openScanner}>
                 <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-white" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true">
                   <path stroke-linecap="round" stroke-linejoin="round" d="M3 7h3l2-2h6l2 2h3v11a2 2 0 01-2 2H5a2 2 0 01-2-2z" />
