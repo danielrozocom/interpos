@@ -230,12 +230,25 @@ export const GET: RequestHandler = async ({ url }) => {
     // Aggregate recargas by method (from recargas)
     const recargasByMethod: Record<string, number> = {};
     let totalRecargas = 0;
+    const recargasCountsByMethod: Record<string, number> = {};
     // Only count positive recargas (ignore negative adjustments/consumos)
     for (const r of recargas) {
       const q = Number(r.quantity || 0);
       if (q <= 0) continue; // skip non-positive entries
       const m = r.method || 'Unknown';
       recargasByMethod[m] = (recargasByMethod[m] || 0) + q;
+      // count transactions (each recarga row counts as one transaction)
+      // normalize common variants to canonical keys
+      const nm = String(m || '').toLowerCase().normalize('NFD').replace(/\p{Diacritic}/gu, '');
+      let key = m;
+      try {
+        if (nm.includes('efectivo') || nm.includes('cash')) key = 'Efectivo';
+        else if (nm.includes('operacion') || nm.includes('interna') || nm.includes('internal') || nm.includes('operacional') || nm.includes('operación interna')) key = 'Recargas por operación interna 🔧';
+        else key = m;
+      } catch (e) {
+        key = m;
+      }
+      recargasCountsByMethod[key] = (recargasCountsByMethod[key] || 0) + 1;
       totalRecargas += q;
     }
 
@@ -248,6 +261,7 @@ export const GET: RequestHandler = async ({ url }) => {
   salesCountsByMethod,
   totalRecargas,
   recargasByMethod,
+  recargasCountsByMethod,
   productsCounts,
   topProducts,
         counts: {

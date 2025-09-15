@@ -373,10 +373,120 @@ $: if (_hasMounted) {
   // Derived counts per method to drive txLabel display and sizing
   $: derivedSalesSaldoCount = Object.entries(derivedSalesCountsByMethod).reduce((s: number, [k, v]) => k.toLowerCase().includes('saldo') ? s + Number(v || 0) : s, 0) || 0;
   $: derivedSalesCashCount = Object.entries(derivedSalesCountsByMethod).reduce((s: number, [k, v]) => k.toLowerCase().includes('efectivo') ? s + Number(v || 0) : s, 0) || 0;
-  $: derivedRecargasCountsByMethod = (summary && summary.summary && summary.summary.recargasCountsByMethod) ? summary.summary.recargasCountsByMethod : {};
+  $: derivedRecargasCountsByMethod = (() => {
+    const byMethod = (summary && summary.summary && summary.summary.recargasCountsByMethod) ? summary.summary.recargasCountsByMethod : {};
+    // If server didn't provide a per-method breakdown but provided a total count, add a fallback entry
+    try {
+      const hasKeys = byMethod && Object.keys(byMethod).length > 0;
+      const serverTotal = summary && summary.summary && summary.summary.counts && Number(summary.summary.counts.recargas || 0);
+      if (!hasKeys && serverTotal && serverTotal > 0) {
+        return { 'Total (server)': serverTotal };
+      }
+    } catch (e) { /* ignore */ }
+    return byMethod;
+  })();
+  // Normalize keys (remove diacritics) and compute robust counts for recargas
+  function normalizeKey(s: string) {
+    try {
+      return String(s || '').normalize('NFD').replace(/\p{Diacritic}/gu, '').toLowerCase();
+    } catch (e) {
+      // older environments may not support Unicode property escapes; fallback
+      return String(s || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
+    }
+  }
+
   $: derivedRecargasCount = Object.values(derivedRecargasCountsByMethod).reduce((s: number, v: any) => s + Number(v || 0), 0) || 0;
-  $: derivedRecargasCashCount = Object.entries(derivedRecargasCountsByMethod).reduce((s: number, [k, v]) => k.toLowerCase().includes('efectivo') ? s + Number(v || 0) : s, 0) || 0;
-  $: derivedRecargasInternalCount = Object.entries(derivedRecargasCountsByMethod).reduce((s: number, [k, v]) => (k.toLowerCase().includes('operación interna') || k.toLowerCase().includes('operacion interna')) ? s + Number(v || 0) : s, 0) || 0;
+
+  $: derivedRecargasCashCount = (() => {
+    const entries = Object.entries(derivedRecargasCountsByMethod || {});
+    return entries.reduce((s: number, [k, v]) => {
+      const nk = normalizeKey(String(k || ''));
+      if (nk.includes('efectivo') || nk.includes('cash')) return s + Number(v || 0);
+      return s;
+    }, 0);
+  })() || 0;
+
+  $: derivedRecargasInternalCount = (() => {
+    const entries = Object.entries(derivedRecargasCountsByMethod || {});
+    return entries.reduce((s: number, [k, v]) => {
+      const nk = normalizeKey(String(k || ''));
+      if (nk.includes('operacion') || nk.includes('interna') || nk.includes('internal') || nk.includes('operacional')) return s + Number(v || 0);
+      return s;
+    }, 0);
+  })() || 0;
+
+  // Display fallbacks and proportional estimates when per-method breakdown is missing
+  $: serverTotalRecargas = Number(summary && summary.summary && summary.summary.counts && Number(summary.summary.counts.recargas || 0)) || 0;
+
+  // Estimate counts proportionally to amounts when breakdown not provided
+  $: estimatedRecargasCashCount = (() => {
+    if (hasRecargasBreakdown) return 0;
+    if (!serverTotalRecargas) return 0;
+    const cashAmt = Number(derivedRecargasCash || 0);
+    const internalAmt = Number(derivedRecargasInternal || 0);
+    const denom = cashAmt + internalAmt;
+    if (denom > 0) return Math.round(serverTotalRecargas * (cashAmt / denom));
+    return Math.floor(serverTotalRecargas / 2);
+  })();
+
+  $: estimatedRecargasInternalCount = serverTotalRecargas - (Number(estimatedRecargasCashCount) || 0);
+
+  $: displayRecargasCount = (derivedRecargasCount > 0) ? derivedRecargasCount : serverTotalRecargas;
+  $: displayRecargasCashCount = (derivedRecargasCashCount > 0)
+    ? derivedRecargasCashCount
+    : (manualRecargasCashCount != null ? manualRecargasCashCount : (estimatedRecargasCashCount > 0 ? estimatedRecargasCashCount : Number(summary && summary.summary && summary.summary.counts && summary.summary.counts.recargas_efectivo || 0)));
+  $: displayRecargasInternalCount = (derivedRecargasInternalCount > 0)
+    ? derivedRecargasInternalCount
+    : (manualRecargasInternalCount != null ? manualRecargasInternalCount : (estimatedRecargasInternalCount > 0 ? estimatedRecargasInternalCount : Number(summary && summary.summary && summary.summary.counts && summary.summary.counts.recargas_interna || 0)));
+
+  // Debug UI control to inspect raw objects from server (toggleable)
+  let showRecargasDebug = false;
+
+  // Whether server provided a per-method breakdown for recargas
+  $: hasRecargasBreakdown = Boolean(summary && summary.summary && summary.summary.recargasCountsByMethod && Object.keys(summary.summary.recargasCountsByMethod).length > 0);
+
+  // Manual overrides (localStorage)
+  let manualRecargasCashCount: number | null = null;
+  let manualRecargasInternalCount: number | null = null;
+  let manualCountsSource: any = null;
+
+  const MANUAL_KEY = 'interpos_manual_recargas_counts_v1';
+
+  // load manual overrides from localStorage on mount
+  onMount(() => {
+    try {
+      if (typeof localStorage !== 'undefined') {
+        const raw = localStorage.getItem(MANUAL_KEY);
+        if (raw) {
+          const parsed = JSON.parse(raw);
+          manualRecargasCashCount = parsed.cash != null ? Number(parsed.cash) : null;
+          manualRecargasInternalCount = parsed.internal != null ? Number(parsed.internal) : null;
+          manualCountsSource = parsed;
+        }
+      }
+    } catch (e) { /* ignore */ }
+  });
+
+  function saveManualCounts() {
+    try {
+      const toSave = { cash: manualRecargasCashCount, internal: manualRecargasInternalCount };
+      if (typeof localStorage !== 'undefined') {
+        localStorage.setItem(MANUAL_KEY, JSON.stringify(toSave));
+      }
+      manualCountsSource = toSave;
+    } catch (e) { /* ignore */ }
+  }
+
+  function clearManualCounts() {
+    try {
+      if (typeof localStorage !== 'undefined') {
+        localStorage.removeItem(MANUAL_KEY);
+      }
+    } catch (e) { /* ignore */ }
+    manualRecargasCashCount = null;
+    manualRecargasInternalCount = null;
+    manualCountsSource = null;
+  }
 
   // Helper to choose class for the txLabel: slightly larger when count is zero
   function countClass(n: number | string | undefined | null) {
@@ -1005,21 +1115,29 @@ $: if (_hasMounted) {
             <div class="summary-card">
               <p class="text-sm text-gray-500">Recargas totales 🔁</p>
               <p class="text-2xl font-semibold">{formatCurrency(derivedTotalRecargas)}</p>
-              <p class="text-sm text-gray-400" class:text-base={isZero(summary.summary.counts.recargas)} class:font-medium={isZero(summary.summary.counts.recargas)}>{txLabel(summary.summary.counts.recargas)}</p>
+              <p class="{countClass(displayRecargasCount)}">{txLabel(displayRecargasCount)}</p>
             </div>
           </div>
           <div class="p-4 bg-white rounded-lg shadow-sm">
             <div class="summary-card">
               <p class="text-sm text-gray-500">Recargas en efectivo 💵</p>
               <p class="text-2xl font-semibold">{formatCurrency(derivedRecargasCash)}</p>
-              <p class="text-sm text-gray-400" class:text-base={isZero((summary.summary.recargasCountsByMethod && Object.entries(summary.summary.recargasCountsByMethod).reduce((s,[k,v]) => k.toLowerCase().includes('efectivo') ? s+Number(v||0) : s, 0)) || 0)} class:font-medium={isZero((summary.summary.recargasCountsByMethod && Object.entries(summary.summary.recargasCountsByMethod).reduce((s,[k,v]) => k.toLowerCase().includes('efectivo') ? s+Number(v||0) : s, 0)) || 0)}>{txLabel((summary.summary.recargasCountsByMethod && Object.entries(summary.summary.recargasCountsByMethod).reduce((s,[k,v]) => k.toLowerCase().includes('efectivo') ? s+Number(v||0) : s, 0)) || 0)}</p>
+              {#if hasRecargasBreakdown}
+                <p class="{countClass(displayRecargasCashCount)}">{txLabel(displayRecargasCashCount)}</p>
+              {:else}
+                <p class="{countClass(displayRecargasCashCount)}">{txLabel(displayRecargasCashCount)} {#if manualRecargasCashCount != null}<span class="text-xs text-gray-500">(manual)</span>{:else}<span class="text-xs text-gray-400">(estimado)</span>{/if}</p>
+              {/if}
             </div>
           </div>
           <div class="p-4 bg-white rounded-lg shadow-sm">
             <div class="summary-card">
               <p class="text-sm text-gray-500">Recargas por operación interna 🔧</p>
               <p class="text-2xl font-semibold">{formatCurrency(derivedRecargasInternal)}</p>
-              <p class="text-sm text-gray-400" class:text-base={isZero((summary.summary.recargasCountsByMethod && Object.entries(summary.summary.recargasCountsByMethod).reduce((s,[k,v]) => k.toLowerCase().includes('operación interna') || k.toLowerCase().includes('operacion interna') ? s+Number(v||0) : s, 0)) || 0)} class:font-medium={isZero((summary.summary.recargasCountsByMethod && Object.entries(summary.summary.recargasCountsByMethod).reduce((s,[k,v]) => k.toLowerCase().includes('operación interna') || k.toLowerCase().includes('operacion interna') ? s+Number(v||0) : s, 0)) || 0)}>{txLabel((summary.summary.recargasCountsByMethod && Object.entries(summary.summary.recargasCountsByMethod).reduce((s,[k,v]) => k.toLowerCase().includes('operación interna') || k.toLowerCase().includes('operacion interna') ? s+Number(v||0) : s, 0)) || 0)}</p>
+              {#if hasRecargasBreakdown}
+                <p class="{countClass(displayRecargasInternalCount)}">{txLabel(displayRecargasInternalCount)}</p>
+              {:else}
+                <p class="{countClass(displayRecargasInternalCount)}">{txLabel(displayRecargasInternalCount)} {#if manualRecargasInternalCount != null}<span class="text-xs text-gray-500">(manual)</span>{:else}<span class="text-xs text-gray-400">(estimado)</span>{/if}</p>
+              {/if}
             </div>
           </div>
         </div>
@@ -1029,6 +1147,8 @@ $: if (_hasMounted) {
         <canvas bind:this={recargasCanvas} style="max-height:320px; width:100%"></canvas>
       </div>
     </div>
+
+    
 
     <!-- Top productos -->
   <div class="section-header mt-3">
