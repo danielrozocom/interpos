@@ -6,6 +6,19 @@
   export let topbarLight = false;
   import { page } from '$app/stores';
 
+  // Close the slide menu on mobile when a nav link is clicked
+  function handleNavClick() {
+    try {
+      // If viewport is small, close the menu
+      if (typeof window !== 'undefined') {
+        const isMobile = window.matchMedia('(max-width: 767px)').matches;
+        if (isMobile) menuOpen = false;
+      }
+    } catch (e) {
+      // ignore
+    }
+  }
+
   // Global Ctrl-based shortcuts dispatcher
   function globalKeyHandler(e: KeyboardEvent) {
     if (typeof window === 'undefined') return;
@@ -79,12 +92,12 @@
         {/if}
       </div>
       <nav class="sidebar-nav" aria-label="Menú principal">
-        <a href="/" class="nav-link { $page.url.pathname === '/' ? 'active' : '' }">🏠 <span class="link-text">Inicio</span></a>
-        <a href="/recharge" class="nav-link { $page.url.pathname === '/recharge' ? 'active' : '' }">⚡ <span class="link-text">Recargar</span></a>
-        <a href="/history" class="nav-link { $page.url.pathname === '/history' ? 'active' : '' }">📜 <span class="link-text">Historial</span></a>
-        <a href="/check-balance" class="nav-link { $page.url.pathname === '/check-balance' ? 'active' : '' }">💰 <span class="link-text">Consultar saldo</span></a>
-        <a href="/sell" class="nav-link { $page.url.pathname === '/sell' ? 'active' : '' }">🛒 <span class="link-text">Vender</span></a>
-        <a href="/reports" class="nav-link { $page.url.pathname === '/reports' ? 'active' : '' }">📊 <span class="link-text">Reportes</span></a>
+  <a href="/" on:click={handleNavClick} class="nav-link { $page.url.pathname === '/' ? 'active' : '' }">🏠 <span class="link-text">Inicio</span></a>
+  <a href="/recharge" on:click={handleNavClick} class="nav-link { $page.url.pathname === '/recharge' ? 'active' : '' }">⚡ <span class="link-text">Recargar</span></a>
+  <a href="/history" on:click={handleNavClick} class="nav-link { $page.url.pathname === '/history' ? 'active' : '' }">📜 <span class="link-text">Historial</span></a>
+  <a href="/check-balance" on:click={handleNavClick} class="nav-link { $page.url.pathname === '/check-balance' ? 'active' : '' }">💰 <span class="link-text">Consultar saldo</span></a>
+  <a href="/sell" on:click={handleNavClick} class="nav-link { $page.url.pathname === '/sell' ? 'active' : '' }">🛒 <span class="link-text">Vender</span></a>
+  <a href="/reports" on:click={handleNavClick} class="nav-link { $page.url.pathname === '/reports' ? 'active' : '' }">📊 <span class="link-text">Reportes</span></a>
       </nav>
     </aside>
 
