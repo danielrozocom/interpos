@@ -26,6 +26,7 @@
   let exporting = false;
   let exportMessage = '';
   let showExportMenu = false;
+  let selectedExportFormat: string | null = null;
   // Auto-fetch control
   let _hasMounted = false;
   let _autoFetchTimer: ReturnType<typeof setTimeout> | null = null;
@@ -664,7 +665,7 @@ $: if (_hasMounted) {
   async function exportPDF() {
     if (!summary) return;
     if (typeof document === 'undefined') return;
-    exporting = true; exportMessage = 'Generando PDF (vector)...';
+    exporting = true; exportMessage = 'Generando PDF...';
     try {
       const jsPDF = await import('jspdf');
       const PDF = (jsPDF as any).jsPDF;
@@ -893,14 +894,47 @@ $: if (_hasMounted) {
         </div>
         <div class="flex items-center gap-3">
           <div class="relative">
-            <button class="btn-export inline-flex items-center p-2 export-button" aria-haspopup="true" aria-expanded={showExportMenu} aria-label="Exportar" title="Exportar" on:click|stopPropagation={() => toggleExportMenu()}>
-              <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7"/></svg>
+            <button class="btn-export relative inline-flex items-center p-2 export-button" aria-haspopup="true" aria-expanded={showExportMenu} aria-label={selectedExportFormat ? `Exportar como ${selectedExportFormat}` : 'Exportar'} title={selectedExportFormat ? `Exportar como ${selectedExportFormat}` : 'Exportar'} on:click|stopPropagation={() => toggleExportMenu()}>
+              <!-- clearer download icon (icon-only button) -->
+              <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M12 3v12" />
+                <path stroke-linecap="round" stroke-linejoin="round" d="M8 11l4 4 4-4" />
+                <path stroke-linecap="round" stroke-linejoin="round" d="M21 21H3" />
+              </svg>
+              {#if selectedExportFormat === 'PDF'}
+                <span class="absolute -top-0.5 -right-0.5 h-3 w-3 rounded-full bg-primary-700 border-2 border-white" aria-hidden="true" title="PDF seleccionado"></span>
+              {:else if selectedExportFormat === 'Excel'}
+                <span class="absolute -top-0.5 -right-0.5 h-3 w-3 rounded-full bg-green-600 border-2 border-white" aria-hidden="true" title="Excel seleccionado"></span>
+              {/if}
             </button>
             {#if showExportMenu}
-              <div class="export-popover" role="menu" aria-label="Opciones de exportación">
-                <button class="export-item" on:click={() => { exportPDF(); closeExportMenu(); }} disabled={!summary || exporting}>PDF</button>
-                <button class="export-item" on:click={() => { exportCSV(); closeExportMenu(); }} disabled={!summary || exporting}>CSV</button>
-                <button class="export-item" on:click={() => { exportExcel(); closeExportMenu(); }} disabled={!summary || exporting}>Excel</button>
+              <div class="export-popover" role="menu" aria-label="Opciones de exportación" tabindex="-1" on:mouseleave={() => closeExportMenu()}>
+                <button
+                  class="export-item flex items-center gap-2 px-3 py-2 rounded hover:bg-gray-100 hover:border hover:border-gray-300 focus:bg-gray-100 focus:border focus:border-gray-300 w-full text-left transition-all duration-200"
+                  class:font-semibold={selectedExportFormat === 'PDF'}
+                  class:bg-blue-50={selectedExportFormat === 'PDF'}
+                  class:border-2={selectedExportFormat === 'PDF'}
+                  class:border-primary-700={selectedExportFormat === 'PDF'}
+                  aria-pressed={selectedExportFormat === 'PDF'}
+                  title="Exportar PDF"
+                  on:click={() => { selectedExportFormat = 'PDF'; exportPDF(); closeExportMenu(); }}
+                  disabled={!summary || exporting}
+                >
+                  <span class="ml-1">PDF</span>
+                </button>
+                <button
+                  class="export-item flex items-center gap-2 px-3 py-2 rounded hover:bg-gray-100 hover:border hover:border-gray-300 focus:bg-gray-100 focus:border focus:border-gray-300 w-full text-left transition-all duration-200"
+                  class:font-semibold={selectedExportFormat === 'Excel'}
+                  class:bg-green-50={selectedExportFormat === 'Excel'}
+                  class:border-2={selectedExportFormat === 'Excel'}
+                  class:border-green-600={selectedExportFormat === 'Excel'}
+                  aria-pressed={selectedExportFormat === 'Excel'}
+                  title="Exportar Excel"
+                  on:click={() => { selectedExportFormat = 'Excel'; exportExcel(); closeExportMenu(); }}
+                  disabled={!summary || exporting}
+                >
+                  <span class="ml-1">Excel</span>
+                </button>
               </div>
             {/if}
           </div>
