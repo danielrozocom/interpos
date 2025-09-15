@@ -56,6 +56,14 @@ body {
   --topbar-gap: 20px;
 }
 
+/* Respect iOS/Android safe-area insets (notch, rounded corners) */
+body {
+  padding-top: env(safe-area-inset-top);
+  padding-left: env(safe-area-inset-left);
+  padding-right: env(safe-area-inset-right);
+  padding-bottom: env(safe-area-inset-bottom);
+}
+
 /* Normalize top spacing inside the main content area.
    Some pages add large top margins or padding on their first child which
    can push the whole page down. Remove the top margin of the first

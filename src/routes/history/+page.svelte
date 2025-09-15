@@ -477,6 +477,7 @@ async function refreshTransactions() {
                 }}
                 placeholder="Ingrese ID del usuario"
                 autocomplete="off"
+                autofocus
               />
               <button type="button" class="h-10 w-10 p-1 rounded-lg flex items-center justify-center bg-[#35528C] text-white shadow-sm hover:bg-[#2A4170] focus:outline-none focus:ring-2 focus:ring-[#35528C]/40 flex-none shrink-0" aria-label="Abrir escáner" on:click={openScanner}>
                 <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-white" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true">
