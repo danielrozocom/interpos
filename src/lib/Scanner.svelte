@@ -471,6 +471,30 @@
           }
         } catch(e) {}
 
+        // intentar asegurar autofocus / reproducción para mejorar la lectura automática
+        try {
+          // algunos navegadores requieren videoEl.play() para iniciar la reproducción del stream
+          if (videoEl) {
+            // focus ayuda a dispositivos móviles a priorizar la cámara
+            try { videoEl.focus(); } catch (fErr) { /* ignore */ }
+            // attempt play; if the promise is rejected por autoplay policy, ignore
+            try {
+              const p = videoEl.play();
+              if (p && typeof p.catch === 'function') {
+                p.catch(() => {
+                  // fall back a un pequeño retry
+                  setTimeout(() => { try { videoEl.play(); } catch(e) {} }, 200);
+                });
+              }
+            } catch (playErr) {
+              // ignore play errors
+            }
+          }
+        } catch (err) {
+          // non-fatal
+          console.debug('Scanner: autofocus/play attempt failed', err);
+        }
+
         // populate device list and label for UI
         try { await listCameras(); } catch(e){}
         isRequestingPermission = false;
@@ -587,7 +611,7 @@
     display:flex;
     align-items:center;
     justify-content:center;
-    z-index:50;
+    z-index:9999; /* ensure modal sits above app header */
     padding: 16px; /* espacio lateral en móviles */
     box-sizing: border-box;
   }
@@ -601,6 +625,8 @@
     border-radius: 10px;
     overflow: hidden;
     box-shadow: 0 10px 30px rgba(0,0,0,0.4);
+    position: relative;
+    z-index: 10000; /* place modal content above other page elements */
     box-sizing: border-box;
   }
 
@@ -772,7 +798,7 @@
       <button class="close-btn" aria-label="Cerrar escáner" on:click={closeModal}>✕</button>
     </div>
     <div class="modal-body">
-      <video bind:this={videoEl} autoplay playsinline muted></video>
+  <video bind:this={videoEl} tabindex="0" autoplay playsinline muted></video>
       {#if permissionDenied}
         <div class="permission-panel" role="alert">
           <div style="color:white; margin-bottom:8px;">{permissionMessage || 'Permiso de cámara denegado o cámara inactiva'}</div>
