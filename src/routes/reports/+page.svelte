@@ -96,9 +96,10 @@
       if (effEnd) params.set('endDate', effEnd);
       const res = await fetch('/api/reports/summary?' + params.toString());
       if (!res.ok) throw new Error('Error fetching report');
-      summary = await res.json();
-      // update charts after data arrives
-      updateCharts();
+  summary = await res.json();
+  // Charts are updated by the `afterUpdate` hook when `summary` changes.
+  // Avoid calling updateCharts() directly here to prevent duplicate
+  // destroys/creations and potential afterUpdate -> update -> afterUpdate loops.
   // mark this range as fetched and update applied range for UI
   lastFetchedRange = key;
   appliedStart = startDate || '';
