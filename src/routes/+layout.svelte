@@ -109,7 +109,7 @@
 </div>
 <style>
   /* Topbar */
-  .topbar { position: sticky; top: 0; z-index: 100; background: #35528C; box-shadow: 0 6px 18px rgba(22,50,90,0.18); height:var(--topbar-h); color: #ffffff; }
+  .topbar { position: fixed; top: 0; left: 0; right: 0; z-index: 1000; background: #35528C; box-shadow: 0 6px 18px rgba(22,50,90,0.18); height:var(--topbar-h); color: #ffffff; }
   .topbar-inner { max-width: 1120px; margin: 0 auto; padding: 0 1rem; display:flex; align-items:center; height:var(--topbar-h); gap:0.5rem; }
   .topbar-brand { font-weight:800; color:#ffffff; text-decoration:none; font-size:1.25rem; flex:1; text-align:center; }
   /* legacy topbar favicon removed; kept in markup historically (no styles needed) */
@@ -136,9 +136,9 @@
   .link-text { white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
   .sidebar.collapsed .link-text { display:none; }
   /* sidebar-footer removed from current markup */
-  /* main-content should not add the topbar height again — the header
-    already occupies space. Use --topbar-gap for the extra spacing only. */
-  .main-content { background: #f8fafc; min-height:100vh; margin-top: 0; margin-left:220px; transition: margin-left .22s ease; padding-top:var(--topbar-gap); }
+  /* With a fixed header we must reserve its height so content doesn't slide under it.
+     Use calc(var(--topbar-h) + var(--topbar-gap)) so the existing gap is preserved. */
+  .main-content { background: #f8fafc; min-height: calc(100vh - var(--topbar-h)); margin-top: 0; margin-left:220px; transition: margin-left .22s ease; padding-top: calc(var(--topbar-h) + var(--topbar-gap)); }
   .sidebar.collapsed ~ .main-content { margin-left:72px; }
 
   /* Responsive: transform sidebar to top drawer on small screens */
