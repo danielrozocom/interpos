@@ -46,7 +46,7 @@
   <meta name="description" content="Sistema de punto de venta" />
 </svelte:head>
 
-<div class="max-w-7xl mx-auto px-4">
+<div class="max-w-7xl mx-auto px-4 pb-16">
   {#if error}
   <div class="mb-4 p-4 rounded-lg message-error shadow-sm">
       <div class="flex items-center">
