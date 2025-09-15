@@ -596,7 +596,7 @@ let showCashModal = false;
   <!-- Mobile Navigation Tabs -->
   <div class="md:hidden bg-white border-b border-gray-200 flex">
     <button
-      class="flex-1 py-3 px-4 text-center font-medium transition-colors duration-200"
+  class="flex-1 py-2 px-4 text-center font-medium transition-colors duration-200"
       class:bg-primary={mobileView === 'products'}
       class:text-white={mobileView === 'products'}
       class:text-primary={mobileView !== 'products'}
@@ -728,7 +728,7 @@ let showCashModal = false;
             </div>
           {/each}
         {:else}
-          <div class="col-span-full flex flex-col items-center justify-center py-8 md:py-12 text-gray-500">
+          <div class="col-span-full flex flex-col items-center justify-center py-3 md:py-4 text-gray-500">
             <p class="text-lg md:text-xl">No hay productos disponibles</p>
           </div>
         {/if}
@@ -813,7 +813,7 @@ let showCashModal = false;
         {/if}
         <!-- Sugerencias de usuario, error y éxito debajo del input -->
         {#if userId.length > 0 && !userName}
-          <div class="mt-2 text-sm">
+      <div class="mt-2 text-sm">
             {#if userSuggestions.length > 0}
               <div class="rounded-lg border border-gray-200 bg-white shadow-sm overflow-hidden">
                 {#each userSuggestions as suggestion}

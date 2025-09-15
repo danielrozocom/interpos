@@ -47,3 +47,69 @@ body {
     @apply bg-gray-300 text-gray-600;
   }
 }
+
+:root {
+  /* Height of the persistent topbar. Reduced slightly to tighten vertical rhythm. */
+  --topbar-h: 52px;
+  /* Vertical gap between topbar and page content. Change this single variable to
+    control the global spacing across all pages. Set to 20px as requested. */
+  --topbar-gap: 20px;
+}
+
+/* Normalize top spacing inside the main content area.
+   Some pages add large top margins or padding on their first child which
+   can push the whole page down. Remove the top margin of the first
+   direct child to ensure consistent spacing relative to the header.
+   If you need a gap, adjust --topbar-gap and the padding-top on .main-content. */
+.main-content > :first-child {
+  margin-top: 0 !important;
+}
+
+/* Normalize common large spacing utilities inside the main app content
+   to produce a more compact, consistent vertical rhythm below the header.
+   These are intentionally conservative reductions (not zero) and use
+   !important to override Tailwind utility classes where necessary. */
+.main-content .py-8 { padding-top: 1rem !important; padding-bottom: 1rem !important; }
+.main-content .py-6 { padding-top: 0.75rem !important; padding-bottom: 0.75rem !important; }
+.main-content .pt-8 { padding-top: 1rem !important; }
+.main-content .pt-6 { padding-top: 0.75rem !important; }
+.main-content .mb-8 { margin-bottom: 1rem !important; }
+.main-content .mb-6 { margin-bottom: 0.75rem !important; }
+.main-content .mb-4 { margin-bottom: 0.5rem !important; }
+.main-content .mt-6 { margin-top: 0.75rem !important; }
+.main-content .mt-4 { margin-top: 0.5rem !important; }
+.main-content .mt-2 { margin-top: 0.25rem !important; }
+
+/* Reduce top margins for headings inside main content so they don't push layout down */
+.main-content h1,
+.main-content h2,
+.main-content h3 {
+  margin-top: 0 !important;
+  margin-bottom: 0.35rem !important;
+}
+
+/* Ensure direct children don't carry large top margins (extra defense) */
+.main-content > * {
+  margin-top: 0 !important;
+}
+
+/* Force no top padding on children so tailwind pt-* inside the first-level containers
+   can't push the page down. The only vertical offset from the header should be
+   from --topbar-gap controlled on .main-content itself. */
+.main-content > * {
+  padding-top: 0 !important;
+}
+
+/* Additional strict rule for elements that may set inline styles or utility classes
+   for spacing — explicitly neutralize common top spacing properties at first level. */
+.main-content > *[class*="pt-"] {
+  padding-top: 0 !important;
+}
+.main-content > *[class*="mt-"] {
+  margin-top: 0 !important;
+}
+.main-content > *[class*="py-"] {
+  padding-top: 0 !important;
+  padding-bottom: 0 !important;
+}
+

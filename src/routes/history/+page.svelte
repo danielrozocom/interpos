@@ -437,13 +437,13 @@ async function refreshTransactions() {
 
 <div class="min-h-screen bg-gray-50 p-4">
   <div class="max-w-4xl mx-auto">
-    <div class="text-center mb-8 animate-fadeIn">
-      <h1 class="text-4xl font-bold text-[#35528C] mb-3 font-sans s-xNGq_AHMpqrL">Historial de Transacciones</h1>
+    <div class="text-center mb-2 animate-fadeIn">
+      <h1 class="text-4xl font-bold text-[#35528C] mb-1 font-sans s-xNGq_AHMpqrL">Historial de Transacciones</h1>
       <p class="text-lg text-[#35528C]/80 font-sans max-w-2xl mx-auto">Consulta el historial de movimientos de un usuario</p>
     </div>
 
     {#if step === 1}
-      <div class="bg-white rounded-2xl shadow-lg border border-[#35528C]/10 p-8 mb-8 transform transition-all duration-200 hover:shadow-xl animate-fadeIn">
+  <div class="bg-white rounded-2xl shadow-lg border border-[#35528C]/10 p-4 mb-4 transform transition-all duration-200 hover:shadow-xl animate-fadeIn">
   <!-- Título removido por solicitud del usuario -->
         <form on:submit|preventDefault={fetchTransactions} class="space-y-6">
           <div>
@@ -525,7 +525,7 @@ async function refreshTransactions() {
         </form>
       </div>
       {#if error}
-        <div class="max-w-4xl mx-auto mt-4 mb-6 transform animate-fadeIn">
+  <div class="max-w-4xl mx-auto mt-2 mb-4 transform animate-fadeIn">
           <div class="bg-red-50 border-l-4 border-red-400 p-4 rounded-r-xl">
             <div class="flex items-center">
               <svg class="h-5 w-5 text-red-400 mr-3" viewBox="0 0 20 20" fill="currentColor">
@@ -583,7 +583,7 @@ async function refreshTransactions() {
         </div>
 
         {#if error}
-          <div class="max-w-xl mx-auto mb-8 transform animate-fadeIn">
+          <div class="max-w-xl mx-auto mb-4 transform animate-fadeIn">
             <div class="bg-red-50 border-l-4 border-red-400 p-4 rounded-r-xl">
               <div class="flex items-center">
                 <svg class="h-5 w-5 text-red-400 mr-3" viewBox="0 0 20 20" fill="currentColor">
@@ -594,7 +594,7 @@ async function refreshTransactions() {
             </div>
           </div>
         {:else if transactions.length === 0}
-          <div class="text-center py-12">
+          <div class="text-center py-3">
             <span class="text-6xl">📋</span>
             <h3 class="text-lg font-medium text-gray-900 mt-4">Sin transacciones</h3>
             <p class="text-gray-500 mt-2">Este usuario no tiene transacciones registradas.</p>
@@ -656,7 +656,7 @@ async function refreshTransactions() {
             </div>
             {#if filteredTransactions.length === 0}
               <!-- Mensaje cuando no hay datos después del filtrado -->
-              <div class="text-center py-12">
+              <div class="text-center py-3">
                 <div class="mb-4">
                   <svg class="mx-auto h-16 w-16 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />

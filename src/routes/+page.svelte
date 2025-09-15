@@ -46,9 +46,9 @@
   <meta name="description" content="Sistema de punto de venta" />
 </svelte:head>
 
-<div class="max-w-7xl mx-auto px-4 py-8">
+<div class="max-w-7xl mx-auto px-4">
   {#if error}
-    <div class="mb-6 p-4 rounded-lg message-error shadow-sm">
+  <div class="mb-4 p-4 rounded-lg message-error shadow-sm">
       <div class="flex items-center">
         <span class="text-2xl mr-3">❌</span>
         <p class="text-lg font-medium">{error}</p>
@@ -56,13 +56,13 @@
     </div>
   {/if}
 
-  <div class="text-center mb-12">
-    <h1 class="text-4xl font-bold text-[#35528C] mb-2">Bienvenido a {siteName}</h1>
+  <div class="text-center mb-2">
+    <h1 class="text-4xl font-bold text-[#35528C] mb-1">Bienvenido a {siteName}</h1>
     <p class="text-[#35528C]/80">Panel de Administración</p>
   </div>
 
   <!-- Stats Cards Principales -->
-  <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6 mb-12">
+  <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6 mb-4">
     <div class="bg-white p-4 sm:p-6 rounded-lg shadow-lg">
       <div class="flex items-center">
         <div class="flex-shrink-0">

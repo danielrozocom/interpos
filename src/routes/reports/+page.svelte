@@ -4,7 +4,22 @@
 
   let startDate: string = '';
   let endDate: string = '';
-  const today = new Date().toISOString().split('T')[0];
+  // timezone to use for report date inputs (Colombia)
+  const TIMEZONE = 'America/Bogota';
+  // local date formatter (YYYY-MM-DD) using a fixed timezone to avoid client UTC offset issues
+  function formatLocalISO(d: Date, timeZone: string = TIMEZONE) {
+    try {
+      // 'en-CA' produces YYYY-MM-DD which matches the input[type=date] format
+      return d.toLocaleDateString('en-CA', { timeZone });
+    } catch (e) {
+      // fallback to manual local components if toLocaleDateString fails
+      const y = d.getFullYear();
+      const m = String(d.getMonth() + 1).padStart(2, '0');
+      const dd = String(d.getDate()).padStart(2, '0');
+      return `${y}-${m}-${dd}`;
+    }
+  }
+  const today = formatLocalISO(new Date(), TIMEZONE);
   let loading = false;
   let error = '';
   let summary: any = null;
@@ -23,7 +38,7 @@
 
   // Date presets helpers
   function formatDateISO(d: Date) {
-    return d.toISOString().split('T')[0];
+    return formatLocalISO(d, TIMEZONE);
   }
   function handleDocClick(e: MouseEvent) {
     const target = e.target as HTMLElement | null;
@@ -71,9 +86,8 @@
   };
 
   onMount(() => {
-    const now = new Date();
-    const iso = now.toISOString().split('T')[0];
-    // Por defecto seleccionar hoy
+    // Por defecto seleccionar hoy en la zona horaria de Colombia
+    const iso = formatLocalISO(new Date(), TIMEZONE);
     startDate = iso;
     endDate = iso;
     fetchSummary();
@@ -81,7 +95,7 @@
 
   // Date preset helpers
   function fmt(d: Date) {
-    return d.toISOString().split('T')[0];
+    return formatLocalISO(d, TIMEZONE);
   }
 
     // Date presets for quick selection (end date is always today)
@@ -90,7 +104,7 @@
         label: 'Hoy',
         getRange: () => {
           const today = new Date();
-          const iso = today.toISOString().split('T')[0];
+          const iso = formatLocalISO(today, TIMEZONE);
           return { start: iso, end: iso };
         }
       },
@@ -102,8 +116,8 @@
           const day = now.getDay(); // 0 (Sun) - 6 (Sat)
           const diffToMonday = ((day + 6) % 7); // 0 for Monday, 6 for Sunday
           const monday = new Date(now.getFullYear(), now.getMonth(), now.getDate() - diffToMonday);
-          const isoStart = monday.toISOString().split('T')[0];
-          const isoEnd = now.toISOString().split('T')[0];
+          const isoStart = formatLocalISO(monday, TIMEZONE);
+          const isoEnd = formatLocalISO(now, TIMEZONE);
           return { start: isoStart, end: isoEnd };
         }
       },
@@ -112,8 +126,8 @@
         getRange: () => {
           const now = new Date();
           const start = new Date(now.getFullYear(), now.getMonth(), 1);
-          const isoStart = start.toISOString().split('T')[0];
-          const isoEnd = now.toISOString().split('T')[0];
+          const isoStart = formatLocalISO(start, TIMEZONE);
+          const isoEnd = formatLocalISO(now, TIMEZONE);
           return { start: isoStart, end: isoEnd };
         }
       },
@@ -122,8 +136,8 @@
         getRange: () => {
           const now = new Date();
           const start = new Date(now.getFullYear(), 0, 1);
-          const isoStart = start.toISOString().split('T')[0];
-          const isoEnd = now.toISOString().split('T')[0];
+          const isoStart = formatLocalISO(start, TIMEZONE);
+          const isoEnd = formatLocalISO(now, TIMEZONE);
           return { start: isoStart, end: isoEnd };
         }
       }
@@ -193,7 +207,23 @@
   }
 
   function formatCurrency(n: number) {
-    return `$${Number(n || 0).toLocaleString('es-CO', { minimumFractionDigits: 0 })}`;
+    // Use en-US locale so thousands use commas: e.g. $1,316,000
+    return `$${Number(n || 0).toLocaleString('en-US', { minimumFractionDigits: 0 })}`;
+  }
+
+  // Robust number parser reused across the file
+  function toNumber(val: any) {
+    if (typeof val === 'number') return val;
+    if (!val && val !== 0) return 0;
+    let s = String(val);
+    s = s.replace(/[$\s]/g, '');
+    if (s.indexOf('.') !== -1 && s.indexOf(',') !== -1) {
+      s = s.replace(/\./g, '').replace(/,/g, '.');
+    } else {
+      s = s.replace(/,/g, '');
+    }
+    const n = parseFloat(s);
+    return isNaN(n) ? 0 : n;
   }
 
   // Return a string like "1 transacción" or "2 transacciones"
@@ -232,6 +262,58 @@
   $: totalTopUnits = topProductsList.reduce((s: number, t: any) => s + Number(t.quantity || 0), 0);
   $: totalTopDistinct = topProductsList.length;
 
+  // Derived totals computed from the same objects used to build charts
+  $: derivedSalesByMethod = (summary && summary.summary && summary.summary.salesByMethod) ? summary.summary.salesByMethod : {};
+  $: derivedRecargasByMethod = (summary && summary.summary && summary.summary.recargasByMethod) ? summary.summary.recargasByMethod : {};
+  $: derivedSalesCountsByMethod = (summary && summary.summary && summary.summary.salesCountsByMethod) ? summary.summary.salesCountsByMethod : {};
+
+  $: derivedTotalSales = Object.values(derivedSalesByMethod).reduce((s: number, v: any) => s + toNumber(v || 0), 0) || 0;
+  $: derivedTotalSalesCash = Object.entries(derivedSalesByMethod).reduce((s: number, [k, v]) => k.toLowerCase().includes('efectivo') ? s + toNumber(v || 0) : s, 0) || 0;
+  $: derivedCountsOrders = Object.values(derivedSalesCountsByMethod).reduce((s: number, v: any) => s + Number(v || 0), 0) || 0;
+
+  // Derived counts per method to drive txLabel display and sizing
+  $: derivedSalesSaldoCount = Object.entries(derivedSalesCountsByMethod).reduce((s: number, [k, v]) => k.toLowerCase().includes('saldo') ? s + Number(v || 0) : s, 0) || 0;
+  $: derivedSalesCashCount = Object.entries(derivedSalesCountsByMethod).reduce((s: number, [k, v]) => k.toLowerCase().includes('efectivo') ? s + Number(v || 0) : s, 0) || 0;
+  $: derivedRecargasCountsByMethod = (summary && summary.summary && summary.summary.recargasCountsByMethod) ? summary.summary.recargasCountsByMethod : {};
+  $: derivedRecargasCount = Object.values(derivedRecargasCountsByMethod).reduce((s: number, v: any) => s + Number(v || 0), 0) || 0;
+  $: derivedRecargasCashCount = Object.entries(derivedRecargasCountsByMethod).reduce((s: number, [k, v]) => k.toLowerCase().includes('efectivo') ? s + Number(v || 0) : s, 0) || 0;
+  $: derivedRecargasInternalCount = Object.entries(derivedRecargasCountsByMethod).reduce((s: number, [k, v]) => (k.toLowerCase().includes('operación interna') || k.toLowerCase().includes('operacion interna')) ? s + Number(v || 0) : s, 0) || 0;
+
+  // Helper to choose class for the txLabel: slightly larger when count is zero
+  function countClass(n: number | string | undefined | null) {
+    const v = Number(n || 0);
+    return v === 0 ? 'text-sm font-medium text-gray-400' : 'text-xs text-gray-400';
+  }
+
+  // Safer boolean helper for Svelte class directives
+  function isZero(n: number | string | undefined | null) {
+    return Number(n || 0) === 0;
+  }
+
+  // Derived subtotal for 'saldo' specifically
+  $: derivedTotalSalesSaldo = (() => {
+    const entries = Object.entries(derivedSalesByMethod || {});
+    const matched = entries.filter(([k]) => String(k || '').toLowerCase().includes('saldo'));
+    const sumMatched = matched.reduce((s: number, [, v]) => s + toNumber(v || 0), 0);
+    if (sumMatched > 0) return sumMatched;
+    // fallback: if no explicit 'saldo' label, infer as total - cash
+    const inferred = Number(derivedTotalSales) - Number(derivedTotalSalesCash || 0);
+    // debug list of keys and whether they match
+    try { console.debug('reports: derivedTotalSalesSaldo keys:', entries.map(([k]) => k)); console.debug('reports: saldo-matches:', matched.map(m => m[0])); } catch (e) { /* ignore */ }
+    return inferred > 0 ? inferred : 0;
+  })();
+
+  $: derivedTotalRecargas = Object.values(derivedRecargasByMethod).reduce((s: number, v: any) => s + toNumber(v || 0), 0) || 0;
+  $: derivedRecargasCash = Object.entries(derivedRecargasByMethod).reduce((s: number, [k, v]) => k.toLowerCase().includes('efectivo') ? s + toNumber(v || 0) : s, 0) || 0;
+  $: derivedRecargasInternal = Object.entries(derivedRecargasByMethod).reduce((s: number, [k, v]) => (k.toLowerCase().includes('operación interna') || k.toLowerCase().includes('operacion interna')) ? s + toNumber(v || 0) : s, 0) || 0;
+
+  // Quick mismatch detection between server-provided totals and derived totals (logs only)
+  $: if (summary && summary.summary) {
+    if (Number(summary.summary.totalSales || 0) !== Number(derivedTotalSales)) console.warn('Reports: server totalSales mismatch', summary.summary.totalSales, derivedTotalSales);
+    if (Number(summary.summary.totalSalesCash || 0) !== Number(derivedTotalSalesCash)) console.warn('Reports: server totalSalesCash mismatch', summary.summary.totalSalesCash, derivedTotalSalesCash);
+    if (Number(summary.summary.totalRecargas || 0) !== Number(derivedTotalRecargas)) console.warn('Reports: server totalRecargas mismatch', summary.summary.totalRecargas, derivedTotalRecargas);
+  }
+
   // Clean product name for display: remove IDs, parenthesis, trailing xN and prices
   function cleanProductName(s: string | undefined | null) {
     if (!s) return '';
@@ -254,7 +336,7 @@
     if (!summary || !summary.summary) return 0;
     const salesByMethod = summary.summary.salesByMethod || {};
     return Object.entries(salesByMethod).reduce((s, [k, v]) => {
-      if (String(k).toLowerCase().includes('saldo')) return s + Number(v || 0);
+      if (String(k).toLowerCase().includes('saldo')) return s + toNumber(v);
       return s;
     }, 0);
   }
@@ -281,6 +363,15 @@
     const salesByMethod = summary.summary.salesByMethod || {};
     const recargasByMethod = summary.summary.recargasByMethod || {};
 
+    // Debug logging to help diagnose mismatches between chart and card
+    try {
+      console.debug('reports:updateCharts salesByMethod:', salesByMethod);
+      const computedSaldo = Object.entries(salesByMethod).reduce((s,[k,v]) => k.toLowerCase().includes('saldo') ? s + toNumber(v) : s, 0);
+      console.debug('reports:updateCharts computedSaldo:', computedSaldo, 'derivedTotalSalesSaldo:', derivedTotalSalesSaldo);
+    } catch (err) {
+      console.warn('reports:updateCharts debug error', err);
+    }
+
     const salesLabels = Object.keys(salesByMethod);
     const salesData = salesLabels.map(k => salesByMethod[k]);
 
@@ -305,7 +396,12 @@
             scales: {
               y: {
                 ticks: {
-                  callback: function(value: any) { return Number(value).toLocaleString('es-CO'); }
+                  callback: function(value: any) {
+                    const n = Number(value);
+                    if (Number.isInteger(n)) return n.toLocaleString('en-US');
+                    // For fractional, format with up to 2 decimals, then replace dot with comma
+                    return n.toLocaleString('en-US', {minimumFractionDigits:1, maximumFractionDigits:2}).replace('.', ',');
+                  }
                 }
               }
             },
@@ -338,7 +434,12 @@
             scales: {
               y: {
                 ticks: {
-                  callback: function(value: any) { return Number(value).toLocaleString('es-CO'); }
+                  callback: function(value: any) {
+                    const n = Number(value);
+                    if (Number.isInteger(n)) return n.toLocaleString('en-US');
+                    // For fractional, format with up to 2 decimals, then replace dot with comma
+                    return n.toLocaleString('en-US', {minimumFractionDigits:1, maximumFractionDigits:2}).replace('.', ',');
+                  }
                 }
               }
             },
@@ -593,7 +694,12 @@
       // Footer: generation datetime at bottom-right
       try {
         const genDate = new Date();
-        const genStr = genDate.toLocaleString();
+        let genStr = '';
+        try {
+          genStr = genDate.toLocaleString('es-CO', { timeZone: TIMEZONE });
+        } catch (e) {
+          genStr = genDate.toLocaleString();
+        }
         pdf.setFontSize(10);
         pdf.setTextColor(120);
         // place the text at the bottom-right margin
@@ -623,15 +729,15 @@
   <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@300;400;600;700&display=swap" rel="stylesheet">
 </svelte:head>
 
-<div class="max-w-4xl mx-auto p-4">
+<div class="max-w-4xl mx-auto p-4 reports-root">
   <div class="text-center header-space">
-    <h1 class="text-4xl font-bold text-[#35528C] mb-2 mt-2 font-sans s-xNGq_AHMpqrL">Reportes</h1>
-    <p class="text-lg text-[#35528C]/80 font-sans max-w-2xl mx-auto s-WmfxB9smyTUP mb-4">Resumen de ventas y recargas. Filtra por rango de fechas.</p>
+  <h1 class="text-4xl font-bold text-[#35528C] mb-1 font-sans s-xNGq_AHMpqrL">Reportes</h1>
+    <p class="text-lg text-[#35528C]/80 font-sans max-w-2xl mx-auto s-WmfxB9smyTUP mb-2">Resumen general de la actividad. Usa los filtros para ajustar el periodo.</p>
   </div>
 
   
 
-  <div class="card p-6 mb-6">
+  <div class="card p-4 mb-4 filters-container">
     <div class="grid grid-cols-1 sm:grid-cols-3 gap-4 items-end">
       <div>
         <label for="startDate" class="block text-sm font-medium text-gray-700">Fecha inicio</label>
@@ -704,29 +810,29 @@
       <h3 class="section-title">Ventas <span class="section-meta">({displayRange(startDate, endDate)})</span></h3>
     </div>
   </div>
-  <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+  <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
       <!-- Left column: stacked summary cards (50/50 on md) -->
       <div>
         <div class="flex flex-col gap-4">
           <div class="p-4 bg-white rounded-lg shadow-sm">
             <div class="summary-card">
               <p class="text-sm text-gray-500">Ventas totales 📊</p>
-              <p class="text-2xl font-semibold">{formatCurrency(summary.summary.totalSales)}</p>
-              <p class="text-xs text-gray-400">{txLabel(summary.summary.counts.orders)}</p>
+                <p class="text-2xl font-semibold">{formatCurrency(derivedTotalSales)}</p>
+                <p class="text-sm text-gray-400" class:text-base={isZero(derivedCountsOrders || summary.summary.counts.orders)} class:font-medium={isZero(derivedCountsOrders || summary.summary.counts.orders)}>{txLabel(derivedCountsOrders || summary.summary.counts.orders)}</p>
             </div>
           </div>
           <div class="p-4 bg-white rounded-lg shadow-sm">
             <div class="summary-card">
               <p class="text-sm text-gray-500">Ventas en saldo 💳</p>
-              <p class="text-2xl font-semibold">{formatCurrency(totalSalesSaldo())}</p>
-              <p class="text-xs text-gray-400">{txLabel((summary.summary.salesCountsByMethod && Object.entries(summary.summary.salesCountsByMethod).reduce((s,[k,v]) => k.toLowerCase().includes('saldo') ? s+Number(v||0) : s, 0)) || 0)}</p>
+                <p class="text-2xl font-semibold">{formatCurrency(derivedTotalSalesSaldo || totalSalesSaldo())}</p>
+                <p class="text-sm text-gray-400" class:text-base={isZero((summary.summary.salesCountsByMethod && Object.entries(summary.summary.salesCountsByMethod).reduce((s,[k,v]) => k.toLowerCase().includes('saldo') ? s+Number(v||0) : s, 0)) || 0)} class:font-medium={isZero((summary.summary.salesCountsByMethod && Object.entries(summary.summary.salesCountsByMethod).reduce((s,[k,v]) => k.toLowerCase().includes('saldo') ? s+Number(v||0) : s, 0)) || 0)}>{txLabel((summary.summary.salesCountsByMethod && Object.entries(summary.summary.salesCountsByMethod).reduce((s,[k,v]) => k.toLowerCase().includes('saldo') ? s+Number(v||0) : s, 0)) || 0)}</p>
             </div>
           </div>
           <div class="p-4 bg-white rounded-lg shadow-sm">
             <div class="summary-card">
               <p class="text-sm text-gray-500">Ventas en efectivo 💵</p>
-              <p class="text-2xl font-semibold">{formatCurrency(summary.summary.totalSalesCash)}</p>
-              <p class="text-xs text-gray-400">{txLabel((summary.summary.salesCountsByMethod && Object.entries(summary.summary.salesCountsByMethod).reduce((s,[k,v]) => k.toLowerCase().includes('efectivo') ? s+Number(v||0) : s, 0)) || 0)}</p>
+                <p class="text-2xl font-semibold">{formatCurrency(derivedTotalSalesCash)}</p>
+                <p class="text-sm text-gray-400" class:text-base={isZero((summary.summary.salesCountsByMethod && Object.entries(summary.summary.salesCountsByMethod).reduce((s,[k,v]) => k.toLowerCase().includes('efectivo') ? s+Number(v||0) : s, 0)) || 0)} class:font-medium={isZero((summary.summary.salesCountsByMethod && Object.entries(summary.summary.salesCountsByMethod).reduce((s,[k,v]) => k.toLowerCase().includes('efectivo') ? s+Number(v||0) : s, 0)) || 0)}>{txLabel((summary.summary.salesCountsByMethod && Object.entries(summary.summary.salesCountsByMethod).reduce((s,[k,v]) => k.toLowerCase().includes('efectivo') ? s+Number(v||0) : s, 0)) || 0)}</p>
             </div>
           </div>
         </div>
@@ -751,22 +857,22 @@
           <div class="p-4 bg-white rounded-lg shadow-sm">
             <div class="summary-card">
               <p class="text-sm text-gray-500">Recargas totales 🔁</p>
-              <p class="text-2xl font-semibold">{formatCurrency(summary.summary.totalRecargas)}</p>
-              <p class="text-xs text-gray-400">{txLabel(summary.summary.counts.recargas)}</p>
+              <p class="text-2xl font-semibold">{formatCurrency(derivedTotalRecargas)}</p>
+              <p class="text-sm text-gray-400" class:text-base={isZero(summary.summary.counts.recargas)} class:font-medium={isZero(summary.summary.counts.recargas)}>{txLabel(summary.summary.counts.recargas)}</p>
             </div>
           </div>
           <div class="p-4 bg-white rounded-lg shadow-sm">
             <div class="summary-card">
               <p class="text-sm text-gray-500">Recargas en efectivo 💵</p>
-              <p class="text-2xl font-semibold">{formatCurrency(Object.entries(summary.summary.recargasByMethod || {}).reduce((s,[k,v]) => k.toLowerCase().includes('efectivo') ? s+Number(v||0) : s, 0))}</p>
-              <p class="text-xs text-gray-400">{txLabel((summary.summary.recargasCountsByMethod && Object.entries(summary.summary.recargasCountsByMethod).reduce((s,[k,v]) => k.toLowerCase().includes('efectivo') ? s+Number(v||0) : s, 0)) || 0)}</p>
+              <p class="text-2xl font-semibold">{formatCurrency(derivedRecargasCash)}</p>
+              <p class="text-sm text-gray-400" class:text-base={isZero((summary.summary.recargasCountsByMethod && Object.entries(summary.summary.recargasCountsByMethod).reduce((s,[k,v]) => k.toLowerCase().includes('efectivo') ? s+Number(v||0) : s, 0)) || 0)} class:font-medium={isZero((summary.summary.recargasCountsByMethod && Object.entries(summary.summary.recargasCountsByMethod).reduce((s,[k,v]) => k.toLowerCase().includes('efectivo') ? s+Number(v||0) : s, 0)) || 0)}>{txLabel((summary.summary.recargasCountsByMethod && Object.entries(summary.summary.recargasCountsByMethod).reduce((s,[k,v]) => k.toLowerCase().includes('efectivo') ? s+Number(v||0) : s, 0)) || 0)}</p>
             </div>
           </div>
           <div class="p-4 bg-white rounded-lg shadow-sm">
             <div class="summary-card">
               <p class="text-sm text-gray-500">Recargas por operación interna 🔧</p>
-              <p class="text-2xl font-semibold">{formatCurrency(Object.entries(summary.summary.recargasByMethod || {}).reduce((s,[k,v]) => k.toLowerCase().includes('operación interna') || k.toLowerCase().includes('operacion interna') ? s+Number(v||0) : s, 0))}</p>
-              <p class="text-xs text-gray-400">{txLabel((summary.summary.recargasCountsByMethod && Object.entries(summary.summary.recargasCountsByMethod).reduce((s,[k,v]) => k.toLowerCase().includes('operación interna') || k.toLowerCase().includes('operacion interna') ? s+Number(v||0) : s, 0)) || 0)}</p>
+              <p class="text-2xl font-semibold">{formatCurrency(derivedRecargasInternal)}</p>
+              <p class="text-sm text-gray-400" class:text-base={isZero((summary.summary.recargasCountsByMethod && Object.entries(summary.summary.recargasCountsByMethod).reduce((s,[k,v]) => k.toLowerCase().includes('operación interna') || k.toLowerCase().includes('operacion interna') ? s+Number(v||0) : s, 0)) || 0)} class:font-medium={isZero((summary.summary.recargasCountsByMethod && Object.entries(summary.summary.recargasCountsByMethod).reduce((s,[k,v]) => k.toLowerCase().includes('operación interna') || k.toLowerCase().includes('operacion interna') ? s+Number(v||0) : s, 0)) || 0)}>{txLabel((summary.summary.recargasCountsByMethod && Object.entries(summary.summary.recargasCountsByMethod).reduce((s,[k,v]) => k.toLowerCase().includes('operación interna') || k.toLowerCase().includes('operacion interna') ? s+Number(v||0) : s, 0)) || 0)}</p>
             </div>
           </div>
         </div>
@@ -778,12 +884,12 @@
     </div>
 
     <!-- Top productos -->
-    <div class="section-header mt-6">
+  <div class="section-header mt-3">
       <div class="title-wrap">
   <h3 class="section-title">Top productos <span class="section-meta">({displayRange(startDate, endDate)} • {totalTopDistinct} productos, {totalTopUnits.toLocaleString('es-CO')} unidades)</span></h3>
       </div>
     </div>
-    <div class="card p-4 mb-6">
+  <div class="card p-4 mb-4">
       {#if topProductsList && topProductsList.length}
         <div class="top-products-list">
           {#each topProductsList as p, i}
@@ -816,6 +922,8 @@
 <style>
   .input-field { padding: .5rem .75rem; border: 1px solid #e5e7eb; border-radius: .5rem; }
   .card { background: white; border-radius: .75rem; box-shadow: 0 6px 18px rgba(16,24,40,0.04); }
+  /* extra spacing for the filters container to separate it from following content */
+  .filters-container { margin-bottom: 2.25rem; }
   .btn-primary { background: #35528C; color: white; padding: .5rem 1rem; border-radius: .5rem; }
   .btn-secondary { background: #f3f4f6; color: #111827; padding: .5rem 1rem; border-radius: .5rem; }
   /* Preset buttons: non-active have a subtle border so each button is distinguished; active keeps only background */
@@ -859,10 +967,12 @@
     color: #2b4a88; /* slightly deeper blue */
     padding-left: 0.6rem;
     border-left: 3px solid rgba(53,82,140,0.12);
-    margin-top: 0.35rem;
-    margin-bottom: 0.6rem; /* added separation */
+    margin-top: 0.6rem; /* a bit more space above */
+    margin-bottom: 1rem; /* increased separation */
   }
   .section-header { display:flex; justify-content:space-between; align-items:center; gap:1rem; }
+  /* Add vertical spacing above and below section headers */
+  .section-header { margin-top: 1.25rem; margin-bottom: 1.25rem; }
   .section-header .title-wrap { display:block; }
   /* section-sub removed: details are shown inline in .section-meta */
 
@@ -894,4 +1004,7 @@
   .tp-simple-suffix-full { display:none; font-size:0.65rem; opacity:0.95; margin-top:1px; }
   /* media helper removed (unused) */
   /* removed dashboard menu styles */
+  /* Ensure this page's content sits below the topbar to avoid overlap */
+  /* add 20px extra so header doesn't touch content (un "tris más" de margen) */
+  .reports-root { padding-top: calc(var(--topbar-h) + var(--topbar-gap) + 20px); }
 </style>

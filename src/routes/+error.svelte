@@ -73,16 +73,16 @@
 <div class="min-h-screen flex flex-col items-center justify-center bg-gradient-to-br {bgColor} px-4">
   <div class="max-w-lg w-full text-center">
     <!-- Error Icon -->
-    <div class="mb-8 animate-fade-in">
+  <div class="mb-4 animate-fade-in">
       <div class="w-32 h-32 mx-auto bg-white rounded-full shadow-lg flex items-center justify-center border-4 {errorCode === 404 ? 'border-blue-200' : errorCode === 500 ? 'border-red-200' : 'border-yellow-200'}">
         <div class="text-6xl">{emoji}</div>
       </div>
     </div>
 
     <!-- Error Message -->
-    <div class="mb-8 animate-slide-up">
-      <h1 class="text-8xl font-bold mb-4 {errorCode === 404 ? 'text-blue-600 animate-bounce' : errorCode === 500 ? 'text-red-600 animate-pulse' : 'text-yellow-600'}">{errorCode}</h1>
-      <h2 class="text-3xl font-bold text-gray-800 mb-4">{title}</h2>
+  <div class="mb-4 animate-slide-up">
+  <h1 class="text-8xl font-bold mb-2 {errorCode === 404 ? 'text-blue-600 animate-bounce' : errorCode === 500 ? 'text-red-600 animate-pulse' : 'text-yellow-600'}">{errorCode}</h1>
+  <h2 class="text-3xl font-bold text-gray-800 mb-2">{title}</h2>
       <p class="text-lg text-gray-600 leading-relaxed max-w-md mx-auto">{description}</p>
     </div>
 
@@ -153,14 +153,14 @@
 </div>
   <div class="max-w-lg w-full text-center">
     <!-- Error Icon -->
-    <div class="mb-8 animate-fade-in">
+  <div class="mb-4 animate-fade-in">
       <div class="w-32 h-32 mx-auto bg-white rounded-full shadow-lg flex items-center justify-center border-4 border-red-200">
         <div class="text-6xl"></div>
       </div>
     </div>
 
     <!-- Error Message -->
-    <div class="mb-8 animate-slide-up">
+  <div class="mb-4 animate-slide-up">
       <h1 class="text-8xl font-bold mb-4 text-red-600 animate-pulse">{errorCode}</h1>
       <h2 class="text-3xl font-bold text-gray-800 mb-4">Error del servidor</h2>
       <p class="text-lg text-gray-600 leading-relaxed max-w-md mx-auto">
@@ -170,7 +170,7 @@
 
     <!-- Error Details (if available) -->
     {#if errorMessage && errorMessage !== 'Internal Error'}
-      <div class="mb-6 p-4 bg-white/80 backdrop-blur-sm rounded-lg border border-gray-200 text-sm text-gray-700">
+  <div class="mb-4 p-3 bg-white/80 backdrop-blur-sm rounded-lg border border-gray-200 text-sm text-gray-700">
         <strong>Detalles:</strong> {errorMessage}
       </div>
     {/if}

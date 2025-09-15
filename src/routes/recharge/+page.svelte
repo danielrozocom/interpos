@@ -223,6 +223,17 @@ function formatCurrency(val: number): string {
       setTimeout(() => {
         message = '';
       }, 3000);
+      // Asegurar que el input de ID reciba el foco para nuevas recargas
+      await tick();
+      try {
+        const el = document.getElementById('userId') as HTMLInputElement | null;
+        if (el) {
+          el.focus();
+          try { el.select(); } catch (e) { /* ignore */ }
+        }
+      } catch (e) {
+        /* ignore focus errors */
+      }
     } catch (error: any) {
       console.error('Error en la transacción:', error);
       message = '❌ ' + (error.message || 'Error al registrar la transacción. Por favor, intente nuevamente.');
@@ -287,14 +298,14 @@ $: {
 <div class="max-w-2xl mx-auto">
   <!-- Header -->
   <div class="text-center header-space">
-    <h1 class="text-4xl font-bold text-[#35528C] mb-3 mt-3 font-sans s-xNGq_AHMpqrL">Recargar Saldo</h1>
+  <h1 class="text-4xl font-bold text-[#35528C] mb-1 font-sans s-xNGq_AHMpqrL">Recargar Saldo</h1>
     <p class="text-lg text-[#35528C]/80 font-sans max-w-2xl mx-auto s-WmfxB9smyTUP">Recarga saldo para un usuario en el sistema</p>
   </div>
 
   <!-- Step Content -->
   <div class="card glass-effect">
     {#if message}
-      <div class="mb-6 p-4 rounded-lg {message.includes('Error') ? 'message-error' : 'message-success'} shadow-sm">
+  <div class="mb-4 p-4 rounded-lg {message.includes('Error') ? 'message-error' : 'message-success'} shadow-sm">
         <div class="flex items-center">
           <span class="text-2xl mr-3">{message.includes('Error') ? '❌' : '✅'}</span>
           <p class="text-lg font-medium">
@@ -343,6 +354,7 @@ $: {
                 if (v !== userId) userId = v;
               }}
               placeholder="Ingrese ID del usuario"
+              autofocus
             />
             <button type="button" class="h-10 w-10 p-1 rounded-lg flex items-center justify-center bg-[#35528C] text-white shadow-sm hover:bg-[#2A4170] focus:outline-none focus:ring-2 focus:ring-[#35528C]/40" aria-label="Abrir escáner" on:click={openScanner}>
               <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-white" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true">
@@ -374,7 +386,7 @@ $: {
       {/if}
 
       {#if userExists}
-        <div class="bg-gradient-to-br from-blue-50 to-blue-50/50 border border-blue-200/50 rounded-xl p-6 mb-6 shadow-sm">
+  <div class="bg-gradient-to-br from-blue-50 to-blue-50/50 border border-blue-200/50 rounded-xl p-3 mb-3 shadow-sm">
           <div class="flex justify-between items-center">
             <div>
               <p class="text-blue-900/80 text-sm mb-1">Usuario</p>
@@ -461,8 +473,8 @@ $: {
           </div>
 
           <!-- Resumen de la transacción -->
-          <div class="bg-gradient-to-br from-gray-50 to-white border border-gray-200/50 rounded-xl p-6 mb-6 shadow-sm">
-            <h3 class="font-semibold text-gray-900 mb-4 text-lg">Resumen de la Transacción</h3>
+          <div class="bg-gradient-to-br from-gray-50 to-white border border-gray-200/50 rounded-xl p-4 mb-4 shadow-sm">
+            <h3 class="font-semibold text-gray-900 mb-2 text-lg">Resumen de la Transacción</h3>
             <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
               <div class="p-4 bg-white rounded-lg border border-gray-100 shadow-sm">
                 <p class="text-sm text-gray-600 mb-1">Tipo</p>
@@ -504,7 +516,7 @@ $: {
           </button>
         {/if}
       {:else if userId && !allUsers.some(u => u.id === userId)}
-        <div class="text-center py-8">
+  <div class="text-center py-3">
           <span class="text-6xl">⚠️</span>
           <h3 class="text-lg font-medium text-red-900 mt-4">Usuario no encontrado</h3>
           <p class="text-red-700 mt-2">No existe un usuario con el ID: {userId}</p>

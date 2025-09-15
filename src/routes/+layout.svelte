@@ -2,6 +2,8 @@
   import '../app.css';
   import { onMount, onDestroy } from 'svelte';
   let menuOpen = false;
+  // UX config: set to true if header should be white (chosen by UX/UI)
+  export let topbarLight = false;
   import { page } from '$app/stores';
 
   // Global Ctrl-based shortcuts dispatcher
@@ -54,46 +56,90 @@
 </script>
 
 <div class="min-h-screen bg-gray-50">
-  <nav class="bg-[#35528C] shadow-sm border-b relative">
-    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-      <div class="flex justify-between h-16 items-center">
-        <div class="flex items-center">
-          <h1 class="text-xl font-bold text-white">InterPOS</h1>
-        </div>
-        <!-- Desktop menu -->
-        <div class="hidden md:flex items-center space-x-4">
-          <a href="/" class="px-3 py-3 rounded-md text-base font-semibold text-white uppercase hover:bg-[#27406B] border-b-2 transition-all duration-150 { $page.url.pathname === '/' ? 'border-white' : 'border-transparent' }">INICIO</a>
-          <a href="/recharge" class="px-3 py-3 rounded-md text-base font-semibold text-white uppercase hover:bg-[#27406B] border-b-2 transition-all duration-150 { $page.url.pathname === '/recharge' ? 'border-white' : 'border-transparent' }">RECARGAR</a>
-          <a href="/history" class="px-3 py-3 rounded-md text-base font-semibold text-white uppercase hover:bg-[#27406B] border-b-2 transition-all duration-150 { $page.url.pathname === '/history' ? 'border-white' : 'border-transparent' }">HISTORIAL</a>
-          <a href="/check-balance" class="px-3 py-3 rounded-md text-base font-semibold text-white uppercase hover:bg-[#27406B] border-b-2 transition-all duration-150 { $page.url.pathname === '/check-balance' ? 'border-white' : 'border-transparent' }">CONSULTAR SALDO</a>
-          <a href="/sell" class="px-3 py-3 rounded-md text-base font-semibold text-white uppercase hover:bg-[#27406B] border-b-2 transition-all duration-150 { $page.url.pathname === '/sell' ? 'border-white' : 'border-transparent' }">VENDER</a>
-        </div>
-        <!-- Mobile hamburger -->
-        <div class="md:hidden flex items-center">
-          <button aria-label="Abrir menú" on:click={() => menuOpen = !menuOpen} class="inline-flex items-center justify-center p-2 rounded-md text-white hover:text-white focus:outline-none focus:ring-2 focus:ring-inset focus:ring-white">
-            <svg class="h-6 w-6" stroke="currentColor" fill="none" viewBox="0 0 24 24">
-              <path class={menuOpen ? 'hidden' : 'block'} stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16" />
-              <path class={menuOpen ? 'block' : 'hidden'} stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
-            </svg>
-          </button>
-        </div>
-      </div>
+  <!-- Persistent top bar -->
+  <header class="topbar" class:light={topbarLight}>
+    <div class="topbar-inner">
+      <!-- Hamburger in header -->
+      <button class="collapse-btn topbar-hamburger" aria-label="Alternar barra lateral" on:click={() => menuOpen = !menuOpen}>
+        <!-- Always show the native hamburger (three lines) icon; remove the separate '-' icon -->
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M4 6h16M4 12h16M4 18h16" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      </button>
+    <a href="/" class="topbar-brand" aria-label="Ir a inicio">InterPOS</a>
     </div>
-    <!-- Mobile menu - positioned absolutely outside the container -->
-    {#if menuOpen}
-      <div class="md:hidden bg-[#35528C] border-t border-[#27406B] absolute top-full left-0 right-0 z-50 shadow-lg">
-        <div class="px-4 py-2 space-y-1">
-          <a href="/" class="block text-white px-4 py-3 text-base font-semibold uppercase hover:bg-[#27406B] rounded transition-colors duration-150 { $page.url.pathname === '/' ? 'bg-[#27406B]' : '' }" on:click={() => menuOpen = false}>INICIO</a>
-          <a href="/recharge" class="block text-white px-4 py-3 text-base font-semibold uppercase hover:bg-[#27406B] rounded transition-colors duration-150 { $page.url.pathname === '/recharge' ? 'bg-[#27406B]' : '' }" on:click={() => menuOpen = false}>RECARGAR</a>
-          <a href="/history" class="block text-white px-4 py-3 text-base font-semibold uppercase hover:bg-[#27406B] rounded transition-colors duration-150 { $page.url.pathname === '/history' ? 'bg-[#27406B]' : '' }" on:click={() => menuOpen = false}>HISTORIAL</a>
-          <a href="/check-balance" class="block text-white px-4 py-3 text-base font-semibold uppercase hover:bg-[#27406B] rounded transition-colors duration-150 { $page.url.pathname === '/check-balance' ? 'bg-[#27406B]' : '' }" on:click={() => menuOpen = false}>CONSULTAR SALDO</a>
-          <a href="/sell" class="block text-white px-4 py-3 text-base font-semibold uppercase hover:bg-[#27406B] rounded transition-colors duration-150 { $page.url.pathname === '/sell' ? 'bg-[#27406B]' : '' }" on:click={() => menuOpen = false}>VENDER</a>
-        </div>
+  </header>
+  <div class="flex">
+  <!-- Sidebar -->
+  <aside class="sidebar" class:collapsed={menuOpen === false} data-open={menuOpen} aria-label="Navegación principal">
+      <div class="sidebar-top">
+        <!-- Show large logo above menu only when sidebar is open -->
+        {#if menuOpen}
+          <div class="brand" aria-hidden="true">
+            <img src="/favicon.svg" alt="InterPOS" class="brand-icon large" />
+          </div>
+        {/if}
       </div>
-    {/if}
-  </nav>
-  
-  <main class="max-w-7xl mx-auto py-6 px-4 sm:px-6 lg:px-8">
-    <slot />
-  </main>
+      <nav class="sidebar-nav" aria-label="Menú principal">
+        <a href="/" class="nav-link { $page.url.pathname === '/' ? 'active' : '' }">🏠 <span class="link-text">Inicio</span></a>
+        <a href="/recharge" class="nav-link { $page.url.pathname === '/recharge' ? 'active' : '' }">⚡ <span class="link-text">Recargar</span></a>
+        <a href="/history" class="nav-link { $page.url.pathname === '/history' ? 'active' : '' }">📜 <span class="link-text">Historial</span></a>
+        <a href="/check-balance" class="nav-link { $page.url.pathname === '/check-balance' ? 'active' : '' }">💰 <span class="link-text">Consultar saldo</span></a>
+        <a href="/sell" class="nav-link { $page.url.pathname === '/sell' ? 'active' : '' }">🛒 <span class="link-text">Vender</span></a>
+        <a href="/reports" class="nav-link { $page.url.pathname === '/reports' ? 'active' : '' }">📊 <span class="link-text">Reportes</span></a>
+      </nav>
+    </aside>
+
+    <!-- Main content area -->
+    <main class="main-content flex-1 px-4 sm:px-6 lg:px-8">
+      <slot />
+    </main>
+  </div>
 </div>
+<style>
+  /* Topbar */
+  .topbar { position: sticky; top: 0; z-index: 100; background: #35528C; box-shadow: 0 6px 18px rgba(22,50,90,0.18); height:var(--topbar-h); color: #ffffff; }
+  .topbar-inner { max-width: 1120px; margin: 0 auto; padding: 0 1rem; display:flex; align-items:center; height:var(--topbar-h); gap:0.5rem; }
+  .topbar-brand { font-weight:800; color:#ffffff; text-decoration:none; font-size:1.25rem; flex:1; text-align:center; }
+  /* legacy topbar favicon removed; kept in markup historically (no styles needed) */
+  /* Topbar-specific hamburger positioned relative to header so it aligns with sidebar emojis */
+  header.topbar .topbar-hamburger { position:absolute; left: calc(0.5rem + 0.75rem); top:50%; transform:translateY(-50%); color:#ffffff; z-index:10; }
+  /* Light/topbar variant chosen by UX */
+  .topbar.light { background: #ffffff; box-shadow: 0 1px 0 rgba(16,24,40,0.06); }
+  .topbar.light .topbar-brand { color: #0f1724; }
+
+  /* Sidebar */
+  .sidebar { background: #35528C; color: #fff; width: 220px; display:flex; flex-direction:column; transition: width .22s ease, transform .22s ease; padding-top:0; position:fixed; left:0; top:var(--topbar-h); bottom:0; z-index:70; }
+  .sidebar.collapsed { width: 72px; }
+  .sidebar-top { display:flex; flex-direction:column; align-items:center; gap:0.25rem; padding-top:6px; padding-bottom:6px; position:relative; }
+  /* Default collapse-btn styling (for any remaining uses inside sidebar) */
+  .collapse-btn { background:transparent; border:none; color:#fff; padding:0.35rem; cursor:pointer; width:44px; height:44px; display:inline-flex; align-items:center; justify-content:center; border-radius:8px; }
+  /* brand-title removed from current markup */
+  /* Large brand icon shown only when sidebar is open — in normal flow above menu */
+  .brand-icon { display:none; }
+  .brand-icon.large { width:80px; height:80px; object-fit:contain; border-radius:4px; display:block; margin:12px auto; box-shadow:none; border:none; }
+  .sidebar.collapsed .brand-icon.large { display:none; }
+  .sidebar-nav { display:flex; flex-direction:column; gap:0.1rem; padding:0.5rem 0.5rem; padding-top:4px; }
+  .nav-link { display:flex; align-items:center; gap:0.75rem; padding:0.65rem 0.75rem; color:rgba(255,255,255,0.95); text-decoration:none; border-radius:0.45rem; }
+  .nav-link.active, .nav-link:hover { background: rgba(255,255,255,0.06); }
+  .link-text { white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .sidebar.collapsed .link-text { display:none; }
+  /* sidebar-footer removed from current markup */
+  /* main-content should not add the topbar height again — the header
+    already occupies space. Use --topbar-gap for the extra spacing only. */
+  .main-content { background: #f8fafc; min-height:100vh; margin-top: 0; margin-left:220px; transition: margin-left .22s ease; padding-top:var(--topbar-gap); }
+  .sidebar.collapsed ~ .main-content { margin-left:72px; }
+
+  /* Responsive: transform sidebar to top drawer on small screens */
+  @media (max-width: 767px) {
+    .sidebar { position:fixed; left:0; top:var(--topbar-h); bottom:0; width:220px; z-index:90; }
+    /* When closed, move sidebar fully off-screen with transform (no layout shift) */
+    .sidebar.collapsed { transform: translateX(-100%); }
+    .sidebar[data-open="true"] { transform: translateX(0); }
+    /* Ensure main content never shifts on mobile (override earlier sibling selector) */
+    .main-content { margin-left:0; }
+    .sidebar.collapsed ~ .main-content { margin-left:0 !important; }
+  /* Mobile: center brand text and keep hamburger on the left without overlap */
+  .topbar-inner { padding-left: 0; padding-right: 0; }
+  /* Keep the brand in normal flow and center it; padding prevents overlap with the hamburger */
+  .topbar-brand { flex:1; text-align:center; margin-left:0; }
+  }
+</style>

@@ -167,7 +167,7 @@ onMount(() => {
 
   .receipt-container {
     max-width: 420px;
-    margin: 10px auto; /* Reducido el margen superior */
+    margin: 4px auto; /* Reducido el margen superior para ajustar al header */
     background: white;
     border-radius: 16px;
     box-shadow: 0 4px 12px rgba(0,0,0,0.1);
@@ -259,7 +259,7 @@ onMount(() => {
   }
 
   .total-section {
-    margin-top: 20px;
+  margin-top: 4px;
     padding: 16px;
     text-align: right;
     font-size: 1.5rem;
@@ -285,7 +285,7 @@ onMount(() => {
   @media (max-width: 768px) {
     .receipt-container {
       max-width: 100%;
-      margin: 10px;
+      margin: 6px;
       border-radius: 8px;
     }
 
