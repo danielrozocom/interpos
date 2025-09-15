@@ -491,7 +491,8 @@ $: if (_hasMounted) {
   // Helper to choose class for the txLabel: slightly larger when count is zero
   function countClass(n: number | string | undefined | null) {
     const v = Number(n || 0);
-    return v === 0 ? 'text-sm font-medium text-gray-400' : 'text-xs text-gray-400';
+    // Match the sales/ventas sizing: normally use text-sm; when zero, slightly larger (text-base) and bold
+    return v === 0 ? 'text-base font-medium text-gray-400' : 'text-sm text-gray-400';
   }
 
   // Safer boolean helper for Svelte class directives
