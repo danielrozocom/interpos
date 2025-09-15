@@ -64,6 +64,57 @@ body {
   padding-bottom: env(safe-area-inset-bottom);
 }
 
+/* Global responsive fixes to make pages behave on narrow viewports */
+/* Use border-box everywhere to avoid width/padding calculation surprises */
+html, body, *, *::before, *::after {
+  box-sizing: border-box;
+}
+
+/* Prevent horizontal overflow and ensure containers respect viewport */
+html, body {
+  width: 100%;
+  overflow-x: hidden;
+}
+
+/* Ensure main content uses the header gap and never shifts horizontally */
+.main-content {
+  box-sizing: border-box;
+  padding-top: var(--topbar-gap);
+  min-height: calc(100vh - var(--topbar-h));
+  overflow-x: hidden;
+}
+
+/* Images and videos should scale down on narrow screens */
+img, video, svg {
+  max-width: 100%;
+  height: auto;
+}
+
+/* Make tables scrollable instead of breaking layout */
+.table-responsive, .overflow-x-auto, table {
+  max-width: 100%;
+}
+table { display: table; width: 100%; }
+
+/* Form controls should be fluid by default */
+input, textarea, select, button {
+  max-width: 100%;
+}
+
+/* Tweak a few mobile-specific layout concerns */
+@media (max-width: 767px) {
+  /* Sidebar becomes a drawer covering a percentage of the screen on small devices */
+  .sidebar { width: 80%; }
+  .sidebar.collapsed { transform: translateX(-100%); }
+  .sidebar[data-open="true"] { transform: translateX(0); }
+
+  /* Make nav link text wrap if needed */
+  .nav-link { white-space: normal; }
+
+  /* Ensure main content padding is not zeroed incorrectly on very small screens */
+  .main-content { padding-left: 12px; padding-right: 12px; }
+}
+
 /* Normalize top spacing inside the main content area.
    Some pages add large top margins or padding on their first child which
    can push the whole page down. Remove the top margin of the first

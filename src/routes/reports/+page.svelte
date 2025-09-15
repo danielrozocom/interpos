@@ -26,6 +26,14 @@
   let exporting = false;
   let exportMessage = '';
   let showExportMenu = false;
+  // Auto-fetch control
+  let _hasMounted = false;
+  let _autoFetchTimer: ReturnType<typeof setTimeout> | null = null;
+  const AUTO_FETCH_DEBOUNCE = 500; // ms
+  // Applied (last-successful) range shown in headings and used for exports
+  let appliedStart: string = '';
+  let appliedEnd: string = '';
+  // Removed duplicate declaration of lastFetchedRange
   
 
   function toggleExportMenu() {
@@ -57,27 +65,44 @@
       document.removeEventListener('click', handleDocClick);
       document.removeEventListener('keydown', handleKeydown);
     }
+    try { if (_autoFetchTimer) { clearTimeout(_autoFetchTimer); _autoFetchTimer = null; } } catch (e) {}
   });
 
   let salesChart: any = null;
   let recargasChart: any = null;
   let salesCanvas: HTMLCanvasElement | null = null;
   let recargasCanvas: HTMLCanvasElement | null = null;
+  let lastFetchedRange = '';
 
-  const fetchSummary = async () => {
+  const fetchSummary = async (opts?: { force?: boolean }) => {
+    const force = opts?.force === true;
+    // clamp endDate for requests so it never exceeds today
+    const effEnd = endDate && endDate > today ? today : endDate;
+    const key = `${startDate || ''}|${effEnd || ''}`;
+
+    // If we've already fetched this exact range and not forcing, skip
+    if (!force && key && lastFetchedRange === key) {
+      return;
+    }
+
+    // cancel any pending auto-fetch debounce to avoid duplicate calls
+    try { if (_autoFetchTimer) { clearTimeout(_autoFetchTimer); _autoFetchTimer = null; } } catch (e) {}
+
     loading = true;
     error = '';
     try {
-  const params = new URLSearchParams();
-  if (startDate) params.set('startDate', startDate);
-  // clamp endDate for requests so it never exceeds today
-  const effEnd = endDate && endDate > today ? today : endDate;
-  if (effEnd) params.set('endDate', effEnd);
+      const params = new URLSearchParams();
+      if (startDate) params.set('startDate', startDate);
+      if (effEnd) params.set('endDate', effEnd);
       const res = await fetch('/api/reports/summary?' + params.toString());
       if (!res.ok) throw new Error('Error fetching report');
       summary = await res.json();
       // update charts after data arrives
       updateCharts();
+  // mark this range as fetched and update applied range for UI
+  lastFetchedRange = key;
+  appliedStart = startDate || '';
+  appliedEnd = effEnd || '';
     } catch (e: any) {
       error = e.message || String(e);
       summary = null;
@@ -85,12 +110,13 @@
     loading = false;
   };
 
-  onMount(() => {
+  onMount(async () => {
     // Por defecto seleccionar hoy en la zona horaria de Colombia
     const iso = formatLocalISO(new Date(), TIMEZONE);
     startDate = iso;
     endDate = iso;
-    fetchSummary();
+    await fetchSummary();
+    _hasMounted = true;
   });
 
   // Date preset helpers
@@ -156,14 +182,85 @@
     fetchSummary();
   }
 
+  // Keep startDate <= endDate and endDate >= startDate when users change inputs
+  function onStartDateChange() {
+    try {
+      if (startDate && endDate && startDate > endDate) {
+        // user increased start beyond end -> move end forward
+        endDate = startDate;
+      }
+    } catch (e) { /* ignore */ }
+  }
+
+  function onEndDateChange() {
+    try {
+      if (startDate && endDate && endDate < startDate) {
+        // user decreased end before start -> move start back
+        startDate = endDate;
+      }
+    } catch (e) { /* ignore */ }
+  }
+
+  // Clamp helper: ensures dateStr (YYYY-MM-DD) lies between min and max if provided
+  function clampDateStr(dateStr: string, min?: string, max?: string) {
+    if (!dateStr) return dateStr;
+    // basic format check
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(dateStr)) return dateStr;
+    if (min && dateStr < min) return min;
+    if (max && dateStr > max) return max;
+    return dateStr;
+  }
+
+  // Prevent typing a start date that would be after endDate or after today
+  function onStartDateInput() {
+    try {
+      const maxAllowed = endDate ? (endDate < today ? endDate : today) : today;
+      const clamped = clampDateStr(startDate, undefined, maxAllowed);
+      if (clamped !== startDate) startDate = clamped;
+    } catch (e) { /* ignore */ }
+  }
+
+  // Prevent typing an end date that would be before startDate or after today
+  function onEndDateInput() {
+    try {
+      const minAllowed = startDate || undefined;
+      const clamped = clampDateStr(endDate, minAllowed, today);
+      if (clamped !== endDate) endDate = clamped;
+    } catch (e) { /* ignore */ }
+  }
+
   // Apply range values directly (strings). Sets both values then fetches once to avoid UI flash.
   function applyRange(s: string, e: string) {
     // set both values synchronously
     startDate = s;
     endDate = e;
+    // clear any pending auto-fetch debounce to avoid duplicate calls
+    try { if (_autoFetchTimer) { clearTimeout(_autoFetchTimer); _autoFetchTimer = null; } } catch (e) {}
     // call fetch after both set
     fetchSummary();
   }
+
+  // typed click handler to invoke fetchSummary (avoids passing MouseEvent into fetchSummary)
+  function handleApplyClick(e: MouseEvent) {
+    // prevent default if used inside a form button
+    try { if ((e as any).preventDefault) (e as any).preventDefault(); } catch (err) {}
+    void fetchSummary();
+  }
+
+// Auto-apply when user edits the date inputs (debounced). Only after initial mount.
+$: if (_hasMounted) {
+  // reference startDate/endDate so this reactive runs when they change
+  const _s = startDate;
+  const _e = endDate;
+  if (_autoFetchTimer) {
+    clearTimeout(_autoFetchTimer);
+    _autoFetchTimer = null;
+  }
+  _autoFetchTimer = setTimeout(() => {
+    fetchSummary();
+    _autoFetchTimer = null;
+  }, AUTO_FETCH_DEBOUNCE);
+}
 
   function presetToday() {
     const now = new Date();
@@ -257,7 +354,7 @@
         return an.localeCompare(bn, 'es', { sensitivity: 'base' });
       }).slice(0, 10)
     : [];
-  $: maxTopQty = topProductsList.length ? Math.max(...topProductsList.map(t => t.quantity)) : 1;
+  $: maxTopQty = topProductsList.length ? Math.max(...topProductsList.map((t: any) => t.quantity)) : 1;
   // total units across the top products list (used for header pill)
   $: totalTopUnits = topProductsList.reduce((s: number, t: any) => s + Number(t.quantity || 0), 0);
   $: totalTopDistinct = topProductsList.length;
@@ -480,10 +577,25 @@
     return false;
   }
 
+  let _lastSummaryKey = '';
   afterUpdate(() => {
-    // Ensure chart updates when summary changes
-    updateCharts();
-  });
+      // Only update charts when the summary object actually changed to avoid
+      // repeatedly destroying/recreating Chart.js instances which can cause
+      // afterUpdate -> update -> afterUpdate loops in some environments.
+      try {
+        const key = summary ? JSON.stringify(summary.summary || {}) : '';
+        if (key !== _lastSummaryKey) {
+          _lastSummaryKey = key;
+          updateCharts();
+        }
+      } catch (e) {
+        // If serialization fails, fall back to a single update attempt
+        if (!_lastSummaryKey) {
+          _lastSummaryKey = 'err';
+          updateCharts();
+        }
+      }
+    });
 
   // Export helpers
   function toCSV(obj: Record<string, number>) {
@@ -499,7 +611,7 @@
     try {
       const salesCsv = toCSV(summary.summary.salesByMethod || {});
       const recCsv = toCSV(summary.summary.recargasByMethod || {});
-  const header = `Reporte InterPOS - Ventas y Recargas\n${displayRange(startDate, endDate)}\n\n`;
+  const header = `Reporte InterPOS - Ventas y Recargas\n${displayRange(appliedStart || startDate, appliedEnd || endDate)}\n\n`;
       const blob = new Blob([header, "Ventas\n", salesCsv, "\n\nRecargas\n", recCsv], { type: 'text/csv;charset=utf-8;' });
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
@@ -570,7 +682,7 @@
   // Range on the line below (simple 'A - B' format, no 'Rango:')
   pdf.setFontSize(11);
   pdf.setTextColor(100);
-  const rangeLabel = displayRange(startDate, endDate);
+  const rangeLabel = displayRange(appliedStart || startDate, appliedEnd || endDate);
   pdf.text(rangeLabel, margin, y);
   y += 22;
 
@@ -741,14 +853,14 @@
     <div class="grid grid-cols-1 sm:grid-cols-3 gap-4 items-end">
       <div>
         <label for="startDate" class="block text-sm font-medium text-gray-700">Fecha inicio</label>
-        <input id="startDate" type="date" bind:value={startDate} max={today} class="input-field mt-1 w-full" />
+  <input id="startDate" type="date" bind:value={startDate} max={endDate || today} class="input-field mt-1 w-full" on:change={onStartDateChange} on:input={onStartDateInput} />
       </div>
       <div>
         <label for="endDate" class="block text-sm font-medium text-gray-700">Fecha fin</label>
-        <input id="endDate" type="date" bind:value={endDate} max={today} class="input-field mt-1 w-full" />
+  <input id="endDate" type="date" bind:value={endDate} min={startDate || ''} max={today} class="input-field mt-1 w-full" on:change={onEndDateChange} on:input={onEndDateInput} />
       </div>
       <div class="flex gap-2 items-center">
-        <button class="btn-primary" on:click={fetchSummary} disabled={loading}>
+  <button class="btn-primary" on:click={handleApplyClick} disabled={loading}>
           {#if loading}
             Cargando...
           {:else}
@@ -807,7 +919,7 @@
   {#if summary?.summary}
   <div class="section-header">
     <div class="title-wrap">
-      <h3 class="section-title">Ventas <span class="section-meta">({displayRange(startDate, endDate)})</span></h3>
+      <h3 class="section-title">Ventas <span class="section-meta">({displayRange(appliedStart || startDate, appliedEnd || endDate)})</span></h3>
     </div>
   </div>
   <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
@@ -848,7 +960,7 @@
   <!-- Recargas: sección separadora + left stacked summaries, right chart (50/50) -->
   <div class="section-header">
     <div class="title-wrap">
-      <h3 class="section-title">Recargas <span class="section-meta">({displayRange(startDate, endDate)})</span></h3>
+      <h3 class="section-title">Recargas <span class="section-meta">({displayRange(appliedStart || startDate, appliedEnd || endDate)})</span></h3>
     </div>
   </div>
     <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -886,7 +998,7 @@
     <!-- Top productos -->
   <div class="section-header mt-3">
       <div class="title-wrap">
-  <h3 class="section-title">Top productos <span class="section-meta">({displayRange(startDate, endDate)} • {totalTopDistinct} productos, {totalTopUnits.toLocaleString('es-CO')} unidades)</span></h3>
+  <h3 class="section-title">Top productos <span class="section-meta">({displayRange(appliedStart || startDate, appliedEnd || endDate)} • {totalTopDistinct} productos, {totalTopUnits.toLocaleString('es-CO')} unidades)</span></h3>
       </div>
     </div>
   <div class="card p-4 mb-4">
@@ -921,6 +1033,14 @@
 
 <style>
   .input-field { padding: .5rem .75rem; border: 1px solid #e5e7eb; border-radius: .5rem; }
+  /* Force consistent background and text color for date controls (some browsers
+    apply different native styling to date inputs or when min/max make them
+    appear invalid). These rules keep startDate and endDate visually identical. */
+  .input-field { background: #fff; color: inherit; }
+  /* Remove native invalid box-shadow that some browsers add for out-of-range dates */
+  .input-field:invalid { box-shadow: none; }
+  /* Ensure the inner editable part of webkit date inputs inherits color */
+  input[type="date"]::-webkit-datetime-edit, input[type="date"]::-webkit-datetime-edit-fields-wrapper { color: inherit; }
   .card { background: white; border-radius: .75rem; box-shadow: 0 6px 18px rgba(16,24,40,0.04); }
   /* extra spacing for the filters container to separate it from following content */
   .filters-container { margin-bottom: 2.25rem; }

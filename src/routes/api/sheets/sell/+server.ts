@@ -17,8 +17,8 @@ export const POST: RequestHandler = async ({ request }) => {
     const doc = await getDoc();
     if (!doc) throw new Error('No se pudo conectar con Google Sheets');
 
-    // Get user sheet
-    const userSheet = doc.sheetsByTitle[SHEET_NAMES.USERS];
+  // Get user sheet
+  const userSheet = doc.sheetsByTitle[SHEET_NAMES.users];
     if (!userSheet) throw new Error('No se encontró la hoja de usuarios');
 
     // Get user data
@@ -45,9 +45,9 @@ export const POST: RequestHandler = async ({ request }) => {
     userRow.set('balance', newBalance);
     await userRow.save();
 
-    // Record transaction in history
-    const historySheet = doc.sheetsByTitle[SHEET_NAMES.HISTORY];
-    if (!historySheet) throw new Error('No se encontró la hoja de historial');
+  // Record transaction in transactions sheet
+  const historySheet = doc.sheetsByTitle[SHEET_NAMES.transactions];
+  if (!historySheet) throw new Error('No se encontró la hoja de transacciones');
 
     await historySheet.addRow({
       userId,
