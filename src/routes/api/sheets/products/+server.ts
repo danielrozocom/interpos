@@ -108,13 +108,13 @@ export const GET: RequestHandler = async ({ url }) => {
       };
     });
 
-    // Validación del rango de precios aceptable: 300 .. 300000
-    const MIN_PRICE = 300;
-    const MAX_PRICE = 300000;
-    // Opcional: registrar cuántos productos se excluyen por precio inválido
+    // Validación del rango de precios aceptable: aceptar desde 0 hacia arriba (sin tope superior)
+    const MIN_PRICE = 0;
+    const MAX_PRICE = Number.POSITIVE_INFINITY;
+    // Opcional: registrar cuántos productos se excluyen por precio inválido (no numérico o negativo)
     const excludedCount = products.filter(p => typeof p.price !== 'number' || p.price < MIN_PRICE || p.price > MAX_PRICE).length;
     if (excludedCount > 0) {
-      console.warn(`Excluyendo ${excludedCount} productos con precio fuera del rango ${MIN_PRICE}-${MAX_PRICE}`);
+      console.warn(`Excluyendo ${excludedCount} productos con precio inválido (no numérico o < ${MIN_PRICE})`);
     }
     // Filtrar productos fuera del rango para que la UI no los muestre
     products = products.filter(p => typeof p.price === 'number' && p.price >= MIN_PRICE && p.price <= MAX_PRICE);

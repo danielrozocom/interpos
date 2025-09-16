@@ -372,11 +372,10 @@ let showCashModal = false;
       error = 'Error: El producto no tiene todos los datos requeridos o el precio no es válido';
       return;
     }
-    // Validar rango de precio aceptable (en centavos o unidad usada por la app)
-    const MIN_PRICE = 300;
-    const MAX_PRICE = 300000;
-    if (product.price < MIN_PRICE || product.price > MAX_PRICE) {
-      error = `El producto "${product.name}" tiene un precio fuera del rango permitido (${MIN_PRICE} - ${MAX_PRICE}).`;
+    // Validar rango de precio aceptable (permitir desde 0 hacia arriba)
+    const MIN_PRICE = 0;
+    if (product.price < MIN_PRICE) {
+      error = `El producto "${product.name}" tiene un precio inválido (debe ser >= ${MIN_PRICE}).`;
       return;
     }
     if (!quantity || quantity < 1 || isNaN(quantity)) {
@@ -461,11 +460,10 @@ let showCashModal = false;
         error = `El producto "${item.name || item.id || 'Sin nombre'}" tiene datos incompletos. Verifica ID, nombre y precio.`;
         return;
       }
-      // Validar rango de precio aceptable para cada item
-      const MIN_PRICE = 300;
-      const MAX_PRICE = 300000;
-      if (item.price < MIN_PRICE || item.price > MAX_PRICE) {
-        error = `El producto "${item.name || item.id || 'Sin nombre'}" tiene un precio fuera del rango permitido (${MIN_PRICE} - ${MAX_PRICE}).`;
+      // Validar rango de precio aceptable para cada item (permitir desde 0 hacia arriba)
+      const MIN_PRICE = 0;
+      if (item.price < MIN_PRICE) {
+        error = `El producto "${item.name || item.id || 'Sin nombre'}" tiene un precio inválido (debe ser >= ${MIN_PRICE}).`;
         return;
       }
       if (typeof item.quantity !== 'number' || item.quantity < 1 || isNaN(item.quantity)) {
