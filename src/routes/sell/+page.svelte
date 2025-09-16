@@ -721,7 +721,7 @@ let showCashModal = false;
           <!-- Skeleton Loading - Exact Replica of Real Product Cards -->
           <div class="col-span-full">
             <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 2xl:grid-cols-7 gap-3 sm:gap-4 w-full">
-              {#each Array(12) as _}
+              {#each Array(24) as _}
                 <div class="bg-white rounded-lg shadow-sm hover:shadow-md transition-all duration-200 cursor-pointer p-2 sm:p-3 relative group border border-primary">
                   <!-- ID placeholder -->
                   <div class="text-xs sm:text-sm text-primary mb-1 sm:mb-2 font-medium">
