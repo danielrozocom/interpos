@@ -99,6 +99,9 @@
   // Scroll lock helpers: prevent background scroll while modal is open
   let _prevBodyOverflow: string | null = null;
   let _prevBodyPaddingRight: string | null = null;
+  // store elements we mark inert so we can restore them
+  let _inertElements: Element[] = [];
+  let _previousActiveElement: Element | null = null;
   function lockScroll() {
     try {
       if (typeof document === 'undefined' || typeof window === 'undefined') return;
@@ -112,6 +115,45 @@
     } catch (e) {
       // ignore
     }
+  }
+
+  // Make background inert: add aria-hidden and a class to all top-level children except the modal backdrop
+  function makeBackgroundInert() {
+    try {
+      if (typeof document === 'undefined') return;
+      const root = document.body;
+      _inertElements = [];
+      for (const child of Array.from(root.children)) {
+        // skip the modal backdrop (it will be appended as a child of body in this component)
+        // We detect it by presence of our modal-backdrop class
+        if (child.classList && child.classList.contains('modal-backdrop')) continue;
+        // mark inert: add aria-hidden and a helper class
+        try {
+          child.setAttribute('aria-hidden', 'true');
+          child.classList.add('scanner-inert');
+          _inertElements.push(child);
+        } catch (e) {
+          // ignore individual failures
+        }
+      }
+      // remember previously focused element to restore later
+      try { _previousActiveElement = document.activeElement; } catch (e) { _previousActiveElement = null; }
+    } catch (e) {}
+  }
+
+  function restoreBackgroundFromInert() {
+    try {
+      for (const el of _inertElements) {
+        try {
+          el.removeAttribute('aria-hidden');
+          el.classList.remove('scanner-inert');
+        } catch (e) {}
+      }
+      _inertElements = [];
+      // restore focus
+      try { if (_previousActiveElement && (document.body.contains(_previousActiveElement))) ((_previousActiveElement as HTMLElement).focus?.()); } catch (e) {}
+      _previousActiveElement = null;
+    } catch (e) {}
   }
 
   function unlockScroll() {
@@ -463,6 +505,15 @@
           isRequestingPermission = false; isInitializing = false; isScanning = true; dispatch('status', 'Escaneando...');
           // populate device list
           try { await listCameras(); } catch(e) {}
+          // set initial focus into modal for accessibility
+          try {
+            if (videoEl) {
+              try { (videoEl as HTMLElement).focus(); } catch(e) {}
+            } else {
+              const btn = document.querySelector('.close-btn') as HTMLElement | null;
+              if (btn) try { btn.focus(); } catch(e) {}
+            }
+          } catch(e) {}
           return; // we've started native detector
         } catch (bdErr) {
           console.warn('BarcodeDetector failed, falling back to ZXing', bdErr);
@@ -730,29 +781,74 @@
   function closeModal() {
   try { stop(); } catch(e) {}
   try { unlockScroll(); } catch(e) {}
+    try { restoreBackgroundFromInert(); } catch(e) {}
     dispatch('close');
   }
 
   // iniciar automáticamente cuando se monta en cliente
+  let backdropEl: HTMLElement | null = null;
+
   onMount(() => {
     if (typeof window !== 'undefined') {
       const pref = loadPreferredDevice();
       if (pref) _activeDeviceId = pref;
       try { initBeep(); } catch(e) { /* ignore */ }
-  try { lockScroll(); } catch(e) {}
-  start();
+      try { lockScroll(); } catch(e) {}
+      // Make the rest of the page inert and trap focus
+      try { makeBackgroundInert(); } catch (e) {}
+
+      // If we have the backdrop element, move it to document.body to ensure it's top-level (portal)
+      try {
+        if (backdropEl && backdropEl.parentElement !== document.body) {
+          document.body.appendChild(backdropEl);
+        }
+      } catch (e) {}
+
+      try { start(); } catch(e) {}
     }
 
     // cerrar con Escape
     const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') closeModal(); };
     window.addEventListener('keydown', onKey);
-    onDestroy(() => { window.removeEventListener('keydown', onKey); });
+    // focus trap: keep Tab navigation inside modal-backdrop
+    const onDocumentKey = (e: KeyboardEvent) => {
+      if (e.key !== 'Tab') return;
+      try {
+        const modal = document.querySelector('.modal-box') as HTMLElement | null;
+        if (!modal) return;
+        const focusable = modal.querySelectorAll<HTMLElement>('a[href], button:not([disabled]), textarea, input, select, [tabindex]:not([tabindex="-1"])');
+        if (!focusable || focusable.length === 0) return;
+        const first = focusable[0];
+        const last = focusable[focusable.length - 1];
+        const active = document.activeElement as HTMLElement | null;
+        if (e.shiftKey) {
+          if (active === first || !modal.contains(active)) {
+            e.preventDefault();
+            last.focus();
+          }
+        } else {
+          if (active === last) {
+            e.preventDefault();
+            first.focus();
+          }
+        }
+      } catch (err) {}
+    };
+    window.addEventListener('keydown', onDocumentKey);
+    onDestroy(() => { window.removeEventListener('keydown', onKey); window.removeEventListener('keydown', onDocumentKey); });
   });
 
   // limpiar al destruir componente
   onDestroy(() => {
   try { stop(); } catch (e) {}
   try { unlockScroll(); } catch (e) {}
+  // remove portal backdrop if we moved it
+  try {
+    if (backdropEl && backdropEl.parentElement === document.body) {
+      try { document.body.removeChild(backdropEl); } catch (e) {}
+    }
+  } catch (e) {}
+  try { restoreBackgroundFromInert(); } catch(e) {}
   });
 </script>
 
@@ -765,7 +861,7 @@
     display:flex;
     align-items:center;
     justify-content:center;
-    z-index:9999; /* ensure modal sits above app header */
+    z-index: 2147483646; /* very high to ensure modal sits above all app UI (but below browser chrome) */
     padding: 16px; /* espacio lateral en móviles */
     box-sizing: border-box;
   }
@@ -780,7 +876,7 @@
     overflow: hidden;
     box-shadow: 0 10px 30px rgba(0,0,0,0.4);
     position: relative;
-    z-index: 10000; /* place modal content above other page elements */
+    z-index: 2147483647; /* ensure modal content is above backdrop and everything else */
     box-sizing: border-box;
   }
 
@@ -828,7 +924,7 @@
     color: white;
     background: rgba(0, 0, 0, 0.55);
     border-radius: 6px;
-    z-index: 100;
+    z-index: 10004;
     max-width: calc(100% - 16px);
   overflow: hidden;
   text-overflow: ellipsis;
@@ -882,7 +978,7 @@
     justify-content: center;
     padding: 16px;
     box-sizing: border-box;
-    z-index: 200;
+    z-index: 10004;
     background: rgba(0, 0, 0, 0.8);
     border-radius: 10px;
   }
@@ -905,13 +1001,27 @@
     position: fixed;
     top: 20px;
     right: 20px;
-    background: rgba(0, 0, 0, 0.8);
+    background: rgba(0, 0, 0, 0.9);
     color: white;
-    padding: 10px 16px;
+    padding: 12px 18px;
     border-radius: 8px;
-    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.3);
-    z-index: 9999;
-    transition: opacity 0.3s;
+    box-shadow: 0 6px 16px rgba(0, 0, 0, 0.4);
+    z-index: 2147483648;
+    transition: opacity 0.3s ease-in-out;
+    font-size: 14px;
+    font-weight: 500;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    backdrop-filter: blur(8px);
+  }
+
+  /* helper to make background non-interactive when modal is open */
+  .scanner-inert {
+    pointer-events: none !important;
+    user-select: none !important;
+    -webkit-user-select: none !important;
+    opacity: 0.6; /* slight dim to indicate inactive background */
+    touch-action: none !important;
+    filter: blur(0.2px) brightness(0.7);
   }
 
   .toast.hidden {
@@ -936,7 +1046,7 @@
   }
 </style>
 
-<div class="modal-backdrop" role="dialog" aria-modal="true" aria-label="Escáner de códigos">
+<div bind:this={backdropEl} class="modal-backdrop" role="dialog" aria-modal="true" aria-label="Escáner de códigos">
   <div class="modal-box">
     <div class="modal-header">
       <div class="header-left">
