@@ -10,6 +10,7 @@
   let userId = '';
   let userBalance = 0;
   let loading = false;
+  let loadingProducts = true;
   let error = '';
   let siteName = 'InterPOS';
   let cart: any[] = [];
@@ -302,6 +303,7 @@ let showCashModal = false;
 
   // Load categories and products
   async function loadProducts() {
+    loadingProducts = true;
     try {
       const response = await fetch('/api/sheets/products');
       let data;
@@ -338,6 +340,8 @@ let showCashModal = false;
     } catch (err: any) {
       error = err.message || 'Error al cargar los productos';
       console.error('Error loading products:', err);
+    } finally {
+      loadingProducts = false;
     }
   }
 
@@ -714,8 +718,33 @@ let showCashModal = false;
           </button>
         </div>
       </div>
-  <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 2xl:grid-cols-7 gap-3 sm:gap-4 w-full" style="margin:0;">
-        {#if (selectedCategory ? products[selectedCategory] : Object.values(products).flat()).length > 0}
+  <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 2xl:grid-cols-7 gap-3 sm:gap-4 w-full" style="margin: 1rem 0;">
+        {#if loadingProducts}
+          <!-- Skeleton Loading - Exact Replica of Real Product Cards -->
+          <div class="col-span-full">
+            <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 2xl:grid-cols-7 gap-3 sm:gap-4 w-full">
+              {#each Array(12) as _}
+                <div class="bg-white rounded-lg shadow-sm hover:shadow-md transition-all duration-200 cursor-pointer p-2 sm:p-3 relative group border border-primary">
+                  <!-- ID placeholder -->
+                  <div class="text-xs sm:text-sm text-primary mb-1 sm:mb-2 font-medium">
+                    <div class="h-3 bg-gray-200 rounded animate-pulse w-8"></div>
+                  </div>
+                  
+                  <!-- Product name placeholder -->
+                  <div class="w-full relative group mb-1 sm:mb-2">
+                    <div class="h-4 sm:h-5 bg-gray-200 rounded animate-pulse"></div>
+                  </div>
+                  
+                  <!-- Price placeholder -->
+                  <div class="h-5 sm:h-6 bg-gray-200 rounded animate-pulse w-12"></div>
+                  
+                  <!-- Hover overlay - exact same as real cards -->
+                  <div class="absolute inset-0 bg-white bg-opacity-0 group-hover:bg-opacity-10 transition-all duration-200 rounded-lg"></div>
+                </div>
+              {/each}
+            </div>
+          </div>
+        {:else if (selectedCategory ? products[selectedCategory] : Object.values(products).flat()).length > 0}
           {#each (selectedCategory ? products[selectedCategory] : Object.values(products).flat()).sort((a, b) => {
             if (sortByAlphabetical) {
               // Ordenar alfabéticamente por nombre
@@ -778,8 +807,15 @@ let showCashModal = false;
             </div>
           {/each}
         {:else}
-          <div class="col-span-full flex flex-col items-center justify-center py-3 md:py-4 text-gray-500">
-            <p class="text-lg md:text-xl">No hay productos disponibles</p>
+          <div class="col-span-full flex flex-col items-center justify-center py-8 md:py-12 text-gray-500">
+            <div class="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mb-4">
+              <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+                <circle cx="12" cy="12" r="3"/>
+                <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0 .33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1 1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/>
+              </svg>
+            </div>
+            <p class="text-lg md:text-xl font-medium text-gray-700 mb-2">No hay productos disponibles</p>
+            <p class="text-sm text-gray-500">Los productos aparecerán aquí cuando estén disponibles</p>
           </div>
         {/if}
       </div>
