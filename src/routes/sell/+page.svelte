@@ -157,9 +157,9 @@ async function handleScannedSell(ev: Event) {
   // behave exactly like pressing Enter
   performEnterLookup();
   showScanner = false;
-  // focus input after a tick
+  // remove focus from the input after a tick so the cursor leaves the ID field
   if (typeof window !== 'undefined') {
-    tick().then(() => { const el2 = document.getElementById('userId') as HTMLInputElement | null; if (el2) el2.focus(); });
+    tick().then(() => { const el2 = document.getElementById('userId') as HTMLInputElement | null; if (el2) el2.blur(); });
   }
     return;
   }

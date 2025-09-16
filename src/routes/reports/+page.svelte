@@ -349,6 +349,20 @@ $: if (_hasMounted) {
     return `${v} ${v === 1 ? 'transacción' : 'transacciones'}`;
   }
 
+  // Helper: return true when value is non-zero (used by template to toggle emphasis)
+  function isZero(val: any) {
+    try { return Number(val || 0) !== 0; } catch (e) { return false; }
+  }
+
+  // Return CSS classes for count display; emphasize when non-zero
+  function countClass(val: any) {
+    const base = 'text-sm text-gray-400';
+    try {
+      if (Number(val || 0) > 0) return `${base} text-base font-medium`;
+    } catch (e) { /* ignore */ }
+    return base;
+  }
+
   // Return a user-facing range string. If both empty -> 'Todas las fechas'
   function displayRange(a: string | undefined | null, b: string | undefined | null) {
     const A = a || '';
@@ -405,12 +419,8 @@ $: if (_hasMounted) {
   })();
   // Normalize keys (remove diacritics) and compute robust counts for recargas
   function normalizeKey(s: string) {
-    try {
-      return String(s || '').normalize('NFD').replace(/\p{Diacritic}/gu, '').toLowerCase();
-    } catch (e) {
-      // older environments may not support Unicode property escapes; fallback
-      return String(s || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
-    }
+    // Use a combining-mark range to remove diacritics for broader compatibility
+    return String(s || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
   }
 
   $: derivedRecargasCount = Object.values(derivedRecargasCountsByMethod).reduce((s: number, v: any) => s + Number(v || 0), 0) || 0;

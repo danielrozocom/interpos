@@ -152,10 +152,11 @@ export const GET: RequestHandler = async ({ url }) => {
       // remove price patterns like - $8.000 or - 8.000 or $8.000
       t = t.replace(/[-–—]\s*\$?\s*[\d,.]+/g, ' ');
       t = t.replace(/\$\s*[\d,.]+/g, ' ');
-      // remove punctuation characters that are not letters/numbers/space
-      t = t.replace(/[^\p{L}\p{N} ]+/gu, ' ');
-      // decompose accents then remove diacritics
-      t = t.normalize('NFD').replace(/\p{Diacritic}/gu, '');
+  // remove punctuation characters that are not letters/numbers/space
+  // use ASCII-safe fallback to avoid Unicode property escapes
+  t = t.replace(/[^0-9A-Za-z ]+/g, ' ');
+  // decompose accents then remove diacritics (combining marks)
+  t = t.normalize('NFD').replace(/[\u0300-\u036f]/g, '');
       // collapse spaces and trim
       t = t.replace(/\s{2,}/g, ' ').trim();
       return t;
@@ -189,7 +190,7 @@ export const GET: RequestHandler = async ({ url }) => {
         if (!key) continue;
   // build a consistent display: clean then Title Case, remove diacritics for consistency
   let rawDisplay = part.replace(/\([^)]*\)/g, '').replace(/\bID\s*:?\s*\d+\b/gi, '').replace(/\b[x×]\s*\d+\b/gi, '').replace(/[-–—]\s*\$?\s*[\d,.]+/g, '').replace(/\$\s*[\d,.]+/g, '').replace(/\s{2,}/g, ' ').trim();
-  rawDisplay = rawDisplay.normalize('NFD').replace(/\p{Diacritic}/gu, '');
+  rawDisplay = rawDisplay.normalize('NFD').replace(/[\u0300-\u036f]/g, '');
   const display = rawDisplay || key;
         const existing = prodMap.get(key);
         if (existing) existing.qty += Number(qty) || 0;
@@ -214,7 +215,7 @@ export const GET: RequestHandler = async ({ url }) => {
         const key = normalizeForKey(part);
         if (!key) continue;
   let rawDisplay = part.replace(/\([^)]*\)/g, '').replace(/\bID\s*:?\s*\d+\b/gi, '').replace(/\b[x×]\s*\d+\b/gi, '').replace(/[-–—]\s*\$?\s*[\d,.]+/g, '').replace(/\$\s*[\d,.]+/g, '').replace(/\s{2,}/g, ' ').trim();
-  rawDisplay = rawDisplay.normalize('NFD').replace(/\p{Diacritic}/gu, '');
+  rawDisplay = rawDisplay.normalize('NFD').replace(/[\u0300-\u036f]/g, '');
   const display = rawDisplay || key;
         const existing = prodMap.get(key);
         if (existing) existing.qty += addQty;
@@ -239,7 +240,7 @@ export const GET: RequestHandler = async ({ url }) => {
       recargasByMethod[m] = (recargasByMethod[m] || 0) + q;
       // count transactions (each recarga row counts as one transaction)
       // normalize common variants to canonical keys
-      const nm = String(m || '').toLowerCase().normalize('NFD').replace(/\p{Diacritic}/gu, '');
+  const nm = String(m || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
       let key = m;
       try {
         if (nm.includes('efectivo') || nm.includes('cash')) key = 'Efectivo';
