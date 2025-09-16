@@ -910,7 +910,7 @@
     padding: 10px 16px;
     border-radius: 8px;
     box-shadow: 0 4px 8px rgba(0, 0, 0, 0.3);
-    z-index: 300;
+    z-index: 9999;
     transition: opacity 0.3s;
   }
 
