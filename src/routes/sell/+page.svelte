@@ -25,6 +25,14 @@
   let userName = '';
 
 let userSuggestions: any[] = [];
+let activeSuggestionIndex = -1;
+
+$: if (userSuggestions.length > 0 && !userName && (!userId || userId.trim() === '')) {
+  // Mostrar sugerencias: no auto-completamos el campo para evitar llamadas implícitas al servidor.
+}
+
+// Nota: ya no limpiamos automáticamente `userSuggestions` cuando existe `userName`.
+// Esto permite que, si el operador corrige/edita el campo `userId`, las sugerencias vuelvan a aparecer.
 let successMsg = '';
 let mobileView = 'products'; // 'products' or 'cart' for mobile view switching
 let showAddedNotification = false;
@@ -49,15 +57,40 @@ function validateNumericInput(event: KeyboardEvent) {
 function handleUserIdKeydown(e: KeyboardEvent) {
   validateNumericInput(e);
   if (e.key === 'Enter') {
+    // If there are suggestions and none selected as userName, accept the active suggestion
+    if (userSuggestions.length > 0 && activeSuggestionIndex >= 0 && !userName) {
+      const chosen = userSuggestions[activeSuggestionIndex];
+      if (chosen && chosen.id) {
+        userId = String(chosen.id);
+        userSuggestions = [];
+        activeSuggestionIndex = -1;
+        loadUserBalance(true);
+        return;
+      }
+    }
+
     // if empty, show immediate message
     if (!userId || String(userId).trim() === '') {
       error = 'No se encontraron usuarios';
       userSuggestions = [];
+      activeSuggestionIndex = -1;
       return;
     }
     // clear suggestions so lookup is immediate
     userSuggestions = [];
+    activeSuggestionIndex = -1;
     loadUserBalance(true);
+  }
+  // handle arrow navigation for suggestions
+  if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+    if (userSuggestions.length > 0) {
+      e.preventDefault();
+      if (e.key === 'ArrowDown') {
+        activeSuggestionIndex = (activeSuggestionIndex + 1) % userSuggestions.length;
+      } else {
+        activeSuggestionIndex = (activeSuggestionIndex - 1 + userSuggestions.length) % userSuggestions.length;
+      }
+    }
   }
 }
 
@@ -289,7 +322,7 @@ let showCashModal = false;
         productsArray = data;
       }
 
-      // Group products by category
+  // Group products by category
       const productsByCategory: Record<string, any[]> = {};
       productsArray.forEach((product: any) => {
         if (product.category) {
@@ -299,7 +332,8 @@ let showCashModal = false;
           productsByCategory[product.category].push(product);
         }
       });
-      categories = Object.keys(productsByCategory);
+  // Ordenar categorías alfabéticamente (case-insensitive). El botón 'Todos' se maneja por separado en la UI.
+  categories = Object.keys(productsByCategory).sort((a, b) => a.toString().localeCompare(b.toString(), 'es', { sensitivity: 'base' }));
       products = productsByCategory;
     } catch (err: any) {
       error = err.message || 'Error al cargar los productos';
@@ -332,6 +366,13 @@ let showCashModal = false;
     // Validar que el producto tenga todos los datos requeridos y que el precio sea número
     if (!product?.id || !product?.name || typeof product?.price !== 'number') {
       error = 'Error: El producto no tiene todos los datos requeridos o el precio no es válido';
+      return;
+    }
+    // Validar rango de precio aceptable (en centavos o unidad usada por la app)
+    const MIN_PRICE = 300;
+    const MAX_PRICE = 300000;
+    if (product.price < MIN_PRICE || product.price > MAX_PRICE) {
+      error = `El producto "${product.name}" tiene un precio fuera del rango permitido (${MIN_PRICE} - ${MAX_PRICE}).`;
       return;
     }
     if (!quantity || quantity < 1 || isNaN(quantity)) {
@@ -414,6 +455,13 @@ let showCashModal = false;
       // Validar que id y name sean string/number y price sea un número válido
       if (typeof item.id === 'undefined' || item.id === null || String(item.id).trim() === '' || typeof item.name !== 'string' || item.name.trim() === '' || typeof item.price !== 'number' || isNaN(item.price)) {
         error = `El producto "${item.name || item.id || 'Sin nombre'}" tiene datos incompletos. Verifica ID, nombre y precio.`;
+        return;
+      }
+      // Validar rango de precio aceptable para cada item
+      const MIN_PRICE = 300;
+      const MAX_PRICE = 300000;
+      if (item.price < MIN_PRICE || item.price > MAX_PRICE) {
+        error = `El producto "${item.name || item.id || 'Sin nombre'}" tiene un precio fuera del rango permitido (${MIN_PRICE} - ${MAX_PRICE}).`;
         return;
       }
       if (typeof item.quantity !== 'number' || item.quantity < 1 || isNaN(item.quantity)) {
@@ -555,6 +603,7 @@ let showCashModal = false;
   async function fetchUserSuggestions(term: string) {
     if (!term.trim()) {
       userSuggestions = [];
+      activeSuggestionIndex = -1;
       return;
     }
     try {
@@ -572,7 +621,8 @@ let showCashModal = false;
       const startWithId = usersArr.filter(u => u.id && u.id.toString().startsWith(term) && !exactId.includes(u));
       const startWithName = usersArr.filter(u => u.name && u.name.toLowerCase().startsWith(term.toLowerCase()) && !exactName.includes(u) && !startWithId.includes(u));
       const partialName = usersArr.filter(u => u.name && u.name.toLowerCase().includes(term.toLowerCase()) && !exactId.includes(u) && !exactName.includes(u) && !startWithId.includes(u) && !startWithName.includes(u));
-      userSuggestions = [...exactId, ...exactName, ...startWithId, ...startWithName, ...partialName].slice(0, 5);
+  userSuggestions = [...exactId, ...exactName, ...startWithId, ...startWithName, ...partialName].slice(0, 5);
+  activeSuggestionIndex = userSuggestions.length > 0 ? 0 : -1;
     } catch {
       userSuggestions = [];
     }
@@ -629,7 +679,7 @@ let showCashModal = false;
 
   <div class="flex-1 flex flex-col md:flex-row overflow-hidden w-full" style="margin:0; padding:0;">
     <!-- Grid de productos -->
-    <div class="flex-1 p-1 sm:p-2 overflow-auto" class:hidden={mobileView !== 'products'} class:md:block={true}>
+  <div class="flex-1 p-2 sm:p-3 overflow-auto" class:hidden={mobileView !== 'products'} class:md:block={true}>
       <!-- Filtro por categorías -->
       <div class="mb-2 px-1 sm:px-2">
         <div class="flex flex-wrap gap-1 sm:gap-2 items-center">
@@ -664,7 +714,7 @@ let showCashModal = false;
           </button>
         </div>
       </div>
-      <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 2xl:grid-cols-7 gap-2 sm:gap-3 w-full" style="margin:0;">
+  <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 2xl:grid-cols-7 gap-3 sm:gap-4 w-full" style="margin:0;">
         {#if (selectedCategory ? products[selectedCategory] : Object.values(products).flat()).length > 0}
           {#each (selectedCategory ? products[selectedCategory] : Object.values(products).flat()).sort((a, b) => {
             if (sortByAlphabetical) {
@@ -769,7 +819,12 @@ let showCashModal = false;
             on:keydown={handleUserIdKeydown}
             on:input={() => {
               error = '';
-              userSuggestions = [];
+              // Si el usuario previamente cargado está presente, lo eliminamos para permitir nueva búsqueda
+              if (userName) {
+                userName = '';
+                userBalance = 0;
+              }
+              activeSuggestionIndex = -1;
               fetchUserSuggestions(userId);
             }}
             on:paste={handleUserIdPaste}
@@ -816,18 +871,25 @@ let showCashModal = false;
       <div class="mt-2 text-sm">
             {#if userSuggestions.length > 0}
               <div class="rounded-lg border border-gray-200 bg-white shadow-sm overflow-hidden">
-                {#each userSuggestions as suggestion}
-                  <button type="button" class="w-full text-left px-4 py-2 hover:bg-[#e6eaf2] flex items-center gap-2"
-                    on:click={() => {
-                      userId = suggestion.id;
-                      loadUserBalance(true);
-                      userSuggestions = [];
-                    }}
-                  >
-                    <span class="text-primary font-medium">ID: {suggestion.id}</span>
-                    <span class="text-gray-400">|</span>
-                    <span>{suggestion.name}</span>
-                  </button>
+                {#each userSuggestions as suggestion, i}
+                  {#key suggestion.id}
+                    <button
+                      type="button"
+                      class="w-full text-left px-4 py-2 flex items-center gap-2"
+                      class:bg-[#e6eaf2]={i === activeSuggestionIndex}
+                      on:mouseover={() => { activeSuggestionIndex = i; }}
+                      on:click={() => {
+                        userId = suggestion.id;
+                        userSuggestions = [];
+                        activeSuggestionIndex = -1;
+                        loadUserBalance(true);
+                      }}
+                    >
+                      <span class="text-primary font-medium">ID: {suggestion.id}</span>
+                      <span class="text-gray-400">|</span>
+                      <span>{suggestion.name}</span>
+                    </button>
+                  {/key}
                 {/each}
               </div>
             {:else}

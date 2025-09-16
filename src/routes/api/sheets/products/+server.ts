@@ -61,23 +61,63 @@ export const GET: RequestHandler = async ({ url }) => {
       id: row[0] ?? '',
       category: row[1] ?? '',
       name: row[2] ?? '',
-      price: parsePrice(row[3])
-    }));      // Adjust prices (API sends prices as 5.5 which means $5,500)
-      products = products.map(product => {
-        let parsedPrice = 0;
-        if (typeof product.price === 'number' && !isNaN(product.price)) {
-          // Convert 5.5 to 5500 by multiplying by 1000 and rounding
-          parsedPrice = Math.round(product.price * 1000);
-        } else if (typeof product.price === 'string') {
-          // If it comes as string, convert to number and multiply
-          let numPrice = parseFloat(product.price);
-          parsedPrice = Math.round(numPrice * 1000);
+      // price: parsePrice(row[3]) – guardamos también el raw para heurísticas posteriores
+      price: parsePrice(row[3]),
+      _raw: row[3] ?? ''
+    }));
+
+    // Ajustar precios: detectar si la celda original usa decimales para representar miles
+    // Ejemplo: '5.5' -> 5500. Pero un entero como '300' no debe convertirse a 300000.
+    products = products.map(product => {
+  const rawVal = (product as any)._raw ?? '';
+  const rawClean = String(rawVal).replace(/[^^\d.,-]/g, '').replace(/\s/g, '');
+      let parsedPrice = 0;
+
+      // Intentar extraer número desde la representación cruda
+      let numFromRaw: number | null = null;
+      if (rawClean) {
+        let normalized = rawClean;
+        if (rawClean.includes('.') && rawClean.includes(',')) {
+          // 1.234,56 -> 1234.56
+          normalized = rawClean.replace(/\./g, '').replace(',', '.');
+        } else if (rawClean.includes(',') && !rawClean.includes('.')) {
+          // 1234,56 -> 1234.56
+          normalized = rawClean.replace(/,/g, '.');
         }
-        return {
-          ...product,
-          price: parsedPrice
-        };
-      });
+        const maybeNum = parseFloat(normalized);
+        if (!isNaN(maybeNum)) numFromRaw = maybeNum;
+      }
+
+      const numericPrice = typeof product.price === 'number' && !isNaN(product.price) ? product.price : NaN;
+
+      // Detectar si raw muestra decimales y el número es menor a 1000 -> probablemente notación de miles (p.ej. 5.5 => 5500)
+      const looksLikeDecimalThousands = numFromRaw !== null && /[.,]/.test(String(rawVal)) && Math.abs(numFromRaw) < 1000;
+      if (looksLikeDecimalThousands && numFromRaw !== null) {
+        parsedPrice = Math.round(numFromRaw * 1000);
+      } else if (!isNaN(numericPrice)) {
+        // Ya es un número en la unidad final
+        parsedPrice = Math.round(numericPrice);
+      } else if (numFromRaw !== null) {
+        // Fallback al número parseado desde raw
+        parsedPrice = Math.round(numFromRaw);
+      }
+
+      return {
+        ...product,
+        price: parsedPrice
+      };
+    });
+
+    // Validación del rango de precios aceptable: 300 .. 300000
+    const MIN_PRICE = 300;
+    const MAX_PRICE = 300000;
+    // Opcional: registrar cuántos productos se excluyen por precio inválido
+    const excludedCount = products.filter(p => typeof p.price !== 'number' || p.price < MIN_PRICE || p.price > MAX_PRICE).length;
+    if (excludedCount > 0) {
+      console.warn(`Excluyendo ${excludedCount} productos con precio fuera del rango ${MIN_PRICE}-${MAX_PRICE}`);
+    }
+    // Filtrar productos fuera del rango para que la UI no los muestre
+    products = products.filter(p => typeof p.price === 'number' && p.price >= MIN_PRICE && p.price <= MAX_PRICE);
 
       // Filter products if search parameter is present
       const searchTerm = url.searchParams.get('search')?.toLowerCase();

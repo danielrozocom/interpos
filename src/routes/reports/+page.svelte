@@ -95,9 +95,27 @@
       const params = new URLSearchParams();
       if (startDate) params.set('startDate', startDate);
       if (effEnd) params.set('endDate', effEnd);
-      const res = await fetch('/api/reports/summary?' + params.toString());
-      if (!res.ok) throw new Error('Error fetching report');
+    const res = await fetch('/api/reports/summary?' + params.toString());
+    if (!res.ok) throw new Error('Error fetching report');
   summary = await res.json();
+  console.debug('reports: fetched summary from API', { key, summary });
+  try {
+    const recByMethod = (summary && summary.summary && summary.summary.recargasCountsByMethod) ? summary.summary.recargasCountsByMethod : {};
+    const serverCounts = (summary && summary.summary && summary.summary.counts) ? summary.summary.counts : {};
+    const derivedCash = Object.entries(recByMethod).reduce((s: number, [k, v]) => {
+      try { return String(k || '').toLowerCase().includes('efectivo') ? s + Number(v || 0) : s; } catch (e) { return s; }
+    }, 0);
+    const derivedInternal = Object.entries(recByMethod).reduce((s: number, [k, v]) => {
+      try { const nk = String(k || '').toLowerCase(); return (nk.includes('operacion') || nk.includes('interna') || nk.includes('operacional') || nk.includes('internal')) ? s + Number(v || 0) : s; } catch (e) { return s; }
+    }, 0);
+    const serverCash = Number(serverCounts.recargas_efectivo || 0);
+    const serverInternal = Number(serverCounts.recargas_interna || 0);
+    const sourceCash = (derivedCash > 0) ? 'derived' : (serverCash > 0 ? 'server' : 'none');
+    const sourceInternal = (derivedInternal > 0) ? 'derived' : (serverInternal > 0 ? 'server' : 'none');
+    const chosenCash = sourceCash === 'derived' ? derivedCash : (sourceCash === 'server' ? serverCash : 0);
+    const chosenInternal = sourceInternal === 'derived' ? derivedInternal : (sourceInternal === 'server' ? serverInternal : 0);
+    console.debug('reports: recargas counts chosen', { chosenCash, sourceCash, derivedCash, serverCash, chosenInternal, sourceInternal, derivedInternal, serverInternal, serverTotal: Number(serverCounts.recargas || 0) });
+  } catch (e) { console.debug('reports: recargas inspect error', e); }
   // Charts are updated by the `afterUpdate` hook when `summary` changes.
   // Avoid calling updateCharts() directly here to prevent duplicate
   // destroys/creations and potential afterUpdate -> update -> afterUpdate loops.
@@ -432,12 +450,13 @@ $: if (_hasMounted) {
   $: estimatedRecargasInternalCount = serverTotalRecargas - (Number(estimatedRecargasCashCount) || 0);
 
   $: displayRecargasCount = (derivedRecargasCount > 0) ? derivedRecargasCount : serverTotalRecargas;
+  // Prefer derived (per-method breakdown), then server-provided counts, then manual overrides, then estimated fallback
   $: displayRecargasCashCount = (derivedRecargasCashCount > 0)
     ? derivedRecargasCashCount
-    : (manualRecargasCashCount != null ? manualRecargasCashCount : (estimatedRecargasCashCount > 0 ? estimatedRecargasCashCount : Number(summary && summary.summary && summary.summary.counts && summary.summary.counts.recargas_efectivo || 0)));
+    : (Number(summary && summary.summary && summary.summary.counts && summary.summary.counts.recargas_efectivo || 0) > 0 ? Number(summary.summary.counts.recargas_efectivo) : (estimatedRecargasCashCount > 0 ? estimatedRecargasCashCount : 0));
   $: displayRecargasInternalCount = (derivedRecargasInternalCount > 0)
     ? derivedRecargasInternalCount
-    : (manualRecargasInternalCount != null ? manualRecargasInternalCount : (estimatedRecargasInternalCount > 0 ? estimatedRecargasInternalCount : Number(summary && summary.summary && summary.summary.counts && summary.summary.counts.recargas_interna || 0)));
+    : (Number(summary && summary.summary && summary.summary.counts && summary.summary.counts.recargas_interna || 0) > 0 ? Number(summary.summary.counts.recargas_interna) : (estimatedRecargasInternalCount > 0 ? estimatedRecargasInternalCount : 0));
 
   // Debug UI control to inspect raw objects from server (toggleable)
   let showRecargasDebug = false;
@@ -445,72 +464,44 @@ $: if (_hasMounted) {
   // Whether server provided a per-method breakdown for recargas
   $: hasRecargasBreakdown = Boolean(summary && summary.summary && summary.summary.recargasCountsByMethod && Object.keys(summary.summary.recargasCountsByMethod).length > 0);
 
-  // Manual overrides (localStorage)
-  let manualRecargasCashCount: number | null = null;
-  let manualRecargasInternalCount: number | null = null;
-  let manualCountsSource: any = null;
-
-  const MANUAL_KEY = 'interpos_manual_recargas_counts_v1';
-
-  // load manual overrides from localStorage on mount
-  onMount(() => {
+  // no local manual overrides: rely solely on server/derived/estimated counts
     try {
-      if (typeof localStorage !== 'undefined') {
-        const raw = localStorage.getItem(MANUAL_KEY);
-        if (raw) {
-          const parsed = JSON.parse(raw);
-          manualRecargasCashCount = parsed.cash != null ? Number(parsed.cash) : null;
-          manualRecargasInternalCount = parsed.internal != null ? Number(parsed.internal) : null;
-          manualCountsSource = parsed;
-        }
-      }
-    } catch (e) { /* ignore */ }
-  });
+    const recByMethod = (summary && summary.summary && summary.summary.recargasCountsByMethod) ? summary.summary.recargasCountsByMethod : {};
+    const serverCounts = (summary && summary.summary && summary.summary.counts) ? summary.summary.counts : {};
+    const derivedCash = Object.entries(recByMethod).reduce((s: number, [k, v]) => {
+      try { return String(k || '').toLowerCase().includes('efectivo') ? s + Number(v || 0) : s; } catch (e) { return s; }
+    }, 0);
+    const derivedInternal = Object.entries(recByMethod).reduce((s: number, [k, v]) => {
+      try { const nk = String(k || '').toLowerCase(); return (nk.includes('operacion') || nk.includes('interna') || nk.includes('operacional') || nk.includes('internal')) ? s + Number(v || 0) : s; } catch (e) { return s; }
+    }, 0);
+    const serverCash = Number(serverCounts.recargas_efectivo || 0);
+    const serverInternal = Number(serverCounts.recargas_interna || 0);
+    const sourceCash = (derivedCash > 0) ? 'derived' : (serverCash > 0 ? 'server' : 'none');
+    const sourceInternal = (derivedInternal > 0) ? 'derived' : (serverInternal > 0 ? 'server' : 'none');
+    const chosenCash = sourceCash === 'derived' ? derivedCash : (sourceCash === 'server' ? serverCash : 0);
+    const chosenInternal = sourceInternal === 'derived' ? derivedInternal : (sourceInternal === 'server' ? serverInternal : 0);
+    console.debug('reports: recargas counts chosen', { chosenCash, sourceCash, derivedCash, serverCash, chosenInternal, sourceInternal, derivedInternal, serverInternal, serverTotal: Number(serverCounts.recargas || 0) });
+  } catch (e) { console.debug('reports: recargas inspect error', e); }
 
-  function saveManualCounts() {
-    try {
-      const toSave = { cash: manualRecargasCashCount, internal: manualRecargasInternalCount };
-      if (typeof localStorage !== 'undefined') {
-        localStorage.setItem(MANUAL_KEY, JSON.stringify(toSave));
-      }
-      manualCountsSource = toSave;
-    } catch (e) { /* ignore */ }
-  }
-
-  function clearManualCounts() {
-    try {
-      if (typeof localStorage !== 'undefined') {
-        localStorage.removeItem(MANUAL_KEY);
-      }
-    } catch (e) { /* ignore */ }
-    manualRecargasCashCount = null;
-    manualRecargasInternalCount = null;
-    manualCountsSource = null;
-  }
-
-  // Helper to choose class for the txLabel: slightly larger when count is zero
-  function countClass(n: number | string | undefined | null) {
-    const v = Number(n || 0);
-    // Match the sales/ventas sizing: normally use text-sm; when zero, slightly larger (text-base) and bold
-    return v === 0 ? 'text-base font-medium text-gray-400' : 'text-sm text-gray-400';
-  }
-
-  // Safer boolean helper for Svelte class directives
-  function isZero(n: number | string | undefined | null) {
-    return Number(n || 0) === 0;
-  }
-
-  // Derived subtotal for 'saldo' specifically
+  // Compute sales paid with 'Saldo' (derived from salesByMethod when possible)
   $: derivedTotalSalesSaldo = (() => {
-    const entries = Object.entries(derivedSalesByMethod || {});
-    const matched = entries.filter(([k]) => String(k || '').toLowerCase().includes('saldo'));
-    const sumMatched = matched.reduce((s: number, [, v]) => s + toNumber(v || 0), 0);
-    if (sumMatched > 0) return sumMatched;
-    // fallback: if no explicit 'saldo' label, infer as total - cash
-    const inferred = Number(derivedTotalSales) - Number(derivedTotalSalesCash || 0);
-    // debug list of keys and whether they match
-    try { console.debug('reports: derivedTotalSalesSaldo keys:', entries.map(([k]) => k)); console.debug('reports: saldo-matches:', matched.map(m => m[0])); } catch (e) { /* ignore */ }
-    return inferred > 0 ? inferred : 0;
+    try {
+      const entries = Object.entries(derivedSalesByMethod || {});
+      // find any keys that explicitly mention 'saldo'
+      const matched = entries.filter(([k]) => {
+        try { return String(k || '').toLowerCase().includes('saldo'); } catch (e) { return false; }
+      });
+      const sumMatched = matched.reduce((s: number, [, v]) => s + toNumber(v || 0), 0);
+      if (sumMatched > 0) return sumMatched;
+      // fallback: if no explicit 'saldo' label, infer as total - cash
+      const inferred = Number(derivedTotalSales) - Number(derivedTotalSalesCash || 0);
+      // debug list of keys and whether they match
+      try { console.debug('reports: derivedTotalSalesSaldo keys:', entries.map(([k]) => k)); console.debug('reports: saldo-matches:', matched.map(m => m[0])); } catch (e) { /* ignore */ }
+      return inferred > 0 ? inferred : 0;
+    } catch (e) {
+      console.debug('reports: derivedTotalSalesSaldo error', e);
+      return 0;
+    }
   })();
 
   $: derivedTotalRecargas = Object.values(derivedRecargasByMethod).reduce((s: number, v: any) => s + toNumber(v || 0), 0) || 0;
@@ -1123,22 +1114,14 @@ $: if (_hasMounted) {
             <div class="summary-card">
               <p class="text-sm text-gray-500">Recargas en efectivo 💵</p>
               <p class="text-2xl font-semibold">{formatCurrency(derivedRecargasCash)}</p>
-              {#if hasRecargasBreakdown}
-                <p class="{countClass(displayRecargasCashCount)}">{txLabel(displayRecargasCashCount)}</p>
-              {:else}
-                <p class="{countClass(displayRecargasCashCount)}">{txLabel(displayRecargasCashCount)} {#if manualRecargasCashCount != null}<span class="text-xs text-gray-500">(manual)</span>{:else}<span class="text-xs text-gray-400">(estimado)</span>{/if}</p>
-              {/if}
+              <p class="{countClass(displayRecargasCashCount)}">{txLabel(displayRecargasCashCount)}</p>
             </div>
           </div>
           <div class="p-4 bg-white rounded-lg shadow-sm">
             <div class="summary-card">
               <p class="text-sm text-gray-500">Recargas por operación interna 🔧</p>
               <p class="text-2xl font-semibold">{formatCurrency(derivedRecargasInternal)}</p>
-              {#if hasRecargasBreakdown}
-                <p class="{countClass(displayRecargasInternalCount)}">{txLabel(displayRecargasInternalCount)}</p>
-              {:else}
-                <p class="{countClass(displayRecargasInternalCount)}">{txLabel(displayRecargasInternalCount)} {#if manualRecargasInternalCount != null}<span class="text-xs text-gray-500">(manual)</span>{:else}<span class="text-xs text-gray-400">(estimado)</span>{/if}</p>
-              {/if}
+              <p class="{countClass(displayRecargasInternalCount)}">{txLabel(displayRecargasInternalCount)}</p>
             </div>
           </div>
         </div>
