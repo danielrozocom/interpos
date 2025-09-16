@@ -1,4 +1,7 @@
-import adapter from '@sveltejs/adapter-node';
+// Use the Vercel adapter for deployments on Vercel. Locally you can still run
+// with adapter-node if you prefer; for Vercel deployments install
+// `@sveltejs/adapter-vercel` and replace the import below.
+import adapter from '@sveltejs/adapter-vercel';
 import { vitePreprocess } from '@sveltejs/vite-plugin-svelte';
 
 /** @type {import('@sveltejs/kit').Config} */
@@ -8,9 +11,8 @@ const config = {
 	preprocess: vitePreprocess(),
 
 	kit: {
-		// Using adapter-node locally to avoid symlink (EPERM) issues on Windows when
-		// @sveltejs/adapter-vercel tries to create symlinks in .vercel/output. For
-		// deployments to Vercel restore adapter-vercel in this file.
+		// Use the Vercel adapter so SvelteKit emits the correct .vercel/output
+		// structure Vercel expects.
 		adapter: adapter(),
 		paths: {
 			base: process.env.NODE_ENV === 'production' ? '' : ''
