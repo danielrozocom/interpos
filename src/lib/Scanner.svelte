@@ -41,7 +41,13 @@
   let isScanning: boolean = false;
   // current stream and track listeners so we can detect ended events and clean up
   let _currentStream: MediaStream | null = null;
+  let _torchAvailable: boolean = false;
+  let _torchOn: boolean = false;
+  // snapshot fallback removed
   const _trackListeners = new Map<MediaStreamTrack, EventListener>();
+  // Native BarcodeDetector sampling loop state (used when BarcodeDetector is active)
+  let _nativeRafId: number | null = null;
+  let _nativeSamplingRunning: boolean = false;
 
   // Si el prop deviceId cambia desde el padre, actualizar el device activo
   $: if (deviceId && typeof window !== 'undefined') {
@@ -251,6 +257,30 @@
     try { savePreferredDevice(_activeDeviceId); } catch (e) { console.warn('No se pudo guardar la preferencia de cámara', e); }
   }
 
+  // Torch control
+  async function setTorch(on: boolean) {
+    try {
+      const stream = _currentStream;
+      if (!stream) return false;
+      const track = stream.getVideoTracks()[0];
+      if (!track) return false;
+      const capabilities = (typeof track.getCapabilities === 'function') ? track.getCapabilities() as any : null;
+      if (!capabilities || !capabilities.torch) return false;
+      await track.applyConstraints({ advanced: [{ torch: !!on }] } as any);
+      _torchOn = !!on;
+      return true;
+    } catch (e) {
+      console.warn('Torch control failed', e);
+      return false;
+    }
+  }
+
+  async function enableTorch() { return setTorch(true); }
+  async function disableTorch() { return setTorch(false); }
+
+  // Snapshot capture & decode fallback
+  // snapshot capture removed
+
   // Helpers SSR-safe: no usar nada de navigator/window fuera de onMount/start
 
   // start(): inicia o reinicia con la cámara current
@@ -292,6 +322,8 @@
 
           const hints = new Map();
           if (possibleFormats.length > 0) hints.set(DecodeHintType.POSSIBLE_FORMATS, possibleFormats);
+          // Try harder for difficult scans (may increase CPU usage)
+          try { hints.set(DecodeHintType.TRY_HARDER, true); } catch (e) { /* ignore if not present */ }
 
           _codeReader = new BrowserMultiFormatReader();
 
@@ -346,10 +378,108 @@
         dispatch('error', 'Elemento de video no disponible');
         return;
       }
-
       dispatch('status', 'Solicitando permiso de cámara...');
 
-      // Usamos decodeFromVideoDevice que internamente abre la cámara
+      // Preferred constraints: prefer back camera and decent resolution for better decoding
+      const preferredConstraints: any = {
+        video: {
+          deviceId: useDeviceId ? { exact: useDeviceId } : undefined,
+          facingMode: useDeviceId ? undefined : { ideal: 'environment' },
+          width: { ideal: 1280 },
+          height: { ideal: 720 },
+          frameRate: { ideal: 30 }
+        }
+      };
+
+      // Try native BarcodeDetector first (faster on supported browsers)
+      const canUseBarcodeDetector = typeof (window as any).BarcodeDetector === 'function';
+      if (canUseBarcodeDetector) {
+        try {
+          const Detector = (window as any).BarcodeDetector;
+          const supportedFormats = await Detector.getSupportedFormats();
+          // choose formats intersection
+          const formatsToUse = formats.filter(f => supportedFormats.includes(f)).length ? formats.filter(f => supportedFormats.includes(f)) : supportedFormats;
+          const detector = new Detector({ formats: formatsToUse });
+
+          // request stream with preferred constraints
+          const stream = await navigator.mediaDevices.getUserMedia(preferredConstraints);
+          videoEl.srcObject = stream;
+          try { await videoEl.play(); } catch(e) { /* ignore autoplay blocks */ }
+          _currentStream = stream;
+          // attach ended listeners
+          stream.getTracks().forEach(track => {
+            const listener = () => { handleStreamInactive(); };
+            _trackListeners.set(track, listener);
+            try { track.addEventListener('ended', listener); } catch(e) {}
+          });
+
+          // small ROI sampling loop using createImageBitmap for performance
+          _nativeSamplingRunning = true;
+          const sample = async () => {
+            if (!_nativeSamplingRunning || !videoEl) return;
+            try {
+              const vw = videoEl.videoWidth || videoEl.clientWidth;
+              const vh = videoEl.videoHeight || videoEl.clientHeight;
+              if (vw > 0 && vh > 0) {
+                // center crop 60% area
+                const sw = Math.floor(vw * 0.6);
+                const sh = Math.floor(vh * 0.6);
+                const sx = Math.floor((vw - sw) / 2);
+                const sy = Math.floor((vh - sh) / 2);
+                const bitmap = await createImageBitmap(videoEl, sx, sy, sw, sh);
+                const results = await detector.detect(bitmap);
+                if (results && results.length > 0) {
+                  const raw = results[0].rawValue || results[0].raw || '';
+                  // reuse transform logic
+                  let userId: string | null = null; let payload: any = undefined;
+                  if (transform) {
+                    try { const out = transform(raw); userId = out?.userId ?? null; payload = out?.payload; } catch(e) { console.error('Transform error', e); }
+                  } else {
+                    let candidate = String(raw || '').trim(); candidate = candidate.replace(/^(ID:|ID=|STU-|USER-|USR-|UID:)/i, ''); candidate = candidate.replace(/[^0-9]/g, '');
+                    if (new RegExp(`^\\d{${minIdDigits},${maxIdDigits}}$`).test(candidate)) userId = candidate; else userId = null;
+                  }
+                  if (userId) {
+                    playBeepNow();
+                    dispatch('scanned', { userId, raw, payload });
+                    dispatch('status', 'Lectura completada (BarcodeDetector)');
+                    if (!continuous) {
+                      _nativeSamplingRunning = false;
+                      try { stream.getTracks().forEach(t => t.stop()); } catch(e) {}
+                      if (_nativeRafId) { try { cancelAnimationFrame(_nativeRafId); } catch(_) {} _nativeRafId = null; }
+                    }
+                  }
+                }
+                try { bitmap.close(); } catch(e) {}
+              }
+            } catch (e) {
+              // ignore per-frame errors
+            }
+              _nativeRafId = requestAnimationFrame(sample);
+          };
+          // start sampling after video plays
+          try { videoEl.play().catch(() => {}); } catch(e) {}
+            _nativeRafId = requestAnimationFrame(sample);
+
+          isRequestingPermission = false; isInitializing = false; isScanning = true; dispatch('status', 'Escaneando...');
+          // populate device list
+          try { await listCameras(); } catch(e) {}
+          return; // we've started native detector
+        } catch (bdErr) {
+          console.warn('BarcodeDetector failed, falling back to ZXing', bdErr);
+          // cleanup any stream we may have opened before falling back
+          try {
+            if (_currentStream) {
+              _currentStream.getTracks().forEach(t => { try { t.stop(); } catch(_) {} });
+              _currentStream = null;
+            }
+            if (_nativeRafId) { try { cancelAnimationFrame(_nativeRafId); } catch(_) {} _nativeRafId = null; }
+            _nativeSamplingRunning = false;
+          } catch (e) {}
+          // fallback to ZXing below
+        }
+      }
+
+      // Fallback: use ZXing (existing flow)
       try {
         // reset previo si existía
         try { _codeReader?.reset(); } catch(e) {}
@@ -471,6 +601,24 @@
           }
         } catch(e) {}
 
+        // Detect torch/focus capabilities and try to set continuous focus if available
+        try {
+          const stream = _currentStream;
+          if (stream) {
+            const track = stream.getVideoTracks()[0];
+            if (track && typeof track.getCapabilities === 'function') {
+              const caps = track.getCapabilities() as any;
+              _torchAvailable = !!caps && !!caps.torch;
+              // attempt to set continuous focus mode if available
+              try {
+                if (caps && caps.focusMode && caps.focusMode.includes && caps.focusMode.includes('continuous')) {
+                  try { (track as any).applyConstraints({ advanced: [{ focusMode: 'continuous' }] } as any); } catch(e) { /* ignore */ }
+                }
+              } catch(e) {}
+            }
+          }
+        } catch (e) { /* non-fatal */ }
+
         // intentar asegurar autofocus / reproducción para mejorar la lectura automática
         try {
           // algunos navegadores requieren videoEl.play() para iniciar la reproducción del stream
@@ -483,7 +631,7 @@
               if (p && typeof p.catch === 'function') {
                 p.catch(() => {
                   // fall back a un pequeño retry
-                  setTimeout(() => { try { videoEl.play(); } catch(e) {} }, 200);
+                  setTimeout(() => { try { videoEl?.play(); } catch(e) {} }, 200);
                 });
               }
             } catch (playErr) {
@@ -552,6 +700,12 @@
     } catch (e) {
       // ignore
     }
+
+    // stop native BarcodeDetector sampling loop if active
+    try {
+      _nativeSamplingRunning = false;
+      if (_nativeRafId) { try { cancelAnimationFrame(_nativeRafId); } catch(e) {} _nativeRafId = null; }
+    } catch (e) {}
 
     // limpiar timers
     if (_debounceTimer) { clearTimeout(_debounceTimer); _debounceTimer = null; }
@@ -794,11 +948,18 @@
             {/each}
           </select>
         {/if}
+        {#if _torchAvailable}
+          <button type="button" aria-pressed={_torchOn} title={_torchOn ? 'Apagar linterna' : 'Encender linterna'} on:click={async () => { if (_torchOn) await disableTorch(); else await enableTorch(); }} style="margin-left:8px; padding:6px 8px; border-radius:6px; border:1px solid #d1d5db; background:white;">
+            {_torchOn ? '🔦 On' : '🔦 Off'}
+          </button>
+        {/if}
+        <!-- photo capture fallback removed -->
       </div>
       <button class="close-btn" aria-label="Cerrar escáner" on:click={closeModal}>✕</button>
     </div>
     <div class="modal-body">
   <video bind:this={videoEl} tabindex="0" autoplay playsinline muted></video>
+      <!-- snapshot UI removed -->
       {#if permissionDenied}
         <div class="permission-panel" role="alert">
           <div style="color:white; margin-bottom:8px;">{permissionMessage || 'Permiso de cámara denegado o cámara inactiva'}</div>
