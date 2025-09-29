@@ -63,6 +63,13 @@ npm run dev
 
 Para producción, despliega en Vercel o en tu VPS usando el adapter correspondiente.
 
+## Configuración de Vercel
+
+El proyecto usa `@sveltejs/adapter-vercel` para el despliegue. La configuración en `vercel.json` es mínima:
+
+- No incluyas una sección `functions` en `vercel.json`, ya que el adapter maneja automáticamente las funciones de SvelteKit.
+- Si agregas configuraciones personalizadas, asegúrate de que cada objeto de función tenga al menos una propiedad (ej. `runtime`).
+
 ## Buenas prácticas
 
 * Nunca subas `service-account.json` ni `.env` al repositorio.
