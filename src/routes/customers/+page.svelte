@@ -104,33 +104,36 @@
   let savingUser = false;
   let saveSuccess = false;
   let saveErrors: string[] = [];
+  let modalMode: 'create' | 'edit' = 'create';
   let _bodyScrollY = 0;
   let searchInput: HTMLInputElement | null = null;
+
+  // Delete confirmation modal state
+  let showDeleteModal = false;
+  let deletingUser: User | null = null;
+  let deletingUserFlag = false;
 
   function openUserModal(user: User | null = null) {
     if (user) {
       editingUser = user;
       modalName = user.name || '';
       modalId = user.id || '';
+      modalMode = 'edit';
     } else {
       editingUser = null;
       modalName = '';
       modalId = '';
+      modalMode = 'create';
     }
     // reset save state when opening
     savingUser = false;
     saveSuccess = false;
-  saveErrors = [];
+    saveErrors = [];
     showUserModal = true;
-    // prevent background scrolling while modal is open by fixing body position
-    if (typeof window !== 'undefined' && typeof document !== 'undefined') {
-      _bodyScrollY = window.scrollY || document.documentElement.scrollTop || 0;
-      document.body.style.position = 'fixed';
-      document.body.style.top = `-${_bodyScrollY}px`;
-      document.body.style.left = '0';
-      document.body.style.right = '0';
-      document.body.style.width = '100%';
-      document.body.style.overflow = 'hidden';
+    // prevent background scrolling while modal is open by adding modal-open class
+    if (typeof window !== 'undefined') {
+      document.documentElement.classList.add('modal-open');
+      document.body.classList.add('modal-open');
     }
   }
 
@@ -140,32 +143,18 @@
     savingUser = false;
     saveSuccess = false;
   saveErrors = [];
-    // restore body scrolling and scroll position
-    if (typeof window !== 'undefined' && typeof document !== 'undefined') {
-      document.body.style.position = '';
-      document.body.style.top = '';
-      document.body.style.left = '';
-      document.body.style.right = '';
-      document.body.style.width = '';
-      document.body.style.overflow = '';
-      // restore previous scroll
-      try {
-        window.scrollTo(0, _bodyScrollY || 0);
-      } catch (e) {
-        // ignore
-      }
+    // restore body scrolling by removing modal-open class
+    if (typeof window !== 'undefined') {
+      document.documentElement.classList.remove('modal-open');
+      document.body.classList.remove('modal-open');
     }
   }
 
   onDestroy(() => {
-    if (typeof window !== 'undefined' && typeof document !== 'undefined') {
-      document.body.style.position = '';
-      document.body.style.top = '';
-      document.body.style.left = '';
-      document.body.style.right = '';
-      document.body.style.width = '';
-      document.body.style.overflow = '';
-      try { window.scrollTo(0, _bodyScrollY || 0); } catch (e) {}
+    if (typeof window !== 'undefined') {
+      // ensure scroll lock class removed on destroy
+      document.documentElement.classList.remove('modal-open');
+      document.body.classList.remove('modal-open');
     }
   });
 
@@ -237,10 +226,10 @@
       await fetchUsers();
       saveSuccess = true;
 
-      // Keep the modal briefly to show confirmation, then close
+      // Auto-close modal after save
       setTimeout(() => {
         closeUserModal();
-      }, 900);
+      }, 1500);
     } catch (err: any) {
       console.error('Error creating/updating user', err);
       if (!saveErrors || saveErrors.length === 0) {
@@ -496,7 +485,8 @@
   <div class="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-40">
     <div class="modal-content bg-white rounded-lg p-6 w-full max-w-md shadow-lg">
         <h3 class="text-lg font-semibold mb-4">{editingUser ? 'Editar cliente' : 'Agregar cliente'}</h3>
-
+        
+        <!-- Visual feedback for modal mode -->
   <label for="modalId" class="block text-sm text-gray-700">ID <span class="text-red-600">*</span></label>
   <input id="modalId" class="input-field mt-2 mb-3" bind:value={modalId} placeholder="Ej: 12345" required inputmode="numeric" pattern="\d*" title="Solo números" on:input={(e) => { modalId = (e.target as HTMLInputElement).value.replace(/\D/g, ''); }} />
   {#if false}
@@ -508,8 +498,14 @@
   <input id="modalName" class="input-field mt-2 mb-2" bind:value={modalName} placeholder="Nombre del cliente" required />
 
         {#if saveErrors && saveErrors.length > 0}
-          <div class="mb-2 text-sm text-red-600">
-            <ul class="list-disc list-inside">
+          <div class="mb-2 p-3 bg-red-50 border border-red-200 rounded-lg">
+            <div class="flex items-center space-x-2 mb-2">
+              <svg class="w-5 h-5 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+              </svg>
+              <span class="text-sm font-medium text-red-800">Errores encontrados:</span>
+            </div>
+            <ul class="list-disc list-inside text-sm text-red-700 ml-7">
               {#each saveErrors as e}
                 <li>{e}</li>
               {/each}
@@ -518,29 +514,36 @@
         {/if}
 
         {#if saveSuccess}
-          <div class="mb-2 text-sm text-green-600">
-            {#if editingUser}
-              Cliente actualizado con éxito.
-            {:else}
-              Cliente creado con éxito.
-            {/if}
+          <div class="mb-2 p-3 bg-green-50 border border-green-200 rounded-lg">
+            <div class="flex items-center space-x-2">
+              <svg class="w-5 h-5 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
+              </svg>
+              <span class="text-sm font-medium text-green-800">
+                {#if editingUser}
+                  Cliente actualizado correctamente
+                {:else}
+                  Cliente creado correctamente
+                {/if}
+              </span>
+            </div>
+          </div>
+        {:else}
+          <div class="flex justify-end gap-2">
+            <button class="btn-secondary" on:click={closeUserModal} disabled={savingUser}>Cancelar</button>
+            <button class="btn-primary" on:click|preventDefault={submitUser} disabled={savingUser}>
+              {#if savingUser}
+                <svg class="h-4 w-4 animate-spin mr-2" viewBox="0 0 24 24">
+                  <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" fill="none"></circle>
+                  <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
+                </svg>
+                Guardando...
+              {:else}
+                {editingUser ? 'Guardar' : 'Crear'}
+              {/if}
+            </button>
           </div>
         {/if}
-
-        <div class="flex justify-end gap-2">
-          <button class="btn-secondary" on:click={closeUserModal} disabled={savingUser}>Cancelar</button>
-          <button class="btn-primary" on:click|preventDefault={submitUser} disabled={savingUser}>
-            {#if savingUser}
-              <svg class="h-4 w-4 animate-spin mr-2" viewBox="0 0 24 24">
-                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" fill="none"></circle>
-                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
-              </svg>
-              Guardando...
-            {:else}
-              {editingUser ? 'Guardar' : 'Crear'}
-            {/if}
-          </button>
-        </div>
     </div>
   </div>
 {/if}
@@ -648,6 +651,26 @@
     display: inline-flex;
     align-items: center;
     gap: 0.5rem;
+  }
+
+  .btn-success {
+    background: #10B981; /* green-500 */
+    color: white;
+    border: none;
+    border-radius: 0.5rem;
+    padding: 0.75rem 2rem;
+    font-weight: 600;
+    transition: all 0.2s ease;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    box-shadow: 0 2px 4px rgba(16, 185, 129, 0.2);
+  }
+
+  .btn-success:hover {
+    background: #059669; /* green-600 */
+    transform: translateY(-1px);
+    box-shadow: 0 4px 8px rgba(16, 185, 129, 0.3);
   }
 
   .btn-secondary:hover {

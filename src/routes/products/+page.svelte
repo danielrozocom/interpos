@@ -3,6 +3,7 @@
   let products: any[] = [];
   let loading = true;
   let error = '';
+  let deleteSuccess = '';
   let searchTerm = '';
   let searchInput: HTMLInputElement | null = null;
   let sortBy: 'id' | 'name' | 'price' | 'category' = 'name';
@@ -18,6 +19,10 @@
   let modalCategoryNew = '';
   let saving = false;
   let saveErrors: string[] = [];
+  let saveSuccess = false;
+
+  // Scroll lock state
+  let _bodyScrollY = 0;
 
   $: categories = Array.from(new Set(products.map(p => p.category).filter(Boolean)));
 
@@ -95,30 +100,40 @@
       modalCategoryNew = '';
     }
     saveErrors = [];
+    saveSuccess = false;
     showModal = true;
+    // prevent background scrolling while modal is open by fixing body position
+    if (typeof window !== 'undefined' && typeof document !== 'undefined') {
+      _bodyScrollY = window.scrollY || document.documentElement.scrollTop || 0;
+      document.body.style.position = 'fixed';
+      document.body.style.top = `-${_bodyScrollY}px`;
+      document.body.style.left = '0';
+      document.body.style.right = '0';
+      document.body.style.width = '100%';
+      document.body.style.overflow = 'hidden';
+    }
   }
 
   function closeModal() {
     showModal = false;
     saving = false;
-  }
-
-  // Disable body scroll when modal is open (client-side only)
-  // Use a global class to lock scroll when modals are open. Simpler and more robust across browsers.
-  function updateGlobalScrollLock() {
-    if (typeof window === 'undefined') return;
-    const html = document.documentElement;
-    const body = document.body;
-    if (showModal) {
-      html.classList.add('modal-open');
-      body.classList.add('modal-open');
-    } else {
-      html.classList.remove('modal-open');
-      body.classList.remove('modal-open');
+    saveSuccess = false;
+    // restore body scrolling and scroll position
+    if (typeof window !== 'undefined' && typeof document !== 'undefined') {
+      document.body.style.position = '';
+      document.body.style.top = '';
+      document.body.style.left = '';
+      document.body.style.right = '';
+      document.body.style.width = '';
+      document.body.style.overflow = '';
+      // restore previous scroll
+      try {
+        window.scrollTo(0, _bodyScrollY || 0);
+      } catch (e) {
+        // ignore
+      }
     }
   }
-
-  $: updateGlobalScrollLock();
 
   // Prevent modal from overlapping the fixed header:
   import { tick } from 'svelte';
@@ -162,9 +177,14 @@
   import { onDestroy } from 'svelte';
   onDestroy(() => {
     if (typeof window !== 'undefined') {
-      // ensure scroll lock class removed on destroy
-      document.documentElement.classList.remove('modal-open');
-      document.body.classList.remove('modal-open');
+      // ensure scroll lock removed on destroy
+      document.body.style.position = '';
+      document.body.style.top = '';
+      document.body.style.left = '';
+      document.body.style.right = '';
+      document.body.style.width = '';
+      document.body.style.overflow = '';
+      try { window.scrollTo(0, _bodyScrollY || 0); } catch (e) {}
     }
   });
 
@@ -196,7 +216,12 @@
         throw new Error(data?.error || 'Error guardando producto');
       }
       await fetchProducts();
-      closeModal();
+      saveSuccess = true;
+      
+      // Cerrar modal automáticamente después de 1.5 segundos
+      setTimeout(() => {
+        closeModal();
+      }, 1500);
     } catch (e: any) {
       saveErrors = [e.message || 'Error al guardar producto'];
     } finally {
@@ -214,6 +239,10 @@
       });
       if (!res.ok) throw new Error('Error al eliminar');
       await fetchProducts();
+      deleteSuccess = 'Producto eliminado correctamente';
+      setTimeout(() => {
+        deleteSuccess = '';
+      }, 3000);
     } catch (e) {
       alert('No se pudo eliminar el producto');
     }
@@ -229,6 +258,17 @@
     <h1 class="text-4xl font-bold text-[#35528C] mb-1 font-sans s-xAzoHdC_kP8W">Gestión de Productos</h1>
     <p class="text-lg text-[#35528C]/80 font-sans max-w-3xl mx-auto s-xAzoHdC_kP8W">Administra el catálogo de productos disponibles para venta</p>
   </div>
+
+  {#if deleteSuccess}
+    <div class="mb-4 p-3 bg-green-50 border border-green-200 rounded-lg max-w-6xl mx-auto">
+      <div class="flex items-center space-x-2">
+        <svg class="w-5 h-5 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
+        </svg>
+        <span class="text-sm font-medium text-green-800">{deleteSuccess}</span>
+      </div>
+    </div>
+  {/if}
   <!-- Controls similar to users page -->
   <div class="card glass-effect s-xAzoHdC_kP8W mb-6">
     <div class="flex flex-col lg:flex-row gap-4 items-start lg:items-center justify-between">
@@ -380,40 +420,63 @@
   </div>
 
   {#if showModal}
-    <div class="fixed inset-0 z-50 modal-overlay bg-black bg-opacity-40 flex items-start justify-center px-6" style="overflow:hidden; position:relative;" role="dialog" aria-modal="true">
-      <div bind:this={modalEl} class="modal-content bg-white rounded-lg p-6 w-full max-w-lg shadow-lg overflow-auto" style="position: absolute; left: 50%; transform: translateX(-50%); top: {modalTop}px; max-height: {modalMaxHeight}px;">
+    <div class="fixed inset-0 z-50 modal-overlay bg-black bg-opacity-40 flex items-center justify-center px-6" style="overflow:hidden; position:relative;" role="dialog" aria-modal="true">
+      <div bind:this={modalEl} class="modal-content bg-white rounded-lg p-6 w-full max-w-lg shadow-lg overflow-auto" style="max-height: {modalMaxHeight}px;">
         <h3 class="text-lg font-semibold mb-4">{editingProduct ? 'Editar producto' : 'Agregar producto'}</h3>
 
-  <label for="modalId" class="block text-sm text-gray-700">ID <span class="text-red-600">*</span></label>
-  <input id="modalId" bind:value={modalId} class="input-field mt-2 mb-3" required aria-required="true" type="number" inputmode="numeric" pattern="\d*" />
+        <label for="modalId" class="block text-sm text-gray-700">ID <span class="text-red-600">*</span></label>
+        <input id="modalId" bind:value={modalId} class="input-field mt-2 mb-3" required aria-required="true" type="number" inputmode="numeric" pattern="\d*" />
 
-  <label for="modalName" class="block text-sm text-gray-700">Nombre <span class="text-red-600">*</span></label>
-  <input id="modalName" bind:value={modalName} class="input-field mt-2 mb-3" required aria-required="true" />
+        <label for="modalName" class="block text-sm text-gray-700">Nombre <span class="text-red-600">*</span></label>
+        <input id="modalName" bind:value={modalName} class="input-field mt-2 mb-3" required aria-required="true" />
 
-  <label for="modalPrice" class="block text-sm text-gray-700">Precio <span class="text-red-600">*</span></label>
-  <input id="modalPrice" bind:value={modalPrice} class="input-field mt-2 mb-3" inputmode="numeric" required aria-required="true" type="number" step="0.01" />
+        <label for="modalPrice" class="block text-sm text-gray-700">Precio <span class="text-red-600">*</span></label>
+        <input id="modalPrice" bind:value={modalPrice} class="input-field mt-2 mb-3" inputmode="numeric" required aria-required="true" type="number" step="0.01" />
 
-  <label for="modalCategory" class="block text-sm text-gray-700">Categoría <span class="text-red-600">*</span></label>
-  <div class="mt-2 mb-3">
-    <select id="modalCategory" bind:value={modalCategory} class="input-field w-full">
-      <option value="">Seleccione una categoría</option>
-      {#each categories as c}
-        <option value={c}>{c}</option>
-      {/each}
-      <option value="__new__">-- Nueva categoría --</option>
-    </select>
-    {#if modalCategory === '__new__'}
-      <input id="modalCategoryNew" bind:value={modalCategoryNew} placeholder="Nombre de la nueva categoría" class="input-field mt-2" />
-    {/if}
-  </div>
+        <label for="modalCategory" class="block text-sm text-gray-700">Categoría <span class="text-red-600">*</span></label>
+        <div class="mt-2 mb-3">
+          <select id="modalCategory" bind:value={modalCategory} class="input-field w-full">
+            <option value="">Seleccione una categoría</option>
+            {#each categories as c}
+              <option value={c}>{c}</option>
+            {/each}
+            <option value="__new__">-- Nueva categoría --</option>
+          </select>
+          {#if modalCategory === '__new__'}
+            <input id="modalCategoryNew" bind:value={modalCategoryNew} placeholder="Nombre de la nueva categoría" class="input-field mt-2" />
+          {/if}
+        </div>
 
         {#if saveErrors && saveErrors.length > 0}
-          <div class="mb-2 text-sm text-red-600">
-            <ul class="list-disc list-inside">
+          <div class="mb-2 p-3 bg-red-50 border border-red-200 rounded-lg">
+            <div class="flex items-center space-x-2 mb-2">
+              <svg class="w-5 h-5 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+              </svg>
+              <span class="text-sm font-medium text-red-800">Errores encontrados:</span>
+            </div>
+            <ul class="list-disc list-inside text-sm text-red-700 ml-7">
               {#each saveErrors as e}
                 <li>{e}</li>
               {/each}
             </ul>
+          </div>
+        {/if}
+
+        {#if saveSuccess}
+          <div class="mb-2 p-3 bg-green-50 border border-green-200 rounded-lg">
+            <div class="flex items-center space-x-2">
+              <svg class="w-5 h-5 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
+              </svg>
+              <span class="text-sm font-medium text-green-800">
+                {#if editingProduct}
+                  Producto actualizado correctamente
+                {:else}
+                  Producto creado correctamente
+                {/if}
+              </span>
+            </div>
           </div>
         {/if}
 

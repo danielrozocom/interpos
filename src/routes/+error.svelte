@@ -7,43 +7,64 @@
   $: errorMessage = $page.error?.message || 'Ha ocurrido un error inesperado';
   
   // Determinar el tipo de error y mensaje personalizado
-  $: ({ title, description, actionText, actionIcon, bgColor, emoji } = getErrorDetails(errorCode));
+  $: ({ title, description, actionText, actionIcon, bgGradient, iconColor, textColor, accentColor, illustration } = getErrorDetails(errorCode));
   
   function getErrorDetails(code: number) {
     switch (code) {
       case 404:
         return {
-          title: '¡Ups! Página no encontrada',
-          description: 'La página que buscas no existe, ha sido movida o el enlace es incorrecto.',
-          actionText: 'Volver al inicio',
+          title: 'Página no encontrada',
+          description: 'La página que buscas no existe o ha sido movida. Verifica la URL o navega desde el menú principal.',
+          actionText: 'Ir al inicio',
           actionIcon: '🏠',
-          bgColor: 'from-blue-50 to-indigo-50',
-          emoji: '🔍'
+          bgGradient: 'from-white to-gray-50',
+          iconColor: 'text-[#2A4169]',
+          textColor: 'text-[#2A4169]',
+          accentColor: 'border-blue-200 bg-blue-100',
+          illustration: 'search'
         };
       case 500:
         return {
           title: 'Error del servidor',
-          description: 'Ha ocurrido un error interno en el servidor. Nuestro equipo ha sido notificado.',
+          description: 'Ha ocurrido un error interno. Nuestro equipo ha sido notificado y está trabajando en la solución.',
           actionText: 'Reintentar',
           actionIcon: '🔄',
-          bgColor: 'from-red-50 to-pink-50',
-          emoji: '🔧'
+          bgGradient: 'from-white to-red-50',
+          iconColor: 'text-red-500',
+          textColor: 'text-[#2A4169]',
+          accentColor: 'border-red-200 bg-red-100',
+          illustration: 'server'
+        };
+      case 403:
+        return {
+          title: 'Acceso denegado',
+          description: 'No tienes permisos para acceder a esta página. Contacta al administrador si crees que es un error.',
+          actionText: 'Volver',
+          actionIcon: '←',
+          bgGradient: 'from-white to-yellow-50',
+          iconColor: 'text-yellow-500',
+          textColor: 'text-[#2A4169]',
+          accentColor: 'border-yellow-200 bg-yellow-100',
+          illustration: 'lock'
         };
       default:
         return {
           title: 'Error inesperado',
-          description: 'Ha ocurrido un error. Por favor, inténtalo más tarde.',
-          actionText: 'Volver al inicio',
-          actionIcon: '⚠️',
-          bgColor: 'from-gray-50 to-blue-50',
-          emoji: '⚠️'
+          description: 'Ha ocurrido un error. Por favor, inténtalo más tarde o contacta al soporte.',
+          actionText: 'Ir al inicio',
+          actionIcon: '🏠',
+          bgGradient: 'from-white to-gray-50',
+          iconColor: 'text-gray-500',
+          textColor: 'text-[#2A4169]',
+          accentColor: 'border-gray-200 bg-gray-100',
+          illustration: 'warning'
         };
     }
   }
 
   function handleAction() {
     if (typeof window === 'undefined') return;
-    if (errorCode === 500) {
+    if (errorCode === 500 || errorCode === 403) {
       window.location.reload();
     } else {
       window.location.href = '/';
@@ -70,188 +91,158 @@
   <meta name="description" content={description} />
 </svelte:head>
 
-<div class="min-h-screen flex flex-col items-center justify-center bg-gradient-to-br {bgColor} px-4">
-  <div class="max-w-lg w-full text-center">
-    <!-- Error Icon -->
-  <div class="mb-4 animate-fade-in">
-      <div class="w-32 h-32 mx-auto bg-white rounded-full shadow-lg flex items-center justify-center border-4 {errorCode === 404 ? 'border-blue-200' : errorCode === 500 ? 'border-red-200' : 'border-yellow-200'}">
-        <div class="text-6xl">{emoji}</div>
-      </div>
-    </div>
-
-    <!-- Error Message -->
-  <div class="mb-4 animate-slide-up">
-  <h1 class="text-8xl font-bold mb-2 {errorCode === 404 ? 'text-blue-600 animate-bounce' : errorCode === 500 ? 'text-red-600 animate-pulse' : 'text-yellow-600'}">{errorCode}</h1>
-  <h2 class="text-3xl font-bold text-gray-800 mb-2">{title}</h2>
-      <p class="text-lg text-gray-600 leading-relaxed max-w-md mx-auto">{description}</p>
-    </div>
-
-    <!-- Action Buttons -->
-    <div class="space-y-4 animate-slide-up" style="animation-delay: 0.2s;">
-      <button 
-        on:click={handleAction}
-        class="block w-full px-8 py-4 bg-primary text-white rounded-xl shadow-lg hover:shadow-xl transform hover:scale-105 transition-all duration-300 font-semibold text-lg"
-      >
-        {actionIcon} {actionText}
-      </button>
+<div class="min-h-screen flex items-center justify-center bg-gradient-to-br {bgGradient} p-4">
+  <div class="max-w-2xl w-full">
+    <!-- Main Error Card -->
+    <div class="bg-white overflow-hidden animate-fade-in">
       
-      <button 
-        on:click={goBack}
-        class="block w-full px-8 py-4 bg-white text-gray-700 rounded-xl shadow-md hover:shadow-lg border-2 border-gray-200 hover:border-gray-300 transition-all duration-300 font-medium"
-      >
-        ← Volver atrás
-      </button>
-    </div>
-
-    <!-- Navigation shortcuts for 404 -->
-    {#if errorCode === 404}
-      <div class="mt-8 grid grid-cols-2 gap-4 animate-slide-up" style="animation-delay: 0.4s;">
-        <a href="/sell" class="p-4 bg-white rounded-lg shadow-md hover:shadow-lg transition-all duration-300 text-center group">
-          <div class="text-2xl mb-2 group-hover:scale-110 transition-transform">🛒</div>
-          <div class="text-sm font-medium text-gray-700">Vender</div>
-        </a>
-        <a href="/recharge" class="p-4 bg-white rounded-lg shadow-md hover:shadow-lg transition-all duration-300 text-center group">
-          <div class="text-2xl mb-2 group-hover:scale-110 transition-transform">💳</div>
-          <div class="text-sm font-medium text-gray-700">Recargar</div>
-        </a>
-      </div>
-    {/if}
-
-    <!-- Additional Help -->
-    <div class="mt-8 p-6 bg-white/90 backdrop-blur-sm rounded-xl border border-gray-200 animate-slide-up" style="animation-delay: 0.6s;">
-      <div class="flex items-start space-x-3">
-        <div class="text-2xl">💡</div>
-        <div class="text-left">
-          <p class="font-semibold text-gray-800 mb-2">¿Necesitas ayuda?</p>
-          <p class="text-sm text-gray-600 leading-relaxed">
-            {#if errorCode === 404}
-              Verifica que la URL esté escrita correctamente o navega desde el menú principal.
-            {:else if errorCode === 500}
-              Si el problema persiste, por favor contacta al administrador del sistema.
-            {:else}
-              Si el problema persiste, por favor contacta al soporte técnico.
-            {/if}
-          </p>
+      <!-- Header with Illustration -->
+      <div class="relative px-8 pt-12 pb-8 text-center">
+        <div class="absolute inset-0 bg-gradient-to-b from-transparent to-white/10"></div>
+        
+        <!-- SVG Illustration based on error type -->
+        <div class="relative z-10 mb-6">
+          {#if illustration === 'search'}
+            <svg class="w-24 h-24 mx-auto text-[#2A4169] animate-bounce" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path>
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M13 13l6 6"></path>
+            </svg>
+          {:else if illustration === 'server'}
+            <svg class="w-24 h-24 mx-auto {iconColor} animate-pulse" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M5 12h14M5 12a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v4a2 2 0 01-2 2M5 12a2 2 0 00-2 2v4a2 2 0 002 2h14a2 2 0 002-2v-4a2 2 0 00-2-2m-2-4h.01M17 16h.01"></path>
+            </svg>
+          {:else if illustration === 'lock'}
+            <svg class="w-24 h-24 mx-auto {iconColor} animate-pulse" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <rect x="3" y="11" width="18" height="11" rx="2" ry="2" stroke-width="1.5"></rect>
+              <circle cx="12" cy="16" r="1" stroke-width="1.5"></circle>
+              <path d="m9 11 3-3 3 3" stroke-width="1.5"></path>
+            </svg>
+          {:else}
+            <svg class="w-24 h-24 mx-auto {iconColor} animate-pulse" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z"></path>
+            </svg>
+          {/if}
         </div>
-      </div>
-    </div>
-
-    <!-- Technical Details (for debugging - only for server errors) -->
-    {#if errorCode >= 500}
-      <details class="mt-6 text-left animate-slide-up" style="animation-delay: 0.8s;">
-        <summary class="cursor-pointer text-sm text-gray-500 hover:text-gray-700 font-medium">Información técnica</summary>
-        <div class="mt-3 p-4 bg-gray-900 rounded-lg text-xs font-mono text-green-400 overflow-x-auto">
-          <div class="space-y-1">
-            <p><span class="text-gray-500">Error:</span> {errorCode} - {errorMessage}</p>
-            <p><span class="text-gray-500">Timestamp:</span> {new Date().toISOString()}</p>
-            <p><span class="text-gray-500">URL:</span> {$page.url.pathname}</p>
-          </div>
+        
+        <!-- Error Code -->
+        <div class="text-9xl font-black {textColor} mb-4 animate-slide-up opacity-20 select-none">
+          {errorCode}
         </div>
-      </details>
-    {/if}
-  </div>
-</div>
-  <div class="max-w-lg w-full text-center">
-    <!-- Error Icon -->
-  <div class="mb-4 animate-fade-in">
-      <div class="w-32 h-32 mx-auto bg-white rounded-full shadow-lg flex items-center justify-center border-4 border-red-200">
-        <div class="text-6xl"></div>
-      </div>
-    </div>
-
-    <!-- Error Message -->
-  <div class="mb-4 animate-slide-up">
-      <h1 class="text-8xl font-bold mb-4 text-red-600 animate-pulse">{errorCode}</h1>
-      <h2 class="text-3xl font-bold text-gray-800 mb-4">Error del servidor</h2>
-      <p class="text-lg text-gray-600 leading-relaxed max-w-md mx-auto">
-        Ha ocurrido un error interno en el servidor. Nuestro equipo ha sido notificado y está trabajando para solucionarlo.
-      </p>
-    </div>
-
-    <!-- Error Details (if available) -->
-    {#if errorMessage && errorMessage !== 'Internal Error'}
-  <div class="mb-4 p-3 bg-white/80 backdrop-blur-sm rounded-lg border border-gray-200 text-sm text-gray-700">
-        <strong>Detalles:</strong> {errorMessage}
-      </div>
-    {/if}
-
-    <!-- Action Buttons -->
-    <div class="space-y-4 animate-slide-up" style="animation-delay: 0.2s;">
-      <button 
-        on:click={handleAction}
-        class="block w-full px-8 py-4 bg-primary text-white rounded-xl shadow-lg hover:bg-[#27406a] hover:shadow-xl transform hover:scale-105 transition-all duration-300 font-semibold text-lg"
-      >
-        🔄 Reintentar
-      </button>
-      
-      <button 
-        on:click={goHome}
-        class="block w-full px-8 py-4 bg-white text-gray-700 rounded-xl shadow-md hover:shadow-lg border-2 border-gray-200 hover:border-gray-300 transition-all duration-300 font-medium"
-      >
-        🏠 Volver al inicio
-      </button>
-    </div>
-
-    <!-- Additional Help -->
-    <div class="mt-8 p-6 bg-white/90 backdrop-blur-sm rounded-xl border border-gray-200 animate-slide-up" style="animation-delay: 0.4s;">
-      <div class="flex items-start space-x-3">
-        <div class="text-2xl">💡</div>
-        <div class="text-left">
-          <p class="font-semibold text-gray-800 mb-2">Error temporal</p>
-          <p class="text-sm text-gray-600 leading-relaxed">
-            Si el problema persiste, por favor contacta al administrador del sistema o intenta más tarde.
-          </p>
-        </div>
-      </div>
-    </div>
-
-    <!-- Status Check -->
-    <div class="mt-6 animate-slide-up" style="animation-delay: 0.6s;">
-      <div class="bg-orange-50 border border-orange-200 rounded-lg p-4">
-        <div class="flex items-center space-x-2">
-          <div class="w-3 h-3 bg-orange-500 rounded-full animate-pulse"></div>
-          <span class="text-sm text-orange-700 font-medium">Estado del sistema: Verificando...</span>
-        </div>
-        <p class="text-xs text-orange-600 mt-2">
-          Los servicios se están restaurando automáticamente
+        
+        <!-- Title and Description -->
+        <h1 class="text-4xl font-bold {textColor} mb-4 animate-slide-up" style="animation-delay: 0.1s;">
+          {title}
+        </h1>
+        <p class="text-lg text-gray-600 max-w-lg mx-auto leading-relaxed animate-slide-up" style="animation-delay: 0.2s;">
+          {description}
         </p>
       </div>
-    </div>
 
-    <!-- Technical Details (for debugging) -->
-    <details class="mt-6 text-left animate-slide-up" style="animation-delay: 0.8s;">
-      <summary class="cursor-pointer text-sm text-gray-500 hover:text-gray-700 font-medium">Información técnica</summary>
-      <div class="mt-3 p-4 bg-gray-900 rounded-lg text-xs font-mono text-green-400 overflow-x-auto">
-        <div class="space-y-1">
-          <p><span class="text-gray-500">Error:</span> {errorCode} - {errorMessage}</p>
-          <p><span class="text-gray-500">Timestamp:</span> {new Date().toISOString()}</p>
-          <p><span class="text-gray-500">URL:</span> {$page.url.pathname}</p>
-          <p><span class="text-gray-500">User Agent:</span> {typeof navigator !== 'undefined' ? navigator.userAgent.substring(0, 50) + '...' : 'N/A'}</p>
+      <!-- Action Buttons -->
+      <div class="px-8 pb-8">
+        <div class="flex space-x-3 animate-slide-up" style="animation-delay: 0.3s;">
+          <button 
+            on:click={goBack}
+            class="flex-1 py-3 px-4 bg-gray-100 hover:bg-gray-200 text-gray-700 font-medium rounded-xl transition-all duration-300 flex items-center justify-center space-x-2"
+          >
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"></path>
+            </svg>
+            <span>Volver</span>
+          </button>
+          
+          <button 
+            on:click={goHome}
+            class="flex-1 py-3 px-4 bg-[#35528C] hover:bg-[#2a4068] text-white font-medium rounded-xl transition-all duration-300 flex items-center justify-center space-x-2"
+          >
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"></path>
+            </svg>
+            <span>Inicio</span>
+          </button>
         </div>
       </div>
-    </details>
+
+      <!-- Help Section -->
+      <div class="px-8 pb-8 animate-slide-up" style="animation-delay: 0.4s;">
+        <div class="p-6 {accentColor} rounded-2xl">
+          <div class="flex items-start space-x-3">
+            <div class="text-2xl">💡</div>
+            <div>
+              <p class="font-semibold text-gray-800 mb-2">¿Necesitas ayuda?</p>
+              <p class="text-sm text-gray-600 leading-relaxed">
+                {#if errorCode === 404}
+                  Verifica que la URL esté escrita correctamente o usa los enlaces de navegación.
+                {:else if errorCode === 500}
+                  Si el problema persiste, contacta al administrador del sistema.
+                {:else if errorCode === 403}
+                  Solicita acceso al administrador si necesitas esta página.
+                {:else}
+                  Contacta al soporte técnico para asistencia adicional.
+                {/if}
+              </p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Technical Details for Developers -->
+      {#if errorCode >= 500}
+        <details class="px-8 pb-8 animate-slide-up" style="animation-delay: 0.5s;">
+          <summary class="cursor-pointer text-sm text-gray-500 hover:text-gray-700 font-medium flex items-center space-x-2">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
+            </svg>
+            <span>Detalles técnicos</span>
+          </summary>
+          <div class="mt-4 p-4 bg-gray-900 rounded-xl text-xs font-mono text-green-400 overflow-x-auto">
+            <div class="space-y-2">
+              <div><span class="text-gray-500">Código:</span> {errorCode}</div>
+              <div><span class="text-gray-500">Mensaje:</span> {errorMessage}</div>
+              <div><span class="text-gray-500">URL:</span> {$page.url.pathname}</div>
+              <div><span class="text-gray-500">Timestamp:</span> {new Date().toISOString()}</div>
+              {#if typeof navigator !== 'undefined'}
+                <div><span class="text-gray-500">Navegador:</span> {navigator.userAgent.split(' ').pop()}</div>
+              {/if}
+            </div>
+          </div>
+        </details>
+      {/if}
+    </div>
   </div>
+</div>
 
 <style>
-  .text-primary {
-    color: #35528C;
+  @keyframes fadeIn {
+    from {
+      opacity: 0;
+      transform: translateY(20px) scale(0.95);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0) scale(1);
+    }
   }
-  .bg-primary {
-    background-color: #35528C;
+  .animate-fade-in {
+    animation: fadeIn 0.8s ease-out;
+    animation-fill-mode: both;
   }
-  .bg-primary:hover {
-    background-color: #27406a;
+
+  @keyframes slideUp {
+    from {
+      opacity: 0;
+      transform: translateY(30px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
   }
-  .text-red-600 {
-    color: #DC2626;
+  .animate-slide-up {
+    animation: slideUp 0.6s ease-out;
+    animation-fill-mode: both;
   }
-  .text-blue-600 {
-    color: #2563EB;
-  }
-  .text-yellow-600 {
-    color: #D97706;
-  }
-  
+
   @keyframes bounce {
     0%, 100% {
       transform: translateY(0);
@@ -263,7 +254,7 @@
   .animate-bounce {
     animation: bounce 2s infinite;
   }
-  
+
   @keyframes pulse {
     0%, 100% {
       opacity: 1;
@@ -276,32 +267,13 @@
     animation: pulse 2s infinite;
   }
 
-  @keyframes fadeIn {
-    from {
-      opacity: 0;
-      transform: scale(0.9);
+  /* Responsive adjustments */
+  @media (max-width: 640px) {
+    .text-9xl {
+      font-size: 6rem;
     }
-    to {
-      opacity: 1;
-      transform: scale(1);
+    .text-4xl {
+      font-size: 2rem;
     }
-  }
-  .animate-fade-in {
-    animation: fadeIn 0.6s ease-out;
-  }
-
-  @keyframes slideUp {
-    from {
-      opacity: 0;
-      transform: translateY(20px);
-    }
-    to {
-      opacity: 1;
-      transform: translateY(0);
-    }
-  }
-  .animate-slide-up {
-    animation: slideUp 0.6s ease-out;
-    animation-fill-mode: both;
   }
 </style>

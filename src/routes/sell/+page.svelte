@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { onMount, tick } from 'svelte';
+  import { onMount, onDestroy, tick } from 'svelte';
   import { page } from '$app/stores';
   
   let categories: string[] = [];
@@ -367,6 +367,23 @@ let showCashModal = false;
   // Calculate subtotal
   $: subtotal = selectedProduct ? selectedProduct.price * quantity : 0;
 
+  // Disable body scroll when modal is open (client-side only)
+  // Use a global class to lock scroll when modals are open. Simpler and more robust across browsers.
+  function updateGlobalScrollLock() {
+    if (typeof window === 'undefined') return;
+    const html = document.documentElement;
+    const body = document.body;
+    if (selectedProduct) {
+      html.classList.add('modal-open');
+      body.classList.add('modal-open');
+    } else {
+      html.classList.remove('modal-open');
+      body.classList.remove('modal-open');
+    }
+  }
+
+  $: updateGlobalScrollLock();
+
   function addToCart(product: any) {
     // Validar que el producto tenga todos los datos requeridos y que el precio sea número
     if (!product?.id || !product?.name || typeof product?.price !== 'number') {
@@ -639,6 +656,14 @@ let showCashModal = false;
   $: if (typeof window !== 'undefined') {
     localStorage.setItem('sortByAlphabetical', sortByAlphabetical.toString());
   }
+
+  onDestroy(() => {
+    if (typeof window !== 'undefined') {
+      // ensure scroll lock class removed on destroy
+      document.documentElement.classList.remove('modal-open');
+      document.body.classList.remove('modal-open');
+    }
+  });
 </script>
 
 <svelte:head>
@@ -717,11 +742,11 @@ let showCashModal = false;
           </button>
         </div>
       </div>
-  <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 2xl:grid-cols-7 gap-3 sm:gap-4 w-full" style="margin: 1rem 0;">
+  <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3 sm:gap-4 w-full" style="margin: 1rem 0;">
         {#if loadingProducts}
           <!-- Skeleton Loading - Exact Replica of Real Product Cards -->
           <div class="col-span-full">
-            <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 2xl:grid-cols-7 gap-3 sm:gap-4 w-full">
+            <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3 sm:gap-4 w-full">
               {#each Array(24) as _}
                 <div class="bg-white rounded-lg shadow-sm hover:shadow-md transition-all duration-200 cursor-pointer p-2 sm:p-3 relative group border border-primary">
                   <!-- ID placeholder -->

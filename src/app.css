@@ -3,13 +3,6 @@
 @import 'tailwindcss/components';
 @import 'tailwindcss/utilities';
 
-/* Estilos personalizados */
-* {
-  -webkit-user-select: text !important;
-  user-select: text !important;
-  -webkit-user-drag: auto !important;
-}
-
 body {
   font-family: 'Nunito', ui-sans-serif, system-ui, sans-serif;
 }
@@ -262,16 +255,19 @@ input, textarea, select, button {
    Set a very high z-index so modals always supersede the fixed header (header uses z-index:1000). */
 .modal-overlay {
   display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 2rem;
+  align-items: center; /* vertically center modal */
+  justify-content: center; /* horizontally center modal */
+  /* Reserve space for the fixed header so the modal doesn't sit under it on small viewports.
+     We use calc to subtract the header height and a gap from the top inset. */
+  padding: calc(var(--topbar-gap, 20px) + 1rem) 2rem; /* top/bottom, left/right */
   position: fixed !important;
   inset: 0 !important;
   z-index: 2000 !important; /* must be above header (1000) */
 }
+
 .modal-overlay .modal-content {
   /* ensure modal content sits above the overlay and can scroll internally */
-  max-height: calc(100vh - 4rem);
+  max-height: calc(100vh - (var(--topbar-gap, 20px) + var(--topbar-h, 52px) + 2rem));
   overflow: auto;
   position: relative;
   z-index: 2001;

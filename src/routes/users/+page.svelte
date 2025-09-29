@@ -122,15 +122,10 @@
     saveSuccess = false;
   saveErrors = [];
     showUserModal = true;
-    // prevent background scrolling while modal is open by fixing body position
-    if (typeof window !== 'undefined' && typeof document !== 'undefined') {
-      _bodyScrollY = window.scrollY || document.documentElement.scrollTop || 0;
-      document.body.style.position = 'fixed';
-      document.body.style.top = `-${_bodyScrollY}px`;
-      document.body.style.left = '0';
-      document.body.style.right = '0';
-      document.body.style.width = '100%';
-      document.body.style.overflow = 'hidden';
+    // prevent background scrolling while modal is open by adding modal-open class
+    if (typeof window !== 'undefined') {
+      document.documentElement.classList.add('modal-open');
+      document.body.classList.add('modal-open');
     }
   }
 
@@ -140,32 +135,18 @@
     savingUser = false;
     saveSuccess = false;
   saveErrors = [];
-    // restore body scrolling and scroll position
-    if (typeof window !== 'undefined' && typeof document !== 'undefined') {
-      document.body.style.position = '';
-      document.body.style.top = '';
-      document.body.style.left = '';
-      document.body.style.right = '';
-      document.body.style.width = '';
-      document.body.style.overflow = '';
-      // restore previous scroll
-      try {
-        window.scrollTo(0, _bodyScrollY || 0);
-      } catch (e) {
-        // ignore
-      }
+    // restore body scrolling by removing modal-open class
+    if (typeof window !== 'undefined') {
+      document.documentElement.classList.remove('modal-open');
+      document.body.classList.remove('modal-open');
     }
   }
 
   onDestroy(() => {
-    if (typeof window !== 'undefined' && typeof document !== 'undefined') {
-      document.body.style.position = '';
-      document.body.style.top = '';
-      document.body.style.left = '';
-      document.body.style.right = '';
-      document.body.style.width = '';
-      document.body.style.overflow = '';
-      try { window.scrollTo(0, _bodyScrollY || 0); } catch (e) {}
+    if (typeof window !== 'undefined') {
+      // ensure scroll lock class removed on destroy
+      document.documentElement.classList.remove('modal-open');
+      document.body.classList.remove('modal-open');
     }
   });
 

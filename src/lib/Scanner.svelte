@@ -97,21 +97,15 @@
   let permissionMessage: string | null = null;
 
   // Scroll lock helpers: prevent background scroll while modal is open
-  let _prevBodyOverflow: string | null = null;
-  let _prevBodyPaddingRight: string | null = null;
   // store elements we mark inert so we can restore them
   let _inertElements: Element[] = [];
   let _previousActiveElement: Element | null = null;
   function lockScroll() {
     try {
       if (typeof document === 'undefined' || typeof window === 'undefined') return;
-      const body = document.body;
-      _prevBodyOverflow = body.style.overflow || null;
-      _prevBodyPaddingRight = body.style.paddingRight || null;
-      // compensate for scrollbar width to avoid layout shift
-      const scrollBarWidth = window.innerWidth - document.documentElement.clientWidth;
-      if (scrollBarWidth > 0) body.style.paddingRight = `${scrollBarWidth}px`;
-      body.style.overflow = 'hidden';
+      // prevent background scrolling while modal is open by adding modal-open class
+      document.documentElement.classList.add('modal-open');
+      document.body.classList.add('modal-open');
     } catch (e) {
       // ignore
     }
@@ -159,10 +153,9 @@
   function unlockScroll() {
     try {
       if (typeof document === 'undefined') return;
-      const body = document.body;
-      if (_prevBodyOverflow !== null) body.style.overflow = _prevBodyOverflow; else body.style.overflow = '';
-      if (_prevBodyPaddingRight !== null) body.style.paddingRight = _prevBodyPaddingRight; else body.style.paddingRight = '';
-      _prevBodyOverflow = null; _prevBodyPaddingRight = null;
+      // restore body scrolling by removing modal-open class
+      document.documentElement.classList.remove('modal-open');
+      document.body.classList.remove('modal-open');
     } catch (e) {}
   }
 
