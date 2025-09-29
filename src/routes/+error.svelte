@@ -9,7 +9,7 @@
   // Determinar el tipo de error y mensaje personalizado
   $: ({ title, description, actionText, actionIcon, bgColor, emoji } = getErrorDetails(errorCode));
   
-  function getErrorDetails(code) {
+  function getErrorDetails(code: number) {
     switch (code) {
       case 404:
         return {

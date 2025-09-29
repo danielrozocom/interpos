@@ -1,6 +1,7 @@
 import { error, json } from '@sveltejs/kit';
 import type { RequestHandler } from './$types';
-import { getUserBalance } from '$lib/sheet';
+import { sbServer } from '$lib/supabase';
+import { parseCurrency } from '$lib/parseCurrency';
 
 export const GET: RequestHandler = async ({ url }) => {
   try {
@@ -12,23 +13,16 @@ export const GET: RequestHandler = async ({ url }) => {
       });
     }
 
-    const balance = await getUserBalance(userId);
+    const { data, error: err } = await sbServer.from('Customers').select('Balance').eq('ID', userId).maybeSingle();
+    if (err) {
+      console.error('Supabase error fetching balance:', err);
+      return json({ success: false, error: 'Error al obtener saldo' }, { status: 500 });
+    }
+    if (!data) return json({ success: false, error: 'Usuario no encontrado' }, { status: 404 });
 
-    return json({
-      success: true,
-      balance
-    });
+  return json({ success: true, balance: parseCurrency(data.Balance) });
   } catch (err) {
     console.error('Error en el endpoint de saldo:', err);
-    if (err instanceof Error) {
-      return json({
-        success: false,
-        error: err.message
-      }, { status: err.message.includes('no encontrado') ? 404 : 500 });
-    }
-    return json({
-      success: false,
-      error: 'Error interno del servidor'
-    }, { status: 500 });
+    return json({ success: false, error: 'Error interno del servidor' }, { status: 500 });
   }
 };

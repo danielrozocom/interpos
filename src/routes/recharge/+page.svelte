@@ -1,5 +1,6 @@
 <script lang="ts">
   import { onMount, tick } from 'svelte';
+  import { page } from '$app/stores';
   import { siteName } from '../../lib/config';
   import { normalizeUserId } from '../../lib/normalizeUserId';
   // Reactive state needed by the template and handlers
@@ -18,6 +19,21 @@
   let showScanner: boolean = false;
   let ScannerComponent: any = null;
   let quantityInput: HTMLInputElement | null = null;
+  let userIdInput: HTMLInputElement | null = null;
+
+  // Pre-fill userId from URL parameters
+  $: if ($page.url.searchParams.get('userId')) {
+    const urlUserId = $page.url.searchParams.get('userId');
+    if (urlUserId && urlUserId !== userId) {
+      userId = urlUserId;
+      // Clear the URL parameter after setting the value
+      if (typeof window !== 'undefined') {
+        const newUrl = new URL(window.location.href);
+        newUrl.searchParams.delete('userId');
+        window.history.replaceState({}, '', newUrl.toString());
+      }
+    }
+  }
   // Fetch balance per request
   function validateNumericInput(event: KeyboardEvent) {
     const allowedKeys = ['Backspace', 'Delete', 'Tab', 'Enter', 'ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown'];
@@ -137,14 +153,21 @@ function formatCurrency(val: number): string {
         userExists = true;
         userName = user.name ?? '';
         let balance = 0;
-        
+
         if (user.balance !== undefined) {
-          const numBalance = Number(user.balance);
-          if (!isNaN(numBalance)) {
-            balance = numBalance;
+          // Try using parseCurrency (handles "$0", "-$17,800", etc.)
+          try {
+            const mod = await import('../../lib/parseCurrency');
+            const numBalance = mod.parseCurrency(user.balance);
+            if (!isNaN(numBalance)) balance = numBalance;
+          } catch (e) {
+            // fallback: strip non numeric and parse
+            const fallback = String(user.balance).replace(/[^0-9.-]+/g, '');
+            const numBalance = parseFloat(fallback) || 0;
+            if (!isNaN(numBalance)) balance = numBalance;
           }
         }
-        
+
         currentBalance = balance;
       } else {
         userExists = false;
@@ -292,14 +315,14 @@ $: {
 
 <svelte:head>
   <title>Recarga | {siteName}</title>
-  <meta name="description" content="Recarga saldo para un usuario en el sistema" />
+  <meta name="description" content="Recarga saldo para un cliente en el sistema" />
 </svelte:head>
 
 <div class="max-w-2xl mx-auto">
   <!-- Header -->
   <div class="text-center header-space">
   <h1 class="text-4xl font-bold text-[#35528C] mb-1 font-sans s-xNGq_AHMpqrL">Recargar Saldo</h1>
-    <p class="text-lg text-[#35528C]/80 font-sans max-w-2xl mx-auto s-WmfxB9smyTUP">Recarga saldo para un usuario en el sistema</p>
+  <p class="text-lg text-[#35528C]/80 font-sans max-w-2xl mx-auto s-WmfxB9smyTUP">Recarga saldo para un cliente en el sistema</p>
   </div>
 
   <!-- Step Content -->
@@ -326,16 +349,16 @@ $: {
         if (exactMatch && userExists) {
           handleSubmit();
         } else if (userSuggestions.length > 1) {
-          alert('Hay más de un usuario que coincide, selecciona uno de la lista de sugerencias.');
+          alert('Hay más de un cliente que coincide, selecciona uno de la lista de sugerencias.');
         } else {
-          alert('No existe un usuario con ese ID');
+          alert('No existe un cliente con ese ID');
         }
       }} 
       class="space-y-6"
     >
         <div>
-          <label for="userId" class="block text-sm font-medium text-gray-700 mb-2">
-            ID de Usuario
+            <label for="userId" class="block text-sm font-medium text-gray-700 mb-2">
+            ID de Cliente
           </label>
           <div class="flex items-center gap-2">
             <input 
@@ -353,7 +376,8 @@ $: {
                 const v = e.currentTarget.value.replace(/[^0-9]/g, '');
                 if (v !== userId) userId = v;
               }}
-              placeholder="Ingrese ID del usuario"
+              placeholder="Ingrese ID del cliente"
+              bind:this={userIdInput}
               autofocus
             />
             <button type="button" class="h-10 w-10 p-1 rounded-lg flex items-center justify-center bg-[#35528C] text-white shadow-sm hover:bg-[#2A4170] focus:outline-none focus:ring-2 focus:ring-[#35528C]/40" aria-label="Abrir escáner" on:click={openScanner}>
@@ -374,11 +398,10 @@ $: {
             {#each userSuggestions as u}
               <button 
                 type="button"
-                on:click={() => selectUser(u)}
+                on:click={() => selectUser({ id: u.id, name: u.name || '' })}
                 class="w-full text-left p-3 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors duration-200"
               >
-                <span class="font-medium text-gray-900">ID: {u.id}</span>
-                <span class="text-gray-600 ml-2">- {u.name}</span>
+                <span class="font-medium text-gray-900">ID: {u.id} - <span class="text-gray-600 font-normal">{u.name}</span></span>
               </button>
             {/each}
           </div>
@@ -389,7 +412,7 @@ $: {
   <div class="bg-gradient-to-br from-blue-50 to-blue-50/50 border border-blue-200/50 rounded-xl p-3 mb-3 shadow-sm">
           <div class="flex justify-between items-center">
             <div>
-              <p class="text-blue-900/80 text-sm mb-1">Usuario</p>
+              <p class="text-blue-900/80 text-sm mb-1">Cliente</p>
               <p class="text-blue-900 text-lg font-semibold">{userName}</p>
             </div>
             <div class="text-right">
@@ -518,8 +541,8 @@ $: {
       {:else if userId && !allUsers.some(u => u.id === userId)}
   <div class="text-center py-3">
           <span class="text-6xl">⚠️</span>
-          <h3 class="text-lg font-medium text-red-900 mt-4">Usuario no encontrado</h3>
-          <p class="text-red-700 mt-2">No existe un usuario con el ID: {userId}</p>
+          <h3 class="text-lg font-medium text-red-900 mt-4">Cliente no encontrado</h3>
+          <p class="text-red-700 mt-2">No existe un cliente con el ID: {userId}</p>
         </div>
       {/if}
     </form>
@@ -537,20 +560,6 @@ $: {
   
   .header-space {
     margin-bottom: 2.5rem;
-  }
-  
-  .section-title-center {
-    font-size: 2.5rem;
-    font-weight: 800;
-    background: linear-gradient(135deg, #35528C 0%, #4668a5 100%);
-    -webkit-background-clip: text;
-    background-clip: text;
-    -webkit-text-fill-color: transparent;
-    margin-bottom: 0.5rem;
-    font-family: 'Nunito', ui-sans-serif, system-ui, sans-serif;
-    letter-spacing: -0.5px;
-    text-align: center;
-    text-shadow: 0 2px 10px rgba(53, 82, 140, 0.1);
   }
   
   .btn-primary {

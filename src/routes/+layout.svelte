@@ -58,6 +58,30 @@
       window.dispatchEvent(new CustomEvent('global-shortcut', { detail: { action: 'clearId' } }));
       return;
     }
+
+    // Ctrl+A behavior for InterPOS: if focus is not in an input-like element,
+    // focus and select the user id input (#userId). This allows quick selection
+    // of the id field without interfering with normal text-edit shortcuts.
+    if (keyLower === 'a') {
+      // If the active element is an input-like (text/textarea/contenteditable), allow normal Ctrl+A
+      if (isInputLike) return;
+
+      // Try to find the primary user id input by id, then by a few sensible fallbacks
+      const target = document.getElementById('userId') as HTMLInputElement | null
+                   || document.querySelector('input[name="userId"]') as HTMLInputElement | null
+                   || document.querySelector('input[type="text"]') as HTMLInputElement | null;
+      if (target) {
+        e.preventDefault();
+        try {
+          target.focus();
+          target.select();
+        } catch (err) {
+          // as a fallback, attempt document.execCommand (older browsers)
+          try { document.execCommand && document.execCommand('selectAll'); } catch (e) { /* ignore */ }
+        }
+      }
+      return;
+    }
   }
 
   onMount(() => {
@@ -78,6 +102,15 @@
         <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M4 6h16M4 12h16M4 18h16" stroke-linecap="round" stroke-linejoin="round"/></svg>
       </button>
     <a href="/" class="topbar-brand" aria-label="Ir a inicio">InterPOS</a>
+    {#if $page.data.session?.user}
+      <div style="margin-left:auto; display:flex; align-items:center; gap:0.5rem;">
+        <div class="text-sm">{ $page.data.session.user.name || $page.data.session.user.email }</div>
+        <button on:click={async () => {
+          await fetch('/auth/signout', { method: 'POST', credentials: 'same-origin' });
+          location.reload();
+        }} class="px-2 py-1 bg-white text-sm text-gray-800 rounded">Salir</button>
+      </div>
+    {/if}
     </div>
   </header>
   <div class="flex">
@@ -93,6 +126,9 @@
       </div>
       <nav class="sidebar-nav" aria-label="Menú principal">
   <a href="/" on:click={handleNavClick} class="nav-link { $page.url.pathname === '/' ? 'active' : '' }"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9,22 9,12 15,12 15,22"/></svg> <span class="link-text">Inicio</span></a>
+  <a href="/sell" on:click={handleNavClick} class="nav-link { $page.url.pathname === '/sell' ? 'active' : '' }"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="8" cy="21" r="1"/><circle cx="19" cy="21" r="1"/><path d="M2.05 2.05h2l2.66 12.42a2 2 0 0 0 2 1.58h9.78a2 2 0 0 0 1.95-1.57l1.65-7.43H5.12"/></svg> <span class="link-text">Vender</span></a>
+  <a href="/products" on:click={handleNavClick} class="nav-link { $page.url.pathname === '/products' ? 'active' : '' }"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/></svg> <span class="link-text">Productos</span></a>
+  <a href="/customers" on:click={handleNavClick} class="nav-link { $page.url.pathname === '/customers' ? 'active' : '' }"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/></svg> <span class="link-text">Clientes</span></a>
   <a href="/recharge" on:click={handleNavClick} class="nav-link { $page.url.pathname === '/recharge' ? 'active' : '' }"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 5c-1.5 0-2.8 1.4-3 2-3.5-1.5-11-.3-11 5 0 1.8 0 3 2 4.5V20h4v-2h6v2h4v-4.5c2-1.5 2-2.7 2-4.5 0-5.3-7.5-6.5-11-5 0.3-1.7 1.3-3 3-3 1.6 0 2.8 1.2 3 3 .2 1.8-1 3-2.5 3-1.5 0-2.7-1.2-2.5-3 .2-1.8 1-3 2.5-3z"/><circle cx="7" cy="12" r="1"/><circle cx="17" cy="12" r="1"/><circle cx="12" cy="9" r="1"/></svg> <span class="link-text">Recargar</span></a>
   <a href="/history" on:click={handleNavClick} class="nav-link { $page.url.pathname === '/history' ? 'active' : '' }"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14,2 14,8 20,8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10,9 9,9 8,9"/></svg> <span class="link-text">Historial</span></a>
   <a href="/check-balance" on:click={handleNavClick} class="nav-link { $page.url.pathname === '/check-balance' ? 'active' : '' }"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg> <span class="link-text">Consultar saldo</span></a>
@@ -133,6 +169,15 @@
   .sidebar-nav { display:flex; flex-direction:column; gap:0.1rem; padding:0.5rem 0.5rem; padding-top:4px; }
   .nav-link { display:flex; align-items:center; gap:0.75rem; padding:0.65rem 0.75rem; color:rgba(255,255,255,0.95); text-decoration:none; border-radius:0.45rem; }
   .nav-link.active, .nav-link:hover { background: rgba(255,255,255,0.06); }
+  /* Make SVG icons block-level and normalize their box so centering is consistent */
+  .nav-link svg { display:block; width:24px; height:24px; flex:0 0 24px; margin:0; }
+  /* Also normalize any anchor inside the sidebar in case some links don't use .nav-link */
+  .sidebar a { display:flex; align-items:center; gap:0.75rem; color:inherit; text-decoration:none; }
+  .sidebar a svg { display:block; width:24px; height:24px; flex:0 0 24px; margin:0; }
+  /* When the sidebar is collapsed hide the text and center the icon horizontally */
+  .sidebar.collapsed .nav-link { justify-content: center; padding-left: 0.5rem; padding-right: 0.5rem; }
+  /* Ensure the SVG sits centered inside its flex cell when collapsed */
+  .sidebar.collapsed .nav-link svg { margin-left:auto; margin-right:auto; }
   .link-text { white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
   .sidebar.collapsed .link-text { display:none; }
   /* sidebar-footer removed from current markup */
@@ -140,6 +185,10 @@
      Use calc(var(--topbar-h) + var(--topbar-gap)) so the existing gap is preserved. */
   .main-content { background: #f8fafc; min-height: calc(100vh - var(--topbar-h)); margin-top: 0; margin-left:220px; transition: margin-left .22s ease; padding-top: calc(var(--topbar-h) + var(--topbar-gap)); }
   .sidebar.collapsed ~ .main-content { margin-left:72px; }
+
+  /* Add bottom padding so content/footer area isn't flush to the viewport bottom */
+  :root { --site-footer-gap: 3rem; }
+  .main-content { padding-bottom: var(--site-footer-gap); }
 
   /* Responsive: transform sidebar to top drawer on small screens */
   @media (max-width: 767px) {
@@ -149,6 +198,8 @@
     .sidebar[data-open="true"] { transform: translateX(0); }
     /* Ensure main content never shifts on mobile (override earlier sibling selector) */
     .main-content { margin-left:0; }
+  /* keep a slightly smaller footer gap on mobile to preserve space without wasting view height */
+  .main-content { padding-bottom: 2rem; }
     .sidebar.collapsed ~ .main-content { margin-left:0 !important; }
   /* Mobile: center brand text and keep hamburger on the left without overlap */
   .topbar-inner { padding-left: 0; padding-right: 0; }

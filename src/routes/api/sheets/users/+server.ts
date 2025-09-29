@@ -1,65 +1,32 @@
-import { google } from 'googleapis';
-import { GOOGLE_SHEETS_ID } from '$env/static/private';
 import type { RequestHandler } from './$types';
-
-// Configuración de autenticación que funciona en desarrollo y producción
-const auth = new google.auth.GoogleAuth({
-  credentials: process.env.NODE_ENV === 'production' ? {
-    type: 'service_account',
-    project_id: 'interpos-465317',
-    client_email: process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL,
-    private_key: process.env.GOOGLE_PRIVATE_KEY?.replace(/\n/g, '\n'),
-  } : undefined,
-  keyFile: process.env.NODE_ENV === 'production' ? undefined : 'service-account.json',
-  scopes: ['https://www.googleapis.com/auth/spreadsheets']
-});
-
-const sheets = google.sheets({ version: 'v4', auth });
-const SPREADSHEET_ID = GOOGLE_SHEETS_ID;
+import { sbServer } from '$lib/supabase';
+import { parseCurrency } from '$lib/parseCurrency';
 
 export const GET: RequestHandler = async ({ url }) => {
   try {
     const userId = url.searchParams.get('userId');
-    const res = await sheets.spreadsheets.values.get({
-      spreadsheetId: SPREADSHEET_ID,
-      range: 'Users!A2:C'
-    });
-    console.log('Google Sheets response:', res.data); // <-- LOG IMPORTANTE
-    const rows = res.data.values || [];
-    if (rows.length === 0) {
-      console.warn('No se encontraron datos en la hoja Users!A2:C');
-    }
-    const users = rows.map(([id, name, balance]) => ({
-      id: id ?? '',
-      name: name ?? '',
-      balance: balance ? Number(String(balance).replace(/[^\d.-]/g, '')) || 0 : 0
-    }));
 
     if (userId) {
-      const user = users.find(u => u.id === userId);
-      if (!user) {
-        return new Response(JSON.stringify({ error: 'Usuario no encontrado' }), {
-          status: 404,
-          headers: { 'Content-Type': 'application/json' }
-        });
+      const { data, error } = await sbServer.from('Customers').select('ID,Name,Balance').eq('ID', userId).maybeSingle();
+      if (error) {
+        console.error('Supabase error fetching customer by ID:', error);
+        return new Response(JSON.stringify({ error: 'Error al obtener usuario' }), { status: 500, headers: { 'Content-Type': 'application/json' } });
       }
-      return new Response(JSON.stringify({ balance: user.balance, name: user.name }), {
-        status: 200,
-        headers: { 'Content-Type': 'application/json' }
-      });
+      if (!data) {
+        return new Response(JSON.stringify({ error: 'Usuario no encontrado' }), { status: 404, headers: { 'Content-Type': 'application/json' } });
+      }
+  return new Response(JSON.stringify({ balance: parseCurrency(data.Balance), name: data.Name || '' }), { status: 200, headers: { 'Content-Type': 'application/json' } });
     }
-    return new Response(JSON.stringify(users), {
-      status: 200,
-      headers: { 'Content-Type': 'application/json' }
-    });
+
+    const { data, error } = await sbServer.from('Customers').select('ID,Name,Balance');
+    if (error) {
+      console.error('Supabase error fetching customers:', error);
+      return new Response(JSON.stringify({ error: 'Error al obtener usuarios' }), { status: 500, headers: { 'Content-Type': 'application/json' } });
+    }
+  const users = (data || []).map((r: any) => ({ id: String(r.ID), name: r.Name, balance: parseCurrency(r.Balance) }));
+    return new Response(JSON.stringify(users), { status: 200, headers: { 'Content-Type': 'application/json' } });
   } catch (error) {
-    console.error('Error al obtener usuarios de Google Sheets:', error);
-    return new Response(JSON.stringify({ 
-      error: 'Error al obtener usuarios',
-      details: error instanceof Error ? error.message : 'Error desconocido'
-    }), {
-      status: 500,
-      headers: { 'Content-Type': 'application/json' }
-    });
+    console.error('Unexpected error in /api/sheets/users:', error);
+    return new Response(JSON.stringify({ error: 'Error interno del servidor' }), { status: 500, headers: { 'Content-Type': 'application/json' } });
   }
 };

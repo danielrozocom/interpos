@@ -22,6 +22,7 @@ let dateTo = '';
 let transactionType = 'all'; // 'all', 'positive', 'negative'
 let currentPage = 1;
 let itemsPerPage = 15; // Valor por defecto
+let userIdInput: HTMLInputElement | null = null;
 
 // Filtros computados con filtro de fechas funcional
 $: filteredTransactions = (() => {
@@ -31,7 +32,6 @@ $: filteredTransactions = (() => {
   
   const filtered = transactions.filter(t => {
     const quantity = cleanNumber(t.Quantity);
-    
     // Filtro por tipo de transacción
     let typeMatch = true;
     if (transactionType === 'positive') typeMatch = quantity > 0;
@@ -53,7 +53,6 @@ $: filteredTransactions = (() => {
     
     return typeMatch && dateMatch;
   });
-  
   // Ordenar de más reciente a más vieja
   const sorted = filtered.sort((a, b) => {
     // Función para formatear la hora a HH:mm:ss antes de la comparación
@@ -254,7 +253,29 @@ async function fetchAllUsers() {
   }
 }
 
-onMount(fetchAllUsers);
+onMount(async () => {
+  // First load the list of users for suggestions
+  await fetchAllUsers();
+
+  // If the page was opened with a `userId` query param, pre-fill and fetch history
+  if (typeof window !== 'undefined') {
+    try {
+      const params = new URLSearchParams(window.location.search);
+      const uid = params.get('userId');
+      if (uid) {
+        // Normalize the incoming user id (removes non-digits / formatting)
+        userId = await normalizeUserId(uid);
+        userSuggestions = [];
+        // Allow bindings to update, then fetch transactions
+        tick().then(() => {
+          fetchTransactions();
+        });
+      }
+    } catch (e) {
+      console.warn('Error parsing userId from URL:', e);
+    }
+  }
+});
 
 // Keyboard shortcuts (Ctrl-based)
 function handleGlobalShortcut(ev: CustomEvent) {
@@ -402,7 +423,7 @@ async function refreshTransactions() {
 
 <svelte:head>
   <title>Historial de Transacciones | {siteName}</title>
-  <meta name="description" content="Consultar el historial de movimientos de un usuario" />
+  <meta name="description" content="Consultar el historial de movimientos de un cliente" />
 </svelte:head>
 
 <style>
@@ -439,7 +460,7 @@ async function refreshTransactions() {
   <div class="max-w-4xl mx-auto">
     <div class="text-center mb-2 animate-fadeIn">
       <h1 class="text-4xl font-bold text-[#35528C] mb-1 font-sans s-xNGq_AHMpqrL">Historial de Transacciones</h1>
-      <p class="text-lg text-[#35528C]/80 font-sans max-w-2xl mx-auto">Consulta el historial de movimientos de un usuario</p>
+  <p class="text-lg text-[#35528C]/80 font-sans max-w-2xl mx-auto">Consulta el historial de movimientos de un cliente</p>
     </div>
 
     {#if step === 1}
@@ -447,7 +468,7 @@ async function refreshTransactions() {
   <!-- Título removido por solicitud del usuario -->
         <form on:submit|preventDefault={fetchTransactions} class="space-y-6">
           <div>
-            <label for="userId" class="block text-lg font-semibold text-[#35528C] mb-3">ID de Usuario</label>
+            <label for="userId" class="block text-lg font-semibold text-[#35528C] mb-3">ID de Cliente</label>
             <div class="flex items-center gap-2 min-w-0 flex-nowrap">
               <input 
                 id="userId"
@@ -475,7 +496,7 @@ async function refreshTransactions() {
                     userSuggestions = [];
                   }
                 }}
-                placeholder="Ingrese ID del usuario"
+                placeholder="Ingrese ID del cliente"
                 autocomplete="off"
                 autofocus
               />
@@ -494,13 +515,12 @@ async function refreshTransactions() {
               <div class="space-y-2">
                 {#each userSuggestions as u}
                   <button 
-                    type="button"
-                    on:click={() => { userId = u.id; fetchTransactions(); }}
-                    class="w-full text-left p-3 border border-[#35528C]/30 rounded-lg hover:bg-[#35528C]/10 transition-colors duration-200 font-sans placeholder-[#35528C]/60"
-                  >
-                    <span class="font-medium text-gray-900">ID: {u.id}</span>
-                    <span class="text-gray-600 ml-2">- {u.name}</span>
-                  </button>
+                      type="button"
+                      on:click={() => { userId = u.id; fetchTransactions(); }}
+                      class="w-full text-left p-3 border border-[#35528C]/30 rounded-lg hover:bg-[#35528C]/10 transition-colors duration-200 font-sans placeholder-[#35528C]/60"
+                    >
+                      <span class="font-medium text-gray-900">ID: {u.id} - <span class="text-gray-600 font-normal">{u.name}</span></span>
+                    </button>
                 {/each}
               </div>
             </div>
@@ -547,7 +567,7 @@ async function refreshTransactions() {
       <div class="space-y-8 animate-fadeIn">
         <div class="flex flex-col md:flex-row items-start md:items-center justify-between mb-4">
           <div class="text-left mb-4 md:mb-0">
-            <h2 class="text-xl font-semibold text-[#35528C]">Historial de {userName || 'Usuario'}</h2>
+            <h2 class="text-xl font-semibold text-[#35528C]">Historial de {userName || 'Cliente'}</h2>
             <p class="text-[#35528C]/80">ID: {userId}</p>
           </div>
           <!-- Botones debajo del título en móviles -->
@@ -598,7 +618,7 @@ async function refreshTransactions() {
           <div class="text-center py-3">
             <span class="text-6xl">📋</span>
             <h3 class="text-lg font-medium text-gray-900 mt-4">Sin transacciones</h3>
-            <p class="text-gray-500 mt-2">Este usuario no tiene transacciones registradas.</p>
+            <p class="text-gray-500 mt-2">Este cliente no tiene transacciones registradas.</p>
           </div>
         {:else}
           <div class="bg-white rounded-2xl shadow-lg border border-[#35528C]/10 overflow-hidden">

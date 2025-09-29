@@ -27,6 +27,7 @@
 
 let userSuggestions: any[] = [];
 let activeSuggestionIndex = -1;
+let userIdInput: HTMLInputElement | null = null;
 
 $: if (userSuggestions.length > 0 && !userName && (!userId || userId.trim() === '')) {
   // Mostrar sugerencias: no auto-completamos el campo para evitar llamadas implícitas al servidor.
@@ -71,8 +72,8 @@ function handleUserIdKeydown(e: KeyboardEvent) {
     }
 
     // if empty, show immediate message
-    if (!userId || String(userId).trim() === '') {
-      error = 'No se encontraron usuarios';
+      if (!userId || String(userId).trim() === '') {
+      error = 'No se encontraron clientes';
       userSuggestions = [];
       activeSuggestionIndex = -1;
       return;
@@ -180,7 +181,7 @@ async function performEnterLookup() {
 
   if (!userId || String(userId).trim() === '') {
     userSuggestions = [];
-    error = 'No se encontraron usuarios';
+    error = 'No se encontraron clientes';
     return;
   }
   // otherwise clear suggestions and load
@@ -283,7 +284,7 @@ let showCashModal = false;
           productsArr = data;
         }
         // Filtrar productos válidos
-        searchResults = productsArr.filter(p => p?.id && p?.name && typeof p?.price === 'number');
+        searchResults = productsArr.filter((p: any) => p?.id && p?.name && typeof p?.price === 'number');
       } else {
         searchResults = [];
       }
@@ -423,13 +424,13 @@ let showCashModal = false;
       }
       userIdInput?.focus();
       userIdInput?.scrollIntoView({ behavior: 'smooth', block: 'center' });
-      error = 'Debes ingresar un ID de usuario.';
+  error = 'Debes ingresar un ID de cliente.';
       return;
     }
 
     // Validar si el usuario existe (siempre)
     if (!userName) {
-      error = 'No se encontró el usuario con el ID proporcionado';
+  error = 'No se encontró el cliente con el ID proporcionado';
       return;
     }
 
@@ -437,7 +438,7 @@ let showCashModal = false;
     if (paymentMethod === 'saldo') {
       const newBalance = userBalance - cartTotal;
       if (newBalance < 0) {
-        const confirmMessage = `⚠️ El usuario quedará con un saldo de $${newBalance.toLocaleString('es-CO')} ⚠️\n\n` +
+  const confirmMessage = `⚠️ El cliente quedará con un saldo de $${newBalance.toLocaleString('es-CO')} ⚠️\n\n` +
                              `💰 Saldo actual: $${userBalance.toLocaleString('es-CO')}\n` +
                              `🛒 Total: $${cartTotal.toLocaleString('es-CO')}\n` +
                              `📉 Nuevo saldo: $${newBalance.toLocaleString('es-CO')}\n\n` +
@@ -618,11 +619,11 @@ let showCashModal = false;
         usersArr = data;
       }
       // Prioridad: coincidencia exacta por ID, luego por nombre, luego comienza con, luego incluye
-      const exactId = usersArr.filter(u => u.id && u.id.toString() === term);
-      const exactName = usersArr.filter(u => u.name && u.name.toLowerCase() === term.toLowerCase() && !exactId.includes(u));
-      const startWithId = usersArr.filter(u => u.id && u.id.toString().startsWith(term) && !exactId.includes(u));
-      const startWithName = usersArr.filter(u => u.name && u.name.toLowerCase().startsWith(term.toLowerCase()) && !exactName.includes(u) && !startWithId.includes(u));
-      const partialName = usersArr.filter(u => u.name && u.name.toLowerCase().includes(term.toLowerCase()) && !exactId.includes(u) && !exactName.includes(u) && !startWithId.includes(u) && !startWithName.includes(u));
+      const exactId = usersArr.filter((u: any) => u.id && u.id.toString() === term);
+      const exactName = usersArr.filter((u: any) => u.name && u.name.toLowerCase() === term.toLowerCase() && !exactId.includes(u));
+      const startWithId = usersArr.filter((u: any) => u.id && u.id.toString().startsWith(term) && !exactId.includes(u));
+      const startWithName = usersArr.filter((u: any) => u.name && u.name.toLowerCase().startsWith(term.toLowerCase()) && !exactName.includes(u) && !startWithId.includes(u));
+      const partialName = usersArr.filter((u: any) => u.name && u.name.toLowerCase().includes(term.toLowerCase()) && !exactId.includes(u) && !exactName.includes(u) && !startWithId.includes(u) && !startWithName.includes(u));
   userSuggestions = [...exactId, ...exactName, ...startWithId, ...startWithName, ...partialName].slice(0, 5);
   activeSuggestionIndex = userSuggestions.length > 0 ? 0 : -1;
     } catch {
@@ -867,7 +868,7 @@ let showCashModal = false;
             autocomplete="off"
             spellcheck="false"
             aria-label="ID de Cliente"
-            autofocus
+            bind:this={userIdInput}
           />
           <button
             type="button"
@@ -927,7 +928,7 @@ let showCashModal = false;
                 {/each}
               </div>
             {:else}
-              {#if error && error.includes('usuario')}
+              {#if error && error.includes('cliente')}
                 <div class="text-red-600 animate-fade-in">{error}</div>
                 {#key error}
                   {#await new Promise(resolve => setTimeout(resolve, 2000))}
@@ -936,7 +937,7 @@ let showCashModal = false;
                   {/await}
                 {/key}
               {:else}
-                <span class="text-gray-500">No se encontraron usuarios</span>
+                <span class="text-gray-500">No se encontraron clientes</span>
               {/if}
             {/if}
           </div>
@@ -1244,7 +1245,7 @@ let showCashModal = false;
               on:click={openCashModal}
               disabled={loading || !userId || !userName || !paymentMethod || cart.length === 0}
               class="flex-1 bg-primary text-white px-3 sm:px-4 py-2 sm:py-3 rounded-lg hover:bg-[#27406a] focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 disabled:opacity-50 text-base sm:text-lg font-medium"
-              title={!userId ? 'Ingrese ID de usuario' : (!userName ? 'Seleccione el usuario de las sugerencias' : (!paymentMethod ? 'Seleccione método de pago' : (cart.length === 0 ? 'El carrito está vacío' : '')))}
+              title={!userId ? 'Ingrese ID de cliente' : (!userName ? 'Seleccione el cliente de las sugerencias' : (!paymentMethod ? 'Seleccione método de pago' : (cart.length === 0 ? 'El carrito está vacío' : '')))}
             >
               {loading ? 'Procesando...' : 'FACTURAR'}
             </button>

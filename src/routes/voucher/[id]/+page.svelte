@@ -372,7 +372,7 @@ onMount(() => {
           <span class="line-value">{
             (() => {
               // Función para formatear la hora a HH:mm:ss
-              function formatTime(timeStr) {
+              function formatTime(timeStr: string) {
                 if (!timeStr) return '00:00:00';
                 const parts = timeStr.split(':');
                 const hours = parts[0]?.padStart(2, '0') || '00';

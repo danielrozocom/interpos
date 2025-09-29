@@ -1,8 +1,9 @@
-import { google } from 'googleapis';
-import { GOOGLE_SHEETS_ID } from '$env/static/private';
 import type { RequestHandler } from '@sveltejs/kit';
 import { json } from '@sveltejs/kit';
 import { getCurrentDateInTimezone, formatDate, formatDateOnly, formatTimeOnly } from '$lib/date-utils';
+import { sbServer } from '$lib/supabase';
+import { fromFlexible } from '$lib/dbHelpers';
+import { parseCurrency } from '$lib/parseCurrency';
 
 // Función para formatear tiempo a HH:mm:ss
 function formatTime(timeStr: string): string {
@@ -18,20 +19,7 @@ function formatTime(timeStr: string): string {
   return timeStr.padStart(8, '0');
 }
 
-// Autenticación
-const auth = new google.auth.GoogleAuth({
-  // En desarrollo usa el archivo, en producción usa variables de entorno
-  credentials: process.env.NODE_ENV === 'production' ? {
-    type: 'service_account',
-    project_id: 'interpos-465317',
-    client_email: process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL,
-    private_key: process.env.GOOGLE_PRIVATE_KEY?.replace(/\\n/g, '\n'),
-  } : undefined,
-  keyFile: process.env.NODE_ENV === 'production' ? undefined : 'service-account.json',
-  scopes: ['https://www.googleapis.com/auth/spreadsheets']
-});
-const sheets = google.sheets({ version: 'v4', auth });
-const SPREADSHEET_ID = GOOGLE_SHEETS_ID;
+// Using Supabase instead of Google Sheets
 
 export const POST: RequestHandler = async ({ request }) => {
   try {
@@ -64,55 +52,27 @@ export const POST: RequestHandler = async ({ request }) => {
     // Asegurar que timeStr esté en formato HH:MM:SS
     const timeStr = formatTime(colombiaDate.toLocaleTimeString('en-GB', { hour12: false })); // HH:MM:SS format
 
-    // Prepare the row data for Google Sheets - Orders
-    const ordersValues = [
-      [
-        dateStr,         // Date en formato YYYY-MM-DD (columna A)
-        timeStr,         // Time en formato HH:MM:SS (columna B)
-        orderID,         // OrderID como número de 6 dígitos, sin apóstrofe (columna C)
-        finalUserID,     // UserID (columna D)
-        finalUserName,   // Name (columna E)
-        quantity,        // Quantity - valor total de la compra (columna F)
-        paymentMethod,   // Method - Saldo o Efectivo (columna G)
-        products         // Product(s) - formatted string (columna H)
-      ]
-    ];
+    // Insert order into Supabase Transactions table (Transactions_Orders) with flexible table name
+    try {
+      const ordersSrc = await fromFlexible('Transactions_Orders');
+      const orderInsert = await ordersSrc.from().insert([{ Date: dateStr, Time: timeStr, OrderID: orderID, UserID: finalUserID, Name: finalUserName, Quantity: quantity, Method: paymentMethod, Products: products }]);
+      if (orderInsert.error) {
+        console.error('Error inserting order in Supabase:', orderInsert.error);
+        return json({ success: false, error: 'Error inserting order' }, { status: 500 });
+      }
+    } catch (e) {
+      console.error('Error locating/inserting into Transactions_Orders:', e);
+      return json({ success: false, error: 'Error inserting order' }, { status: 500 });
+    }
 
-    console.log('Values to insert (Orders):', ordersValues);
-
-    // Add the transaction to the "Transactions - Orders" sheet
-    const result = await sheets.spreadsheets.values.append({
-      spreadsheetId: SPREADSHEET_ID,
-      range: 'Transactions - Orders!A:H',
-      valueInputOption: 'USER_ENTERED',
-      requestBody: {
-        values: ordersValues,
-      },
-    });
-
-    // Get current user balance for the transaction
+    // Get current user balance for the transaction from Supabase
     let actualCurrentBalance = 0;
-    
-    // Solo obtener saldo si hay un userID real (no es venta en efectivo sin usuario)
     if (userID && userID !== 'EFECTIVO') {
-      try {
-        const usersSheet = await sheets.spreadsheets.values.get({
-          spreadsheetId: SPREADSHEET_ID,
-          range: 'Users!A:Z',
-        });
-        
-        const users = usersSheet.data.values?.slice(1) || [];
-        const user = users.find(row => row[0] === userID);
-        
-        if (user) {
-          // El saldo está en la columna C (índice 2) de la hoja Users
-          actualCurrentBalance = parseFloat(user[2] || '0');
-          console.log('Found user balance in sheet:', actualCurrentBalance, 'from column C (index 2)');
-        } else {
-          console.log('User not found in Users sheet');
-        }
-      } catch (error) {
-        console.error('Error getting user balance:', error);
+      const userRes = await sbServer.from('Customers').select('Balance,Name').eq('ID', Number(userID)).maybeSingle();
+      if (!userRes.error && userRes.data) {
+        actualCurrentBalance = parseCurrency(userRes.data.Balance);
+      } else if (userRes.error) {
+        console.error('Error fetching user balance from Supabase:', userRes.error);
       }
     } else {
       console.log('Cash payment without user - using balance 0');
@@ -182,50 +142,31 @@ export const POST: RequestHandler = async ({ request }) => {
 
     console.log('Values to insert (Balance):', balanceValues);
 
-    // Update user balance ONLY if payment method is 'Saldo' AND there's a real user
+    // Update user balance in Supabase if payment method is 'Saldo'
     if (paymentMethod === 'Saldo' && userID && userID !== 'EFECTIVO') {
       console.log('Updating user balance from', prevBalance, 'to', calculatedNewBalance);
-      
-      // Find the user row in Users sheet
-      const usersSheet = await sheets.spreadsheets.values.get({
-        spreadsheetId: SPREADSHEET_ID,
-        range: 'Users!A:Z',
-      });
-      
-      const users = usersSheet.data.values?.slice(1) || [];
-      const userRowIndex = users.findIndex(row => row[0] === userID);
-      
-      if (userRowIndex !== -1) {
-        // Update balance in Users sheet (column C, index 2)
-        const sheetRow = userRowIndex + 2; // +2 because we skipped header and array is 0-indexed
-        await sheets.spreadsheets.values.update({
-          spreadsheetId: SPREADSHEET_ID,
-          range: `Users!C${sheetRow}`,
-          valueInputOption: 'USER_ENTERED',
-          requestBody: { values: [[calculatedNewBalance]] }
-        });
-        console.log('✅ User balance updated successfully in Users sheet');
-        console.log('   - Row:', sheetRow);
-        console.log('   - Range: Users!C' + sheetRow);
-        console.log('   - New value written:', calculatedNewBalance);
+      const updateRes = await sbServer.from('Customers').update({ Balance: String(calculatedNewBalance) }).eq('ID', Number(userID));
+      if (updateRes.error) {
+        console.error('Error updating user balance in Supabase:', updateRes.error);
       } else {
-        console.error('User not found for balance update:', userID);
+        console.log('✅ User balance updated successfully in Supabase');
       }
     } else {
       console.log('Skipping balance update - Cash payment or no real user');
     }
 
-    // Add to "Transactions - Balance" sheet
-    await sheets.spreadsheets.values.append({
-      spreadsheetId: SPREADSHEET_ID,
-      range: 'Transactions - Balance!A:I', // 9 columnas: Date, Time, UserID, Name, Quantity, PrevBalance, NewBalance, Method, Observation(s)
-      valueInputOption: 'USER_ENTERED',
-      requestBody: {
-        values: balanceValues,
-      },
-    });
+    // Insert balance transaction into Supabase Transactions_Balance table (flexible name)
+    try {
+      const balanceSrc = await fromFlexible('Transactions_Balance');
+      const balanceInsert = await balanceSrc.from().insert([{ Date: balanceValues[0][0], Time: balanceValues[0][1], UserID: balanceValues[0][2], Name: balanceValues[0][3], Quantity: String(balanceValues[0][4]), PrevBalance: String(balanceValues[0][5]), NewBalance: String(balanceValues[0][6]), Method: balanceValues[0][7], Observations: balanceValues[0][8] }]);
+      if (balanceInsert.error) {
+        console.error('Error inserting balance transaction in Supabase:', balanceInsert.error);
+      }
+    } catch (e) {
+      console.error('Error locating/inserting into Transactions_Balance:', e);
+    }
 
-    console.log('Transaction recorded successfully:', result.data);
+  console.log('Transaction recorded successfully in Supabase');
 
     // Clear the previous user ID, name, and balance after processing the transaction
     const clearedUserID = null;
@@ -238,8 +179,7 @@ export const POST: RequestHandler = async ({ request }) => {
       message: 'Transacción registrada exitosamente',
       data: {
         orderID,
-        date,
-        updatedCells: result.data.updates?.updatedCells || 0
+        date
       }
     });
 
@@ -266,15 +206,23 @@ export const GET: RequestHandler = async ({ url }) => {
     const endDate = url.searchParams.get('endDate');
     const date = url.searchParams.get('date');
 
-    console.log('GOOGLE_SHEETS_ID value:', GOOGLE_SHEETS_ID);
-
-    // Get all transactions from the sheet
-    const result = await sheets.spreadsheets.values.get({
-      spreadsheetId: SPREADSHEET_ID,
-      range: 'Transactions - Orders!A:H', // 8 columnas: Date, Time, OrderID, UserID, Name, Quantity, Method, Product(s)
-    });
-
-    const rows = result.data.values || [];
+    // Query transactions from Supabase Transactions_Orders table
+    // Map the Supabase rows into the same shape expected by the frontend
+    // Query transactions from Supabase Transactions_Orders table (flexible name)
+    let txData: any[] = [];
+    try {
+      const ordersSrc = await fromFlexible('Transactions_Orders');
+      const { data: _txData, error: txErr } = await ordersSrc.from().select('Date,Time,OrderID,UserID,Name,Quantity,Method,Products');
+      if (txErr) {
+        console.error('Error fetching transactions from Supabase:', txErr);
+        return json({ success: false, error: 'Error fetching transactions' }, { status: 500 });
+      }
+      txData = _txData || [];
+    } catch (e) {
+      console.error('Error locating Transactions_Orders:', e);
+      return json({ success: false, error: 'Error fetching transactions' }, { status: 500 });
+    }
+    const rows = (txData || []).map((r: any) => [r.Date, r.Time, r.OrderID, r.UserID, r.Name, r.Quantity, r.Method, r.Products]);
     
     if (rows.length <= 1) {
       return json({ 

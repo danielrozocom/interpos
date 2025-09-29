@@ -14,9 +14,11 @@
       }
       const data = await res.json();
       if (Array.isArray(data)) {
+        // Use parseCurrency to normalize balances like "$0" or "- $17,800"
+        const { parseCurrency } = await import('../lib/parseCurrency');
         users = data.map(user => ({
           ...user,
-          balance: Number(user.balance) || 0
+          balance: parseCurrency(user.balance)
         }));
       } else {
         throw new Error('Formato de respuesta inválido');
@@ -71,7 +73,7 @@
           </div>
         </div>
         <div class="ml-3 sm:ml-4">
-          <p class="text-sm sm:text-base font-medium text-gray-600">Total Usuarios</p>
+          <p class="text-sm sm:text-base font-medium text-gray-600">Total Clientes</p>
           <p class="text-xl sm:text-2xl font-bold text-gray-900">
             {#if loading}
               <span class="inline-block h-5 sm:h-6 w-16 sm:w-20 bg-gray-200 rounded animate-pulse"></span>
@@ -111,7 +113,7 @@
           </div>
         </div>
         <div class="ml-3 sm:ml-4">
-          <p class="text-sm sm:text-base font-medium text-gray-600">Promedio por Usuario</p>
+          <p class="text-sm sm:text-base font-medium text-gray-600">Promedio por Cliente</p>
           <p class="text-xl sm:text-2xl font-bold text-gray-900">
             {#if loading}
               <span class="inline-block h-5 sm:h-6 w-20 sm:w-28 bg-gray-200 rounded animate-pulse"></span>
@@ -132,7 +134,7 @@
         <span class="text-2xl">💰</span>
       </div>
       <h2 class="text-xl font-semibold text-[#35528C] mb-2">Vender</h2>
-      <p class="text-gray-600">Realiza una venta y descuenta productos del saldo del usuario.</p>
+  <p class="text-gray-600">Realiza una venta y descuenta productos del saldo del cliente.</p>
     </a>
 
     <!-- Tarjeta de Recarga -->
@@ -141,7 +143,7 @@
         <span class="text-2xl">💳</span>
       </div>
       <h2 class="text-xl font-semibold text-[#35528C] mb-2">Recargar</h2>
-      <p class="text-gray-600">Agrega saldo a la cuenta de un usuario.</p>
+  <p class="text-gray-600">Agrega saldo a la cuenta de un cliente.</p>
     </a>
 
     <!-- Tarjeta de Historial -->

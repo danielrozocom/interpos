@@ -1,21 +1,5 @@
-import { google } from 'googleapis';
-import { GOOGLE_SHEETS_ID } from '$env/static/private';
 import type { RequestHandler } from '@sveltejs/kit';
-
-// Autenticación
-const auth = new google.auth.GoogleAuth({
-  // En desarrollo usa el archivo, en producción usa variables de entorno
-  credentials: process.env.NODE_ENV === 'production' ? {
-    type: 'service_account',
-    project_id: 'interpos-465317',
-    client_email: process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL,
-    private_key: process.env.GOOGLE_PRIVATE_KEY?.replace(/\\n/g, '\n'),
-  } : undefined,
-  keyFile: process.env.NODE_ENV === 'production' ? undefined : 'service-account.json',
-  scopes: ['https://www.googleapis.com/auth/spreadsheets']
-});
-const sheets = google.sheets({ version: 'v4', auth });
-const SPREADSHEET_ID = GOOGLE_SHEETS_ID;
+import { sbServer } from '$lib/supabase';
 
 function parsePrice(priceStr: string | null | undefined): number {
   if (!priceStr) return 0;
@@ -50,20 +34,19 @@ function parsePrice(priceStr: string | null | undefined): number {
 // GET /api/sheets/products
 export const GET: RequestHandler = async ({ url }) => {
   try {
-    // Read all rows from Products sheet
-    const res = await sheets.spreadsheets.values.get({
-      spreadsheetId: SPREADSHEET_ID,
-      range: 'products!A2:D'
-    });
-    const rows = res.data.values || [];
-    // Columns: ID, Category, Name, Price
-    let products = rows.map(row => ({
-      id: row[0] ?? '',
-      category: row[1] ?? '',
-      name: row[2] ?? '',
-      // price: parsePrice(row[3]) – guardamos también el raw para heurísticas posteriores
-      price: parsePrice(row[3]),
-      _raw: row[3] ?? ''
+    // Read all products from Supabase Products table
+    const { data: rows, error } = await sbServer.from('Products').select('ID,Category,Name,Price');
+    if (error) {
+      console.error('Supabase error fetching products:', error);
+      return new Response(JSON.stringify({ success: false, error: 'Error al consultar productos' }), { status: 500, headers: { 'Content-Type': 'application/json' } });
+    }
+    // Columns: ID, Category, Name, Price (Price is stored as text in the schema)
+    let products = (rows || []).map((row: any) => ({
+      id: String(row.ID ?? ''),
+      category: row.Category ?? '',
+      name: row.Name ?? '',
+      price: parsePrice(String(row.Price ?? '')),
+      _raw: row.Price ?? ''
     }));
 
     // Ajustar precios: detectar si la celda original usa decimales para representar miles

@@ -1,19 +1,6 @@
-import { google } from 'googleapis';
-import { GOOGLE_SHEETS_ID } from '$env/static/private';
 import type { RequestHandler } from '@sveltejs/kit';
-
-const auth = new google.auth.GoogleAuth({
-  credentials: process.env.NODE_ENV === 'production' ? {
-    type: 'service_account',
-    project_id: 'interpos-465317',
-    client_email: process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL,
-    private_key: process.env.GOOGLE_PRIVATE_KEY?.replace(/\\n/g, '\n'),
-  } : undefined,
-  keyFile: process.env.NODE_ENV === 'production' ? undefined : 'service-account.json',
-  scopes: ['https://www.googleapis.com/auth/spreadsheets']
-});
-const sheets = google.sheets({ version: 'v4', auth });
-const SPREADSHEET_ID = GOOGLE_SHEETS_ID;
+import { sbServer } from '$lib/supabase';
+import { fromFlexible } from '$lib/dbHelpers';
 
 function parseNumberCell(cell: any) {
   if (cell === undefined || cell === null) return 0;
@@ -69,16 +56,20 @@ export const GET: RequestHandler = async ({ url }) => {
     const startDate = url.searchParams.get('startDate'); // ISO strings accepted
     const endDate = url.searchParams.get('endDate');
 
-    // Read Orders sheet (sales)
-    const ordersRes = await sheets.spreadsheets.values.get({
-      spreadsheetId: SPREADSHEET_ID,
-      range: 'Transactions - Orders!A:H'
-    });
-    const ordersRows = ordersRes.data.values || [];
-    const orders = (ordersRows.slice(1) || []).map(row => {
-      const date = row[0] || '';
-      const time = row[1] || '';
-      // Normalize to a local YYYY-MM-DD day string
+    // Read Orders from Supabase Transactions_Orders table (flexible names)
+    let ordersRows: any[] = [];
+    try {
+      const ordersSource = await fromFlexible('Transactions_Orders');
+      const { data: _ordersRows, error: ordersErr } = await ordersSource.from().select('Date,Time,OrderID,UserID,Name,Quantity,Method,Products');
+      if (ordersErr) throw ordersErr;
+      ordersRows = _ordersRows || [];
+    } catch (ordersErr) {
+      console.error('Error fetching orders for reports:', ordersErr);
+      return new Response(JSON.stringify({ success: false, error: 'Error fetching orders' }), { status: 500 });
+    }
+    const orders = (ordersRows || []).map((row: any) => {
+      const date = row.Date || '';
+      const time = row.Time || '';
       const day = normalizeToYMD(date, time);
       let iso = '';
       try { iso = new Date(`${date}T${time}`).toISOString(); } catch (e) { iso = date; }
@@ -87,25 +78,29 @@ export const GET: RequestHandler = async ({ url }) => {
         day,
         dateOnly: date,
         timeOnly: time,
-        orderID: row[2] || '',
-        userID: row[3] || '',
-        name: row[4] || '',
-        quantity: parseNumberCell(row[5]),
-        method: row[6] || '',
-        products: row[7] || ''
+        orderID: row.OrderID || '',
+        userID: row.UserID || '',
+        name: row.Name || '',
+        quantity: parseNumberCell(row.Quantity),
+        method: row.Method || '',
+        products: row.Products || ''
       };
     }).filter(o => !startDate || inRange(o.day, startDate, endDate));
 
-    // Read Balance sheet (recargas)
-    const balanceRes = await sheets.spreadsheets.values.get({
-      spreadsheetId: SPREADSHEET_ID,
-      range: 'Transactions - Balance!A:I'
-    });
-    const balanceRows = balanceRes.data.values || [];
-    const recargas = (balanceRows.slice(1) || []).map(row => {
-      const date = row[0] || '';
-      const time = row[1] || '';
-      // Normalize day to local YYYY-MM-DD
+    // Read balance transactions from Supabase Transactions_Balance (flexible names)
+    let balanceRows: any[] = [];
+    try {
+      const balanceSource = await fromFlexible('Transactions_Balance');
+      const { data: _balanceRows, error: balanceErr } = await balanceSource.from().select('Date,Time,UserID,Name,Quantity,PrevBalance,NewBalance,Method,Observations');
+      if (balanceErr) throw balanceErr;
+      balanceRows = _balanceRows || [];
+    } catch (balanceErr) {
+      console.error('Error fetching balance transactions for reports:', balanceErr);
+      return new Response(JSON.stringify({ success: false, error: 'Error fetching balance transactions' }), { status: 500 });
+    }
+    const recargas = (balanceRows || []).map((row: any) => {
+      const date = row.Date || '';
+      const time = row.Time || '';
       const day = normalizeToYMD(date, time);
       let iso = '';
       try { iso = new Date(`${date}T${time}`).toISOString(); } catch (e) { iso = date; }
@@ -114,13 +109,13 @@ export const GET: RequestHandler = async ({ url }) => {
         day,
         dateOnly: date,
         timeOnly: time,
-        userID: row[2] || '',
-        name: row[3] || '',
-        quantity: parseNumberCell(row[4]),
-        prevBalance: parseNumberCell(row[5]),
-        newBalance: parseNumberCell(row[6]),
-        method: row[7] || '',
-        observation: row[8] || ''
+        userID: row.UserID || '',
+        name: row.Name || '',
+        quantity: parseNumberCell(row.Quantity),
+        prevBalance: parseNumberCell(row.PrevBalance),
+        newBalance: parseNumberCell(row.NewBalance),
+        method: row.Method || '',
+        observation: row.Observations || ''
       };
     }).filter(r => !startDate || inRange(r.day, startDate, endDate));
 

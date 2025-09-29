@@ -1,12 +1,12 @@
 # InterPOS
 
-Aplicación de punto de venta para colegio, desarrollada con SvelteKit y Google Sheets como base de datos.
+Aplicación de punto de venta para colegio, desarrollada con SvelteKit y Supabase como backend.
 
 ## Prerrequisitos
 
 * Node.js v16+ y npm
-* Cuenta de servicio de Google Cloud con credenciales JSON
-* Hoja de cálculo de Google Sheets con pestañas **Users**, **Products** y **Transactions**, compartida con el `client_email` de la cuenta de servicio
+* Cuenta de Supabase con un proyecto y credenciales (SUPABASE_URL y SUPABASE_SERVICE_ROLE_KEY)
+* Tablas en Supabase: `Customers`, `Products`, `Transactions_Orders`, `Transactions_Balance` (ver `.env.example`)
 
 ## Instalación
 
@@ -21,12 +21,13 @@ Aplicación de punto de venta para colegio, desarrollada con SvelteKit y Google 
    ```bash
    npm install
    ```
-3. Crea un archivo `.env` en la raíz con:
+3. Crea un archivo `.env` en la raíz usando `.env.example` y rellena las variables:
 
    ```dotenv
-   GOOGLE_SHEETS_ID=<tu_id_de_hoja>
+   SUPABASE_URL=https://your-project.supabase.co
+   SUPABASE_SERVICE_ROLE_KEY=your-service-role-key
+   AUTH_SECRET=some-long-random-string
    ```
-4. Coloca tu `service-account.json` (credenciales) junto a `package.json`.
 5. Asegúrate de que `.gitignore` incluye:
 
    ```gitignore
@@ -40,7 +41,7 @@ Aplicación de punto de venta para colegio, desarrollada con SvelteKit y Google 
 ## Estructura básica
 
 * **src/lib/types.ts**: Interfaces `User`, `Product`, `Transaction`.
-* **src/lib/sheets.ts**: Funciones para leer/escribir en Google Sheets (`getUsers`, `addUser`, `getProducts`, ...).
+* **src/lib/sheet.ts**: Funciones para leer/escribir en Supabase (`getUsers`, `getUserBalance`, ...).
 * **src/routes/api/**: Endpoints REST:
 
   * `/api/users`

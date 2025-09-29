@@ -68,6 +68,22 @@ export function formatTimeOnly(dateString: string | Date): string {
   }
 }
 
+// Ensure a time string is in HH:mm:ss format
+export function formatTime(timeStr: string): string {
+  if (!timeStr) return '00:00:00';
+  // If already HH:mm:ss
+  if (/^\d{2}:\d{2}:\d{2}$/.test(timeStr)) return timeStr;
+  // If HH:mm
+  if (/^\d{1,2}:\d{2}$/.test(timeStr)) {
+    const parts = timeStr.split(':').map(p => p.padStart(2, '0'));
+    return `${parts[0]}:${parts[1]}:00`;
+  }
+  // Fallback: try to parse and format
+  const d = new Date(`1970-01-01T${timeStr}`);
+  if (!isNaN(d.getTime())) return d.toTimeString().split(' ')[0];
+  return '00:00:00';
+}
+
 /**
  * Gets the current date in the specified timezone as ISO 8601 string.
  * @param timezone - The timezone (default: 'America/Bogota').

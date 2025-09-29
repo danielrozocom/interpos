@@ -1,11 +1,13 @@
 <script lang="ts">
   import { onMount } from 'svelte';
+  import { page } from '$app/stores';
   import { formatDate } from '../../lib/date-utils';
   import { normalizeUserId } from '../../lib/normalizeUserId';
 
   let showScanner = false;
   let scannerError = '';
   let Scanner: any = null;
+  let userIdInput: HTMLInputElement | null = null;
 
   // Cargar el componente Scanner solo en el cliente
   onMount(async () => {
@@ -95,6 +97,20 @@
   let loading = false;
   let initialLoading = true;
   let name = '';
+
+  // Pre-fill userId from URL parameters
+  $: if ($page.url.searchParams.get('userId')) {
+    const urlUserId = $page.url.searchParams.get('userId');
+    if (urlUserId && urlUserId !== userId) {
+      userId = urlUserId;
+      // Clear the URL parameter after setting the value
+      if (typeof window !== 'undefined') {
+        const newUrl = new URL(window.location.href);
+        newUrl.searchParams.delete('userId');
+        window.history.replaceState({}, '', newUrl.toString());
+      }
+    }
+  }
 
   $: if (userId === '') name = '';
 
@@ -220,7 +236,7 @@
     }
 
     if (!userId) {
-      error = 'Por favor ingresa un ID de usuario';
+  error = 'Por favor ingresa un ID de cliente';
       return;
     }
 
@@ -244,7 +260,7 @@
         try { body = await balanceResponse.json(); } catch (e) { /* ignore */ }
         const serverMsg = body?.error || body?.message || null;
         console.warn('User not found or server error for userId', userId, serverMsg);
-        error = serverMsg || 'No existe un usuario con ese ID';
+  error = serverMsg || 'No existe un cliente con ese ID';
         // Ensure UI shows the alert and not the empty-transactions state
         balance = null;
         transactions = [];
@@ -336,7 +352,7 @@
       
     } catch (err) {
       console.error('Error en checkBalance:', err);
-      error = 'No existe un usuario con ese ID';
+  error = 'No existe un cliente con ese ID';
       balance = null;
       transactions = [];
     } finally {
@@ -358,7 +374,7 @@
 
 <svelte:head>
   <title>Consulta tu Saldo | InterPOS</title>
-  <meta name="description" content="Consulta el saldo y los últimos movimientos de tu cuenta en InterPOS ingresando tu ID de usuario." />
+  <meta name="description" content="Consulta el saldo y los últimos movimientos de tu cuenta en InterPOS ingresando tu ID de cliente." />
 </svelte:head>
 
 <div class="min-h-screen bg-gray-50 p-4">
@@ -373,7 +389,7 @@
   <div class="bg-white rounded-2xl shadow-lg border border-[#35528C]/10 p-6 mb-4 transform transition-all duration-200 hover:shadow-xl">
       <div class="max-w-xl mx-auto">
         <label class="block text-lg font-semibold text-[#35528C] mb-3" for="userId">
-          ID de Usuario
+          ID de Cliente
         </label>
         <div class="flex flex-col sm:flex-row gap-4 items-start">
           <!-- left group: input + camera button (stay on same row even on mobile) -->
@@ -387,10 +403,11 @@
                   on:paste={handlePaste}
                   on:input={(e) => { const v = e.currentTarget.value.replace(/[^0-9]/g, ''); if (v !== userId) userId = v; }}
                 class="h-12 rounded-xl border-2 border-gray-200 shadow-sm focus:border-[#35528C] focus:ring-2 focus:ring-[#35528C]/20 text-lg px-4 w-full min-w-0"
-                placeholder="Ingresa tu ID"
+                placeholder="Ingresa tu ID de cliente"
                 inputmode="numeric"
                 pattern="[0-9]*"
                 autocomplete="off"
+                bind:this={userIdInput}
                 autofocus
               />
             </div>
