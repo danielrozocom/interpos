@@ -102,7 +102,8 @@
         <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M4 6h16M4 12h16M4 18h16" stroke-linecap="round" stroke-linejoin="round"/></svg>
       </button>
     <a href="/" class="topbar-brand" aria-label="Ir a inicio">InterPOS</a>
-    {#if $page.data.session?.user}
+    <!-- Auth temporarily disabled - will use different solution later -->
+    <!-- {#if $page.data.session?.user}
       <div style="margin-left:auto; display:flex; align-items:center; gap:0.5rem;">
         <div class="text-sm">{ $page.data.session.user.name || $page.data.session.user.email }</div>
         <button on:click={async () => {
@@ -110,7 +111,7 @@
           location.reload();
         }} class="px-2 py-1 bg-white text-sm text-gray-800 rounded">Salir</button>
       </div>
-    {/if}
+    {/if} -->
     </div>
   </header>
   <div class="flex">

@@ -11,5 +11,14 @@ export default defineConfig({
   },
   ssr: {
     noExternal: ['@zxing/browser', '@zxing/library']
+  },
+  build: {
+    rollupOptions: {
+      external: [
+        'supports-color',
+        'google-spreadsheet',
+        'googleapis'
+      ]
+    }
   }
 });

@@ -14,7 +14,8 @@ const config = {
 		// Use the Vercel adapter so SvelteKit emits the correct .vercel/output
 		// structure Vercel expects.
 		adapter: adapter({
-			runtime: 'nodejs20.x'
+			runtime: 'nodejs20.x',
+			external: ['supports-color', 'google-spreadsheet', 'googleapis']
 		}),
 		paths: {
 			base: process.env.NODE_ENV === 'production' ? '' : ''
