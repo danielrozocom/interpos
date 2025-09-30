@@ -23,7 +23,13 @@ export const POST: RequestHandler = async ({ request }) => {
     const dateIso = now.toISOString();
 
     try {
-      const balanceSrc = await fromFlexible('Transactions_Balance');
+      let balanceSrc;
+      try {
+        balanceSrc = await fromFlexible('Transactions_Balance');
+      } catch (inner) {
+        console.warn('fromFlexible failed for Transactions_Balance, trying "Transactions - Balance"', inner);
+        balanceSrc = await fromFlexible('Transactions - Balance');
+      }
       const { error: insertErr } = await balanceSrc.from().insert([{ Date: dateIso, Time: dateIso, UserID: Number(userId), Name: user.Name, Quantity: String(quantity), PrevBalance: String(prevBalance), NewBalance: String(newBalance), Method: method || null, Observations: observations || null }]);
       if (insertErr) {
         console.error('Supabase error inserting transaction:', insertErr);

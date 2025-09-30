@@ -55,14 +55,15 @@ export const POST: RequestHandler = async ({ request }) => {
 
 		// Insert order into Supabase Transactions table (Transactions_Orders) with flexible table name
 		try {
-			const ordersSrc = await fromFlexible('Transactions_Orders');
-			const orderInsert = await ordersSrc.from().insert([{ Date: dateStr, Time: timeStr, OrderID: orderID, UserID: finalUserID, Name: finalUserName, Quantity: quantity, Method: paymentMethod, Products: products }]);
+			console.log('Inserting into transactions_orders table directly...');
+			const orderInsert = await sbServer.from('transactions_orders').insert([{ Date: dateStr, Time: timeStr, OrderID: orderID, UserID: finalUserID, Name: finalUserName, Quantity: quantity, Method: paymentMethod, "Product(s)": products }]);
 			if (orderInsert.error) {
 				console.error('Error inserting order in Supabase:', orderInsert.error);
 				return json({ success: false, error: 'Error inserting order' }, { status: 500 });
 			}
+			console.log('Successfully inserted order into transactions_orders');
 		} catch (e) {
-			console.error('Error locating/inserting into Transactions_Orders:', e);
+			console.error('Error inserting into transactions_orders:', e);
 			return json({ success: false, error: 'Error inserting order' }, { status: 500 });
 		}
 
@@ -156,16 +157,18 @@ export const POST: RequestHandler = async ({ request }) => {
 			console.log('Skipping balance update - Cash payment or no real user');
 		}
 
-		// Insert balance transaction into Supabase Transactions_Balance table (flexible name)
-		try {
-			const balanceSrc = await fromFlexible('Transactions_Balance');
-			const balanceInsert = await balanceSrc.from().insert([{ Date: balanceValues[0][0], Time: balanceValues[0][1], UserID: balanceValues[0][2], Name: balanceValues[0][3], Quantity: String(balanceValues[0][4]), PrevBalance: String(balanceValues[0][5]), NewBalance: String(balanceValues[0][6]), Method: balanceValues[0][7], Observations: balanceValues[0][8] }]);
-			if (balanceInsert.error) {
-				console.error('Error inserting balance transaction in Supabase:', balanceInsert.error);
+		// Insert balance transaction into Supabase transactions_balance table
+			try {
+				console.log('Inserting into transactions_balance table directly...');
+				const balanceInsert = await sbServer.from('transactions_balance').insert([{ Date: balanceValues[0][0], Time: balanceValues[0][1], UserID: balanceValues[0][2], Quantity: String(balanceValues[0][4]), PrevBalance: String(balanceValues[0][5]), NewBalance: String(balanceValues[0][6]), Method: balanceValues[0][7], "Observation(s)": balanceValues[0][8] }]);
+				if (balanceInsert.error) {
+					console.error('Error inserting balance transaction in Supabase:', balanceInsert.error);
+				} else {
+					console.log('Successfully inserted balance transaction into transactions_balance');
+				}
+			} catch (e) {
+				console.error('Error inserting into transactions_balance:', e);
 			}
-		} catch (e) {
-			console.error('Error locating/inserting into Transactions_Balance:', e);
-		}
 
 	console.log('Transaction recorded successfully in Supabase');
 
@@ -209,21 +212,22 @@ export const GET: RequestHandler = async ({ url }) => {
 
 		// Query transactions from Supabase Transactions_Orders table
 		// Map the Supabase rows into the same shape expected by the frontend
-		// Query transactions from Supabase Transactions_Orders table (flexible name)
+		// Query transactions from Supabase transactions_orders table
 		let txData: any[] = [];
 		try {
-			const ordersSrc = await fromFlexible('Transactions_Orders');
-			const { data: _txData, error: txErr } = await ordersSrc.from().select('Date,Time,OrderID,UserID,Name,Quantity,Method,Products');
+			console.log('Querying transactions_orders table directly...');
+			const { data: _txData, error: txErr } = await sbServer.from('transactions_orders').select('Date,Time,OrderID,UserID,Name,Quantity,Method,"Product(s)"');
 			if (txErr) {
 				console.error('Error fetching transactions from Supabase:', txErr);
 				return json({ success: false, error: 'Error fetching transactions' }, { status: 500 });
 			}
 			txData = _txData || [];
+			console.log(`Successfully queried transactions_orders, found ${txData.length} transactions`);
 		} catch (e) {
-			console.error('Error locating Transactions_Orders:', e);
+			console.error('Error querying transactions_orders:', e);
 			return json({ success: false, error: 'Error fetching transactions' }, { status: 500 });
 		}
-		const rows = (txData || []).map((r: any) => [r.Date, r.Time, r.OrderID, r.UserID, r.Name, r.Quantity, r.Method, r.Products]);
+		const rows = (txData || []).map((r: any) => [r.Date, r.Time, r.OrderID, r.UserID, r.Name, r.Quantity, r.Method, r["Product(s)"]]);
 
 		if (rows.length <= 1) {
 			return json({ 
@@ -362,20 +366,24 @@ export const GET: RequestHandler = async ({ url }) => {
 
 		if (date === 'today') {
 			// Obtener fecha actual en zona horaria de Colombia
-			const colombiaTime = new Date().toISOString().split('T')[0]; // YYYY-MM-DD
-			const colombiaDate = new Date(`${colombiaTime}T00:00:00`);
-			const todayDay = colombiaDate.getDate();
-			const todayMonth = colombiaDate.getMonth() + 1;
-			const todayYear = colombiaDate.getFullYear();
+			const now = new Date();
+			const colombiaTime = new Date(now.toLocaleString("en-US", {timeZone: "America/Bogota"}));
+			const todayDay = colombiaTime.getDate();
+			const todayMonth = colombiaTime.getMonth() + 1;
+			const todayYear = colombiaTime.getFullYear();
+			
+			// Formatear fecha en diferentes formatos para comparación
+			const todayFormatted = {
+				iso: `${todayYear}-${todayMonth.toString().padStart(2, '0')}-${todayDay.toString().padStart(2, '0')}`,
+				slash: `${todayDay}/${todayMonth}/${todayYear}`,
+				slashPadded: `${todayDay.toString().padStart(2, '0')}/${todayMonth.toString().padStart(2, '0')}/${todayYear}`
+			};
 
 			console.log('Colombia today:', {
-				colombiaTime,
 				todayDay,
 				todayMonth,
 				todayYear,
-				formatted14: `14/${todayMonth}/${todayYear}`,
-				formatted14_2: `14/${todayMonth}/${todayYear}`,
-				formatted14_3: `14/${todayMonth.toString().padStart(2, '0')}/${todayYear}`
+				formats: todayFormatted
 			});
 			console.log('Total transactions before filter:', filteredTransactions.length);
 			console.log('All transactions dates:', filteredTransactions.map(t => ({
@@ -386,12 +394,15 @@ export const GET: RequestHandler = async ({ url }) => {
       
 			filteredTransactions = filteredTransactions.filter(t => {
 				const dateStr = t.date.toString().toLowerCase();
+				const dateStrOriginal = t.date.toString();
         
-				// Buscar específicamente por 14/7/2025 o 14/07/2025
-				const isToday = dateStr.includes('14/7/2025') || 
-											 dateStr.includes('14/07/2025') ||
-											 dateStr.includes('2025-07-14') ||
-											 (dateStr.includes('14') && dateStr.includes('7') && dateStr.includes('2025'));
+				// Buscar por la fecha actual en diferentes formatos
+				const isToday = dateStr.includes(todayFormatted.iso.toLowerCase()) || 
+											 dateStr.includes(todayFormatted.slash.toLowerCase()) ||
+											 dateStr.includes(todayFormatted.slashPadded.toLowerCase()) ||
+											 dateStrOriginal.includes(todayFormatted.iso) ||
+											 dateStrOriginal.includes(todayFormatted.slash) ||
+											 dateStrOriginal.includes(todayFormatted.slashPadded);
         
 				if (isToday) {
 					console.log('✓ Found today transaction:', { 

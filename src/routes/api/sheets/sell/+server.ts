@@ -49,7 +49,13 @@ export const POST: RequestHandler = async ({ request }) => {
     const now = new Date();
     const dateIso = now.toISOString();
     try {
-      const balanceSrc = await fromFlexible('Transactions_Balance');
+      let balanceSrc;
+      try {
+        balanceSrc = await fromFlexible('Transactions_Balance');
+      } catch (inner) {
+        console.warn('fromFlexible failed for Transactions_Balance, trying "Transactions - Balance"', inner);
+        balanceSrc = await fromFlexible('Transactions - Balance');
+      }
       const { error: insertErr } = await balanceSrc.from().insert([{ Date: dateIso, Time: dateIso, UserID: Number(userId), Name: user.Name, Quantity: String(-Math.abs(amount)), PrevBalance: String(currentBalance), NewBalance: String(newBalance), Method: '-', Observations: product ? `Compra ${product.Name} (ID ${product.ID})` : `Compra producto ${productId}` }]);
       if (insertErr) {
         console.error('Supabase error inserting transaction:', insertErr);
@@ -57,7 +63,7 @@ export const POST: RequestHandler = async ({ request }) => {
         return new Response(JSON.stringify({ success: false, error: 'Error registrando transacción' }), { status: 500, headers: { 'Content-Type': 'application/json' } });
       }
     } catch (e) {
-      console.error('Error locating/inserting into Transactions_Balance:', e);
+      console.error('Error locating/inserting into Transactions_Balance or Transactions - Balance:', e);
       return new Response(JSON.stringify({ success: false, error: 'Error registrando transacción' }), { status: 500, headers: { 'Content-Type': 'application/json' } });
     }
 

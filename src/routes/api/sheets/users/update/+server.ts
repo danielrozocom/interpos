@@ -25,7 +25,13 @@ export const POST: RequestHandler = async ({ request }) => {
     const now = new Date();
     const dateIso = now.toISOString();
     try {
-      const balanceSrc = await fromFlexible('Transactions_Balance');
+      let balanceSrc;
+      try {
+        balanceSrc = await fromFlexible('Transactions_Balance');
+      } catch (inner) {
+        console.warn('fromFlexible failed for Transactions_Balance, trying "Transactions - Balance"', inner);
+        balanceSrc = await fromFlexible('Transactions - Balance');
+      }
       const { error: insertErr } = await balanceSrc.from().insert([{
         Date: dateIso,
         Time: dateIso,
@@ -39,7 +45,7 @@ export const POST: RequestHandler = async ({ request }) => {
       }]);
       if (insertErr) console.error('Supabase insert error:', insertErr);
     } catch (e) {
-      console.error('Error locating/inserting into Transactions_Balance:', e);
+      console.error('Error locating/inserting into Transactions_Balance or Transactions - Balance:', e);
     }
 
     return new Response(JSON.stringify({ success: true }), { status: 200, headers: { 'Content-Type': 'application/json' } });

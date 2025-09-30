@@ -1,6 +1,8 @@
 // Use the Vercel adapter for deployments on Vercel. Locally you can still run
 // with adapter-node if you prefer; for Vercel deployments install
 // `@sveltejs/adapter-vercel` and replace the import below.
+// import adapter from '@sveltejs/adapter-node';
+// import adapter from '@sveltejs/adapter-auto';
 import adapter from '@sveltejs/adapter-vercel';
 import { vitePreprocess } from '@sveltejs/vite-plugin-svelte';
 

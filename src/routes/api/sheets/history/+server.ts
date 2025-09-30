@@ -13,19 +13,36 @@ export const GET: RequestHandler = async ({ url }) => {
     });
   }
   try {
-    // Query Transactions_Balance from Supabase (flexible name)
+    // Query transactions_balance from Supabase directly
     let rows: any[] = [];
     try {
-      const balanceSrc = await fromFlexible('Transactions_Balance');
-      const { data: _rows, error } = await balanceSrc.from().select('Date,Time,UserID,Name,Quantity,PrevBalance,NewBalance,Method,Observations').eq('UserID', Number(userId));
+      console.log('Querying transactions_balance table directly...');
+      
+      // Select commonly used columns that should exist in the table
+      const { data: _rows, error } = await sbServer
+        .from('transactions_balance')
+        .select('Date,Time,UserID,Quantity,PrevBalance,NewBalance,Method,"Observation(s)"')
+        .eq('UserID', Number(userId));
+        
       if (error) {
-        console.error('Error querying Transactions_Balance:', error);
-        return new Response(JSON.stringify({ error: 'Error al consultar el historial' }), { status: 500, headers: { 'Content-Type': 'application/json' } });
+        console.error('Error querying transactions_balance table:', error);
+        return new Response(JSON.stringify({ 
+          error: 'Error al consultar el historial', 
+          details: `Supabase error: ${error.message}`,
+          tableName: 'transactions_balance'
+        }), { status: 500, headers: { 'Content-Type': 'application/json' } });
       }
+      
       rows = _rows || [];
+      console.log(`Successfully queried transactions_balance, found ${rows.length} rows for UserID ${userId}`);
+      
     } catch (e) {
-      console.error('Error locating Transactions_Balance:', e);
-      return new Response(JSON.stringify({ error: 'Error al consultar el historial' }), { status: 500, headers: { 'Content-Type': 'application/json' } });
+      console.error('Error querying transactions_balance table:', e);
+      return new Response(JSON.stringify({ 
+        error: 'Error al consultar el historial', 
+        details: String(e),
+        tableName: 'transactions_balance'
+      }), { status: 500, headers: { 'Content-Type': 'application/json' } });
     }
     console.log('=== DEBUG HISTORY API ===');
     console.log('Total filas leídas:', rows.length);
@@ -58,7 +75,8 @@ export const GET: RequestHandler = async ({ url }) => {
         PrevBalance: row.PrevBalance || '0',
         NewBalance: row.NewBalance || '0',
         Method: row.Method || '',
-        'Observation(s)': row.Observations || ''
+  Observations: row.Observations || '',
+  'Observation(s)': row.Observations || ''
       };
     });
 

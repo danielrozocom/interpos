@@ -90,7 +90,13 @@ export const GET: RequestHandler = async ({ url }) => {
     // Read balance transactions from Supabase Transactions_Balance (flexible names)
     let balanceRows: any[] = [];
     try {
-      const balanceSource = await fromFlexible('Transactions_Balance');
+      let balanceSource;
+      try {
+        balanceSource = await fromFlexible('Transactions_Balance');
+      } catch (inner) {
+        console.warn('fromFlexible failed for Transactions_Balance, trying "Transactions - Balance"', inner);
+        balanceSource = await fromFlexible('Transactions - Balance');
+      }
       const { data: _balanceRows, error: balanceErr } = await balanceSource.from().select('Date,Time,UserID,Name,Quantity,PrevBalance,NewBalance,Method,Observations');
       if (balanceErr) throw balanceErr;
       balanceRows = _balanceRows || [];

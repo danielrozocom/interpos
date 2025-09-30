@@ -157,13 +157,19 @@ export const POST: RequestHandler = async ({ request }) => {
 
     // Insert balance transaction into Supabase Transactions_Balance table (flexible name)
     try {
-      const balanceSrc = await fromFlexible('Transactions_Balance');
+      let balanceSrc;
+      try {
+        balanceSrc = await fromFlexible('Transactions_Balance');
+      } catch (inner) {
+        console.warn('fromFlexible failed for Transactions_Balance, trying "Transactions - Balance"', inner);
+        balanceSrc = await fromFlexible('Transactions - Balance');
+      }
       const balanceInsert = await balanceSrc.from().insert([{ Date: balanceValues[0][0], Time: balanceValues[0][1], UserID: balanceValues[0][2], Name: balanceValues[0][3], Quantity: String(balanceValues[0][4]), PrevBalance: String(balanceValues[0][5]), NewBalance: String(balanceValues[0][6]), Method: balanceValues[0][7], Observations: balanceValues[0][8] }]);
       if (balanceInsert.error) {
         console.error('Error inserting balance transaction in Supabase:', balanceInsert.error);
       }
     } catch (e) {
-      console.error('Error locating/inserting into Transactions_Balance:', e);
+      console.error('Error locating/inserting into Transactions_Balance or Transactions - Balance:', e);
     }
 
   console.log('Transaction recorded successfully in Supabase');
