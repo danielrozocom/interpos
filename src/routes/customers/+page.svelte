@@ -516,7 +516,7 @@
 
 <!-- User modal (create / edit) -->
 {#if showUserModal}
-  <Modal bind:open={showUserModal} title={editingUser ? 'Editar cliente' : 'Agregar cliente'}>
+  <Modal bind:open={showUserModal} title={editingUser ? 'Editar cliente' : 'Agregar cliente'} busy={savingUser}>
     <div class="p-2">
       <h3 class="sr-only">{editingUser ? 'Editar cliente' : 'Agregar cliente'}</h3>
 

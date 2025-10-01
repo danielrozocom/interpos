@@ -427,7 +427,7 @@
   </div>
 
   {#if showModal}
-    <Modal bind:open={showModal} title={editingProduct ? 'Editar producto' : 'Agregar producto'}>
+    <Modal bind:open={showModal} title={editingProduct ? 'Editar producto' : 'Agregar producto'} busy={saving}>
       <div class="p-2">
         <h3 class="sr-only">{editingProduct ? 'Editar producto' : 'Agregar producto'}</h3>
 

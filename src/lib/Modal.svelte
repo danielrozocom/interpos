@@ -5,6 +5,8 @@
   export let title: string = '';
   export let closeOnBackdrop: boolean = true;
   export let trapFocus: boolean = true;
+  // When true the modal shows a blocking busy spinner and prevents closing
+  export let busy: boolean = false;
   // per-instance z offset to allow stacked modals (confirmations) to appear above
   export let zOffset: number = 0;
 
@@ -54,12 +56,12 @@
   }
 
   function onBackdropClick() {
-    if (closeOnBackdrop) close('backdrop');
+    if (closeOnBackdrop && !busy) close('backdrop');
   }
 
   function onKeydown(e: KeyboardEvent) {
     if (e.key === 'Escape') {
-      close('escape');
+      if (!busy) close('escape');
     }
   }
 
@@ -79,6 +81,18 @@
     <div class="fixed inset-0 modal-portal flex items-center justify-center p-4" on:keydown={onKeydown} role="presentation" style={`z-index: ${portalZ}`}>
       <div class="fixed inset-0 modal-backdrop" on:click={onBackdropClick} aria-hidden="true" style={`z-index: ${backdropZ}`}></div>
       <div bind:this={dialogEl} tabindex="-1" class="relative w-full max-w-3xl bg-white rounded-lg shadow-lg modal-content" role="dialog" aria-modal="true" aria-label={title} style={`z-index: ${dialogZ}`}>
+      {#if busy}
+        <!-- blocking overlay inside the modal to show centralized spinner while saving -->
+        <div class="absolute inset-0 z-50 flex items-center justify-center" style="background: rgba(255,255,255,0.7);">
+          <div class="flex flex-col items-center gap-3">
+            <svg class="h-8 w-8 animate-spin text-[#35528C]" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+              <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+              <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
+            </svg>
+            <div class="text-sm text-[#35528C] font-medium">Guardando...</div>
+          </div>
+        </div>
+      {/if}
       <div class="p-6 flex flex-col">
         <div class="flex items-start justify-between mb-4">
           {#if title}
