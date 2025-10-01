@@ -353,8 +353,19 @@
   {#if showModal}
     <!-- Wrapper with high z-index so modal sits above header (header z-index:1000) -->
     <div class="fixed inset-0 flex items-center justify-center p-4" style="z-index:2000">
-      <div class="fixed inset-0 bg-black/40" on:click={closeModal} aria-hidden="true" style="z-index:2000"></div>
-      <div bind:this={modalEl} class="relative w-full max-w-xl bg-white rounded-lg shadow-lg modal-content" style="z-index:2001">
+      <div class="fixed inset-0 bg-black/40" on:click={() => { if (!saving) closeModal(); }} aria-hidden="true" style="z-index:2000"></div>
+        <div bind:this={modalEl} class="relative w-full max-w-xl bg-white rounded-lg shadow-lg modal-content" style="z-index:2001">
+        {#if saving}
+          <div class="absolute inset-0 z-50 flex items-center justify-center" style="background: rgba(255,255,255,0.72);">
+            <div class="flex flex-col items-center gap-3">
+              <svg class="h-8 w-8 animate-spin text-[#35528C]" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
+              </svg>
+              <div class="text-sm text-[#35528C] font-medium">Guardando...</div>
+            </div>
+          </div>
+        {/if}
         <div class="p-6 flex flex-col" style="max-height: {modalMaxHeight}px">
           <div class="overflow-auto pr-2" style="max-height: {modalMaxHeight - 80}px">
             <h3 class="text-lg font-semibold text-gray-900 mb-2">{editing ? 'Editar impuesto' : 'Nuevo impuesto'}</h3>
@@ -412,7 +423,17 @@
 
           <div class="mt-3 mt-4 flex-shrink-0 flex justify-end gap-2 p-2 border-t border-gray-100 bg-white">
             <button class="btn-secondary" on:click={closeModal} disabled={saving}>Cancelar</button>
-            <button class="btn-primary" on:click={submit} disabled={saving}>{saving ? 'Guardando...' : 'Guardar'}</button>
+            <button class="btn-primary" on:click={submit} disabled={saving}>
+              {#if saving}
+                <svg class="h-4 w-4 animate-spin mr-2" viewBox="0 0 24 24">
+                  <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" fill="none"></circle>
+                  <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
+                </svg>
+                Guardando...
+              {:else}
+                Guardar
+              {/if}
+            </button>
           </div>
         </div>
       </div>
