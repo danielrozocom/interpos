@@ -420,15 +420,6 @@
             </div>
           </div>
 
-          <!-- required field hints shown at the bottom of the modal -->
-          <div class="mt-4 p-3 bg-gray-50 border border-gray-100 rounded text-sm text-gray-700">
-            <ul class="list-disc list-inside">
-              <li>El código es obligatorio.</li>
-              <li>El nombre es obligatorio.</li>
-              <li>El valor por defecto es obligatorio y numérico.</li>
-            </ul>
-          </div>
-
           {#if saveErrors.length}
             <div bind:this={errorAlertEl} class="mb-3 p-3 rounded bg-red-50 border border-red-200 text-sm text-red-700">
               <ul class="list-disc list-inside">
