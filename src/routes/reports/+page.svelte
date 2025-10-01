@@ -1190,11 +1190,11 @@ $: if (_hasMounted) {
   .input-field:invalid { box-shadow: none; }
   /* Ensure the inner editable part of webkit date inputs inherits color */
   input[type="date"]::-webkit-datetime-edit, input[type="date"]::-webkit-datetime-edit-fields-wrapper { color: inherit; }
-  .card { background: white; border-radius: .75rem; box-shadow: 0 6px 18px rgba(16,24,40,0.04); }
+  .card { background: white; border-radius: var(--radius-lg); box-shadow: 0 6px 18px rgba(16,24,40,0.04); }
   /* extra spacing for the filters container to separate it from following content */
   .filters-container { margin-bottom: 2.25rem; }
-  .btn-primary { background: #35528C; color: white; padding: .5rem 1rem; border-radius: .5rem; }
-  .btn-secondary { background: #f3f4f6; color: #111827; padding: .5rem 1rem; border-radius: .5rem; }
+  .btn-primary { background: #35528C; color: white; padding: .5rem 1rem; border-radius: var(--radius-md); }
+  .btn-secondary { background: #f3f4f6; color: #111827; padding: .5rem 1rem; border-radius: var(--radius-md); }
   /* Preset buttons: non-active have a subtle border so each button is distinguished; active keeps only background */
   .preset-group .preset-btn {
     background: transparent;

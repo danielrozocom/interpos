@@ -6,6 +6,8 @@
   let deleteSuccess = '';
   let searchTerm = '';
   let searchInput: HTMLInputElement | null = null;
+  let modalIdInput: HTMLInputElement | null = null;
+  let modalNameInput: HTMLInputElement | null = null;
   let sortBy: 'id' | 'name' | 'price' | 'category' = 'name';
   let sortDirection: 'asc' | 'desc' = 'asc';
 
@@ -102,15 +104,27 @@
     saveErrors = [];
     saveSuccess = false;
     showModal = true;
-    // prevent background scrolling while modal is open by fixing body position
+    // prevent background scrolling while modal is open by adding modal-open class (CSS handles overflow)
     if (typeof window !== 'undefined' && typeof document !== 'undefined') {
       _bodyScrollY = window.scrollY || document.documentElement.scrollTop || 0;
-      document.body.style.position = 'fixed';
-      document.body.style.top = `-${_bodyScrollY}px`;
-      document.body.style.left = '0';
-      document.body.style.right = '0';
-      document.body.style.width = '100%';
-      document.body.style.overflow = 'hidden';
+      try {
+        document.documentElement.classList.add('modal-open');
+        document.body.classList.add('modal-open');
+      } catch (e) {}
+      // focus inputs after render without causing scroll
+      tick().then(() => {
+        try {
+          if (modalNameInput && editingProduct) {
+            modalNameInput.focus({ preventScroll: true });
+          } else if (modalIdInput) {
+            modalIdInput.focus({ preventScroll: true });
+            modalIdInput.select?.();
+          }
+        } catch (e) {
+          try { modalNameInput?.focus(); } catch(_) {}
+          try { modalIdInput?.focus(); } catch(_) {}
+        }
+      });
     }
   }
 
@@ -120,18 +134,11 @@
     saveSuccess = false;
     // restore body scrolling and scroll position
     if (typeof window !== 'undefined' && typeof document !== 'undefined') {
-      document.body.style.position = '';
-      document.body.style.top = '';
-      document.body.style.left = '';
-      document.body.style.right = '';
-      document.body.style.width = '';
-      document.body.style.overflow = '';
-      // restore previous scroll
       try {
-        window.scrollTo(0, _bodyScrollY || 0);
-      } catch (e) {
-        // ignore
-      }
+        document.documentElement.classList.remove('modal-open');
+        document.body.classList.remove('modal-open');
+      } catch (e) {}
+      try { setTimeout(() => { window.scrollTo(0, _bodyScrollY || 0); }, 0); } catch (e) {}
     }
   }
 
@@ -177,14 +184,11 @@
   import { onDestroy } from 'svelte';
   onDestroy(() => {
     if (typeof window !== 'undefined') {
-      // ensure scroll lock removed on destroy
-      document.body.style.position = '';
-      document.body.style.top = '';
-      document.body.style.left = '';
-      document.body.style.right = '';
-      document.body.style.width = '';
-      document.body.style.overflow = '';
-      try { window.scrollTo(0, _bodyScrollY || 0); } catch (e) {}
+      // ensure modal-open class removed on destroy
+      try {
+        document.documentElement.classList.remove('modal-open');
+        document.body.classList.remove('modal-open');
+      } catch (e) {}
     }
   });
 
@@ -281,7 +285,7 @@
           </div>
           <input bind:this={searchInput} type="text" bind:value={searchTerm} placeholder="Buscar por ID o nombre..." class="input-field input-with-icon pr-10 s-xAzoHdC_kP8W" />
           {#if searchTerm}
-            <button type="button" class="absolute right-2 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-700" aria-label="Limpiar búsqueda" on:click={() => { searchTerm = ''; searchInput?.focus(); }}>
+            <button type="button" class="absolute right-2 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-700" aria-label="Limpiar búsqueda" on:click={() => { searchTerm = ''; try { searchInput?.focus({ preventScroll: true }); } catch(e) { searchInput?.focus(); } }}>
               <svg class="h-4 w-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
               </svg>
@@ -289,14 +293,15 @@
           {/if}
         </div>
       </div>
-      <div class="flex items-center gap-2 w-full lg:w-auto">
-        <button class="btn-primary btn-add" on:click={() => openModal(null)} title="Agregar producto" aria-label="Agregar producto">
-          <svg class="h-5 w-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
-          </svg>
-          <span class="ml-3 block sm:hidden">Agregar</span>
-          <span class="ml-3 hidden sm:inline">Agregar producto</span>
-        </button>
+      <div class="flex items-center gap-2 w-auto mr-auto">
+        <div class="flex items-center gap-3">
+          <button type="button" class="inline-flex items-center justify-center p-3 rounded-full" on:click={() => openModal(null)} title="Agregar producto" aria-label="Agregar producto" style="background-color: #35528C; color: white;">
+            <svg class="h-5 w-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" style="color: white"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" /></svg>
+          </button>
+          <button type="button" class="inline-flex items-center justify-center p-3 rounded-full" on:click={refreshProducts} title="Sincronizar" aria-label="Sincronizar" style="background-color: #35528C; color: white;">
+            <svg class="h-5 w-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" style="color: white"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" /></svg>
+          </button>
+        </div>
       </div>
 
       <div class="flex flex-col sm:flex-row items-center gap-4 w-full lg:w-auto">
@@ -307,12 +312,7 @@
           </div>
         </div>
 
-        <button on:click={refreshProducts} disabled={loading} class="btn-secondary flex items-center gap-2 whitespace-nowrap">
-          <svg class="h-4 w-4 {loading ? 'animate-spin' : ''}" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-          </svg>
-          {loading ? 'Actualizando...' : 'Actualizar'}
-        </button>
+        <!-- Removed duplicate textual 'Actualizar' button to keep only the circular sync control on the left -->
       </div>
     </div>
   </div>
@@ -421,7 +421,7 @@
 
   {#if showModal}
     <div class="fixed inset-0 z-50 modal-overlay bg-black bg-opacity-40 flex items-center justify-center px-6" style="overflow:hidden; position:relative;" role="dialog" aria-modal="true">
-      <div bind:this={modalEl} class="modal-content bg-white rounded-lg p-6 w-full max-w-lg shadow-lg overflow-auto" style="max-height: {modalMaxHeight}px;">
+      <div bind:this={modalEl} class="modal-content bg-white rounded-lg p-6 w-full max-w-lg shadow-lg overflow-auto" style="max-height: {modalMaxHeight}px; border-radius: var(--radius-lg);">
         <h3 class="text-lg font-semibold mb-4">{editingProduct ? 'Editar producto' : 'Agregar producto'}</h3>
 
         <label for="modalId" class="block text-sm text-gray-700">ID <span class="text-red-600">*</span></label>
@@ -448,7 +448,7 @@
         </div>
 
         {#if saveErrors && saveErrors.length > 0}
-          <div class="mb-2 p-3 bg-red-50 border border-red-200 rounded-lg">
+    <div class="mb-2 p-3 bg-red-50 border border-red-200 rounded-lg" style="border-radius: var(--radius-lg);">
             <div class="flex items-center space-x-2 mb-2">
               <svg class="w-5 h-5 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
@@ -464,7 +464,7 @@
         {/if}
 
         {#if saveSuccess}
-          <div class="mb-2 p-3 bg-green-50 border border-green-200 rounded-lg">
+          <div class="mb-2 p-3 bg-green-50 border border-green-200 rounded-lg" style="border-radius: var(--radius-lg);">
             <div class="flex items-center space-x-2">
               <svg class="w-5 h-5 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>

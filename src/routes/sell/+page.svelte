@@ -439,8 +439,7 @@ let showCashModal = false;
       if (typeof window !== 'undefined') {
         userIdInput = document.getElementById('userId') as HTMLInputElement | null;
       }
-      userIdInput?.focus();
-      userIdInput?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  try { userIdInput?.focus({ preventScroll: true }); } catch(e) { userIdInput?.focus(); }
   error = 'Debes ingresar un ID de cliente.';
       return;
     }

@@ -169,7 +169,7 @@ onMount(() => {
     max-width: 420px;
     margin: 4px auto; /* Reducido el margen superior para ajustar al header */
     background: white;
-    border-radius: 16px;
+  border-radius: var(--radius-lg);
     box-shadow: 0 4px 12px rgba(0,0,0,0.1);
     overflow: hidden;
     border: 1px solid rgba(53, 82, 140, 0.1);
@@ -181,7 +181,7 @@ onMount(() => {
     text-align: center;
     color: white;
     border-bottom: 2px solid rgba(53, 82, 140, 0.2);
-    border-radius: 16px 16px 0 0;
+    border-radius: var(--radius-lg) var(--radius-lg) 0 0;
   }
 
   .company-name {
@@ -198,7 +198,7 @@ onMount(() => {
     font-weight: 600;
     background: white;
     padding: 10px 20px;
-    border-radius: 12px;
+  border-radius: var(--radius-md);
     display: inline-block;
     border: 2px solid white;
     box-shadow: 0 2px 8px rgba(0,0,0,0.1);

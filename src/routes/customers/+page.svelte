@@ -1,6 +1,7 @@
 <script lang="ts">
-  import { onMount, onDestroy } from 'svelte';
+  import { onMount, onDestroy, tick } from 'svelte';
   import { siteName } from '../../lib/config';
+  import Portal from '../../lib/Portal.svelte';
 
   // Types
   interface User {
@@ -107,6 +108,8 @@
   let modalMode: 'create' | 'edit' = 'create';
   let _bodyScrollY = 0;
   let searchInput: HTMLInputElement | null = null;
+  let modalIdInput: HTMLInputElement | null = null;
+  let modalNameInput: HTMLInputElement | null = null;
 
   // Delete confirmation modal state
   let showDeleteModal = false;
@@ -129,32 +132,75 @@
     savingUser = false;
     saveSuccess = false;
     saveErrors = [];
-    showUserModal = true;
-    // prevent background scrolling while modal is open by adding modal-open class
-    if (typeof window !== 'undefined') {
-      document.documentElement.classList.add('modal-open');
-      document.body.classList.add('modal-open');
+    
+    // Save scroll position BEFORE applying modal-open class
+    if (typeof window !== 'undefined' && typeof document !== 'undefined') {
+      _bodyScrollY = window.scrollY || document.documentElement.scrollTop || 0;
+      
+      // Apply scroll lock with proper body positioning to prevent jump
+      document.body.style.position = 'fixed';
+      document.body.style.top = `-${_bodyScrollY}px`;
+      document.body.style.width = '100%';
+      
+      try {
+        document.documentElement.classList.add('modal-open');
+        document.body.classList.add('modal-open');
+      } catch (e) {}
     }
+
+    // show modal
+    showUserModal = true;
+
+    // focus the most relevant input after the modal is rendered
+    tick().then(() => {
+      try {
+        if (modalNameInput && modalMode === 'edit') {
+          modalNameInput.focus({ preventScroll: true });
+        } else if (modalIdInput) {
+          modalIdInput.focus({ preventScroll: true });
+          modalIdInput.select?.();
+        }
+      } catch (e) {
+        try { modalNameInput?.focus(); } catch(_) {}
+        try { modalIdInput?.focus(); } catch(_) {}
+      }
+    });
   }
+
+
 
   function closeUserModal() {
     showUserModal = false;
     // reset transient state
     savingUser = false;
     saveSuccess = false;
-  saveErrors = [];
-    // restore body scrolling by removing modal-open class
-    if (typeof window !== 'undefined') {
-      document.documentElement.classList.remove('modal-open');
-      document.body.classList.remove('modal-open');
+    saveErrors = [];
+    
+    // restore body scroll behavior and position
+    if (typeof window !== 'undefined' && typeof document !== 'undefined') {
+      try {
+        document.documentElement.classList.remove('modal-open');
+        document.body.classList.remove('modal-open');
+        
+        // Remove fixed positioning and restore scroll
+        document.body.style.position = '';
+        document.body.style.top = '';
+        document.body.style.width = '';
+        
+        // Restore scroll position
+        window.scrollTo(0, _bodyScrollY || 0);
+      } catch (e) {}
     }
   }
 
   onDestroy(() => {
     if (typeof window !== 'undefined') {
-      // ensure scroll lock class removed on destroy
+      // ensure scroll lock class and styles removed on destroy
       document.documentElement.classList.remove('modal-open');
       document.body.classList.remove('modal-open');
+      document.body.style.position = '';
+      document.body.style.top = '';
+      document.body.style.width = '';
     }
   });
 
@@ -276,7 +322,7 @@
             class="input-field input-with-icon pr-10 s-xAzoHdC_kP8W"
           />
           {#if searchTerm}
-            <button type="button" class="absolute right-2 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-700" aria-label="Limpiar búsqueda" on:click={() => { searchTerm = ''; searchInput?.focus(); }}>
+            <button type="button" class="absolute right-2 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-700" aria-label="Limpiar búsqueda" on:click={() => { searchTerm = ''; try { searchInput?.focus({ preventScroll: true }); } catch(e) { searchInput?.focus(); } }}>
               <svg class="h-4 w-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
               </svg>
@@ -284,15 +330,16 @@
           {/if}
         </div>
       </div>
-      <!-- Add user button -->
-      <div class="flex items-center gap-2 w-full lg:w-auto">
-        <button class="btn-primary btn-add" on:click={() => openUserModal() } title="Agregar cliente" aria-label="Agregar cliente">
-          <svg class="h-5 w-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
-          </svg>
-          <span class="ml-3 block sm:hidden">Agregar</span>
-          <span class="ml-3 hidden sm:inline">Agregar cliente</span>
-        </button>
+      <!-- Add and sync buttons -->
+      <div class="flex items-center gap-2 w-auto mr-auto">
+        <div class="flex items-center gap-3">
+          <button type="button" class="inline-flex items-center justify-center p-3 rounded-full" on:click={() => openUserModal()} title="Agregar cliente" aria-label="Agregar cliente" style="background-color: #35528C; color: white;">
+            <svg class="h-5 w-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" style="color: white"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" /></svg>
+          </button>
+          <button type="button" class="inline-flex items-center justify-center p-3 rounded-full" on:click={refreshUsers} title="Sincronizar" aria-label="Sincronizar" style="background-color: #35528C; color: white;">
+            <svg class="h-5 w-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" style="color: white"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" /></svg>
+          </button>
+        </div>
       </div>
 
       <!-- Stats and Refresh -->
@@ -313,17 +360,7 @@
           </div>
         </div>
 
-        <!-- Refresh Button -->
-        <button
-          on:click={refreshUsers}
-          disabled={loading}
-          class="btn-secondary flex items-center gap-2 whitespace-nowrap"
-        >
-          <svg class="h-4 w-4 {loading ? 'animate-spin' : ''}" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-          </svg>
-          {loading ? 'Actualizando...' : 'Actualizar'}
-        </button>
+        <!-- Removed textual 'Actualizar' button; keep only the circular sync next to + -->
       </div>
     </div>
   </div>
@@ -482,70 +519,72 @@
 
 <!-- User modal (create / edit) -->
 {#if showUserModal}
-  <div class="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-40">
-    <div class="modal-content bg-white rounded-lg p-6 w-full max-w-md shadow-lg">
-        <h3 class="text-lg font-semibold mb-4">{editingUser ? 'Editar cliente' : 'Agregar cliente'}</h3>
-        
-        <!-- Visual feedback for modal mode -->
-  <label for="modalId" class="block text-sm text-gray-700">ID <span class="text-red-600">*</span></label>
-  <input id="modalId" class="input-field mt-2 mb-3" bind:value={modalId} placeholder="Ej: 12345" required inputmode="numeric" pattern="\d*" title="Solo números" on:input={(e) => { modalId = (e.target as HTMLInputElement).value.replace(/\D/g, ''); }} />
-  {#if false}
-    <!-- advisory removed per request -->
-    <div class="text-sm text-gray-500 mb-3">Si cambias el ID, debe ser numérico y no puede coincidir con otro usuario existente.</div>
-  {/if}
+  <Portal>
+    <div class="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-40">
+      <div class="modal-content bg-white rounded-lg p-6 w-full max-w-md shadow-lg">
+          <h3 class="text-lg font-semibold mb-4">{editingUser ? 'Editar cliente' : 'Agregar cliente'}</h3>
+          
+          <!-- Visual feedback for modal mode -->
+    <label for="modalId" class="block text-sm text-gray-700">ID <span class="text-red-600">*</span></label>
+    <input id="modalId" bind:this={modalIdInput} class="input-field mt-2 mb-3" bind:value={modalId} placeholder="Ej: 12345" required inputmode="numeric" pattern="\d*" title="Solo números" on:input={(e) => { modalId = (e.target as HTMLInputElement).value.replace(/\D/g, ''); }} />
+    {#if false}
+      <!-- advisory removed per request -->
+      <div class="text-sm text-gray-500 mb-3">Si cambias el ID, debe ser numérico y no puede coincidir con otro usuario existente.</div>
+    {/if}
 
-  <label for="modalName" class="block text-sm text-gray-700">Nombre <span class="text-red-600">*</span></label>
-  <input id="modalName" class="input-field mt-2 mb-2" bind:value={modalName} placeholder="Nombre del cliente" required />
+    <label for="modalName" class="block text-sm text-gray-700">Nombre <span class="text-red-600">*</span></label>
+    <input id="modalName" bind:this={modalNameInput} class="input-field mt-2 mb-2" bind:value={modalName} placeholder="Nombre del cliente" required />
 
-        {#if saveErrors && saveErrors.length > 0}
-          <div class="mb-2 p-3 bg-red-50 border border-red-200 rounded-lg">
-            <div class="flex items-center space-x-2 mb-2">
-              <svg class="w-5 h-5 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
-              </svg>
-              <span class="text-sm font-medium text-red-800">Errores encontrados:</span>
-            </div>
-            <ul class="list-disc list-inside text-sm text-red-700 ml-7">
-              {#each saveErrors as e}
-                <li>{e}</li>
-              {/each}
-            </ul>
-          </div>
-        {/if}
-
-        {#if saveSuccess}
-          <div class="mb-2 p-3 bg-green-50 border border-green-200 rounded-lg">
-            <div class="flex items-center space-x-2">
-              <svg class="w-5 h-5 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
-              </svg>
-              <span class="text-sm font-medium text-green-800">
-                {#if editingUser}
-                  Cliente actualizado correctamente
-                {:else}
-                  Cliente creado correctamente
-                {/if}
-              </span>
-            </div>
-          </div>
-        {:else}
-          <div class="flex justify-end gap-2">
-            <button class="btn-secondary" on:click={closeUserModal} disabled={savingUser}>Cancelar</button>
-            <button class="btn-primary" on:click|preventDefault={submitUser} disabled={savingUser}>
-              {#if savingUser}
-                <svg class="h-4 w-4 animate-spin mr-2" viewBox="0 0 24 24">
-                  <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" fill="none"></circle>
-                  <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
+          {#if saveErrors && saveErrors.length > 0}
+            <div class="mb-2 p-3 bg-red-50 border border-red-200 rounded-lg">
+              <div class="flex items-center space-x-2 mb-2">
+                <svg class="w-5 h-5 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
                 </svg>
-                Guardando...
-              {:else}
-                {editingUser ? 'Guardar' : 'Crear'}
-              {/if}
-            </button>
-          </div>
-        {/if}
+                <span class="text-sm font-medium text-red-800">Errores encontrados:</span>
+              </div>
+              <ul class="list-disc list-inside text-sm text-red-700 ml-7">
+                {#each saveErrors as e}
+                  <li>{e}</li>
+                {/each}
+              </ul>
+            </div>
+          {/if}
+
+          {#if saveSuccess}
+            <div class="mb-2 p-3 bg-green-50 border border-green-200 rounded-lg">
+              <div class="flex items-center space-x-2">
+                <svg class="w-5 h-5 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
+                </svg>
+                <span class="text-sm font-medium text-green-800">
+                  {#if editingUser}
+                    Cliente actualizado correctamente
+                  {:else}
+                    Cliente creado correctamente
+                  {/if}
+                </span>
+              </div>
+            </div>
+          {:else}
+            <div class="flex justify-end gap-2">
+              <button class="btn-secondary" on:click={closeUserModal} disabled={savingUser}>Cancelar</button>
+              <button class="btn-primary" on:click|preventDefault={submitUser} disabled={savingUser}>
+                {#if savingUser}
+                  <svg class="h-4 w-4 animate-spin mr-2" viewBox="0 0 24 24">
+                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" fill="none"></circle>
+                    <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
+                  </svg>
+                  Guardando...
+                {:else}
+                  {editingUser ? 'Guardar' : 'Crear'}
+                {/if}
+              </button>
+            </div>
+          {/if}
+      </div>
     </div>
-  </div>
+  </Portal>
 {/if}
 
 <style>
@@ -556,7 +595,7 @@
   .card {
     background: rgba(255, 255, 255, 0.95);
     backdrop-filter: blur(12px);
-    border-radius: 1.5rem;
+    border-radius: var(--radius-xl);
     box-shadow: 
       0 4px 24px -1px rgba(53, 82, 140, 0.1),
       0 2px 8px -1px rgba(53, 82, 140, 0.06);
@@ -579,7 +618,7 @@
     width: 100%;
     /* base padding: slightly reduced left padding to avoid too much empty space */
     padding: 0.75rem 1rem 0.75rem 2.25rem;
-    border-radius: 0.75rem;
+    border-radius: var(--radius-lg);
     border: 1px solid #e5e7eb;
     font-size: 0.875rem;
   /* transitions disabled */
@@ -626,7 +665,7 @@
     background: #35528C; /* solid color instead of gradient */
     color: white;
     border: none;
-    border-radius: 0.5rem;
+    border-radius: var(--radius-md);
     padding: 0.5rem 1rem;
     font-weight: 600;
     transition: none;
@@ -644,7 +683,7 @@
     background: white;
     color: #35528C;
     border: 2px solid #35528C;
-    border-radius: 0.5rem;
+    border-radius: var(--radius-md);
     padding: 0.5rem 1rem;
     font-weight: 600;
     transition: none;
@@ -681,7 +720,7 @@
 
   .btn-sm {
     padding: 0.375rem;
-    border-radius: 0.375rem;
+    border-radius: var(--radius-sm);
     font-size: 0.875rem;
   }
 
@@ -690,7 +729,7 @@
     padding: 0.45rem 0.5rem;
     min-width: 36px;
     min-height: 36px;
-    border-radius: 0.5rem;
+    border-radius: var(--radius-md);
     display: inline-flex;
     align-items: center;
     justify-content: center;
@@ -704,7 +743,7 @@
   /* Bigger, touch-friendly add button */
   .btn-add {
     padding: 0.75rem 1rem;
-    border-radius: 0.75rem;
+    border-radius: var(--radius-lg);
     font-size: 0.95rem;
     display: inline-flex;
     align-items: center;
@@ -723,7 +762,7 @@
       margin: 1rem;
       max-height: calc(100vh - 2rem);
       overflow: auto;
-      border-radius: 0.75rem;
+      border-radius: var(--radius-lg);
     }
     /* Larger icons on mobile for better touch targets (kept moderate) */
     .btn-primary svg,
@@ -826,7 +865,7 @@
     justify-content: center;
     /* vertical padding kept small; control horizontal width so all badges match */
     padding: 0.35rem 0.5rem;
-    border-radius: 9999px;
+    border-radius: var(--radius-full);
     font-size: 0.875rem;
     font-weight: 700;
     line-height: 1;

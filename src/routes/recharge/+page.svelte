@@ -73,7 +73,7 @@
       // behave like pressing Enter: fetch balance immediately
       fetchBalance();
       closeScanner();
-      tick().then(() => { const el = document.getElementById('userId') as HTMLInputElement | null; if (el) el.focus(); });
+  tick().then(() => { const el = document.getElementById('userId') as HTMLInputElement | null; if (el) { try { el.focus({ preventScroll: true }); } catch(e) { el.focus(); } } });
     } else if (raw) {
       userId = await normalizeUserId(String(raw));
       userSuggestions = [];
@@ -251,7 +251,7 @@ function formatCurrency(val: number): string {
       try {
         const el = document.getElementById('userId') as HTMLInputElement | null;
         if (el) {
-          el.focus();
+      try { el.focus({ preventScroll: true }); } catch(e) { el.focus(); }
           try { el.select(); } catch (e) { /* ignore */ }
         }
       } catch (e) {
@@ -273,15 +273,15 @@ function formatCurrency(val: number): string {
     fetchBalance();
     // prepare amount input for typing
     quantity = '';
-    // focus after DOM updates
-    tick().then(() => quantityInput?.focus());
+  // focus after DOM updates (prevent scrolling)
+  tick().then(() => { try { quantityInput?.focus({ preventScroll: true }); } catch(e) { quantityInput?.focus(); } });
   }
 
   async function focusQuantity() {
     // ensure DOM updated
     await tick();
     if (quantityInput) {
-      quantityInput.focus();
+      try { quantityInput.focus({ preventScroll: true }); } catch(e) { quantityInput.focus(); }
       // Select current content if any
       try { (quantityInput as HTMLInputElement).select(); } catch (e) { /* ignore */ }
     }
@@ -572,7 +572,7 @@ $: {
     position: relative;
     overflow: hidden;
     padding: 0.75rem 1.5rem;
-    border-radius: 0.75rem;
+  border-radius: var(--radius-lg);
   }
   
   .btn-primary:hover {
@@ -614,7 +614,7 @@ $: {
   .input-field {
     width: 100%;
     padding: 0.875rem 1.25rem;
-    border-radius: 0.75rem;
+  border-radius: var(--radius-lg);
     border: 2px solid #e5e7eb;
     font-size: 1rem;
     transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
@@ -648,7 +648,7 @@ $: {
   .glass-effect {
     background: rgba(255, 255, 255, 0.95);
     backdrop-filter: blur(12px);
-    border-radius: 1.5rem;
+  border-radius: var(--radius-xl);
     box-shadow: 
       0 4px 24px -1px rgba(53, 82, 140, 0.1),
       0 2px 8px -1px rgba(53, 82, 140, 0.06);

@@ -152,7 +152,7 @@ async function handleScannerScanned(ev: CustomEvent) {
     // cerrar modal
     closeScanner();
     // enfocar input
-    tick().then(() => { const el = document.getElementById('userId') as HTMLInputElement | null; if (el) el.focus(); });
+  tick().then(() => { const el = document.getElementById('userId') as HTMLInputElement | null; if (el) { try { el.focus({ preventScroll: true }); } catch(e) { el.focus(); } } });
   } else if (raw) {
     // si no se pudo derivar un ID, colocar raw para inspección
     userId = await normalizeUserId(String(raw));
@@ -293,7 +293,7 @@ function handleGlobalShortcut(ev: CustomEvent) {
   if (action === 'focusId') {
     const el = document.getElementById('userId') as HTMLInputElement | null;
     if (el) {
-      el.focus();
+  try { el.focus({ preventScroll: true }); } catch(e) { el.focus(); }
       el.select();
     }
     return;

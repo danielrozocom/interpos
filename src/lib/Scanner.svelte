@@ -501,10 +501,10 @@
           // set initial focus into modal for accessibility
           try {
             if (videoEl) {
-              try { (videoEl as HTMLElement).focus(); } catch(e) {}
+              try { (videoEl as HTMLElement).focus({ preventScroll: true }); } catch(e) { try { (videoEl as HTMLElement).focus(); } catch(_) {} }
             } else {
               const btn = document.querySelector('.close-btn') as HTMLElement | null;
-              if (btn) try { btn.focus(); } catch(e) {}
+              if (btn) try { btn.focus({ preventScroll: true }); } catch(e) { try { btn.focus(); } catch(_) {} }
             }
           } catch(e) {}
           return; // we've started native detector
@@ -668,7 +668,7 @@
           // algunos navegadores requieren videoEl.play() para iniciar la reproducción del stream
           if (videoEl) {
             // focus ayuda a dispositivos móviles a priorizar la cámara
-            try { videoEl.focus(); } catch (fErr) { /* ignore */ }
+            try { videoEl.focus({ preventScroll: true }); } catch (fErr) { try { videoEl.focus(); } catch(_) {} }
             // attempt play; if the promise is rejected por autoplay policy, ignore
             try {
               const p = videoEl.play();
@@ -817,12 +817,12 @@
         if (e.shiftKey) {
           if (active === first || !modal.contains(active)) {
             e.preventDefault();
-            last.focus();
+            try { last.focus({ preventScroll: true }); } catch(_) { try { last.focus(); } catch(e) {} }
           }
         } else {
           if (active === last) {
             e.preventDefault();
-            first.focus();
+            try { first.focus({ preventScroll: true }); } catch(_) { try { first.focus(); } catch(e) {} }
           }
         }
       } catch (err) {}
@@ -865,7 +865,7 @@
     max-width: 100%;
     margin: 0 auto;
     background: white;
-    border-radius: 10px;
+  border-radius: var(--radius-md);
     overflow: hidden;
     box-shadow: 0 10px 30px rgba(0,0,0,0.4);
     position: relative;
@@ -916,7 +916,7 @@
     font-size: 12px;
     color: white;
     background: rgba(0, 0, 0, 0.55);
-    border-radius: 6px;
+  border-radius: var(--radius-sm);
     z-index: 10004;
     max-width: calc(100% - 16px);
   overflow: hidden;
@@ -936,7 +936,7 @@
   /* style for select in header to look decent */
   select[aria-label="Seleccionar cámara"] {
     padding: 6px 8px;
-    border-radius: 6px;
+    border-radius: var(--radius-sm);
     border: 1px solid #d1d5db;
     background: white;
     color: #111827;
@@ -973,12 +973,12 @@
     box-sizing: border-box;
     z-index: 10004;
     background: rgba(0, 0, 0, 0.8);
-    border-radius: 10px;
+    border-radius: var(--radius-md);
   }
 
   .permission-panel button {
     padding: 10px 14px;
-    border-radius: 6px;
+    border-radius: var(--radius-sm);
     font-size: 14px;
     cursor: pointer;
     border: none;
@@ -997,7 +997,7 @@
     background: rgba(0, 0, 0, 0.9);
     color: white;
     padding: 12px 18px;
-    border-radius: 8px;
+  border-radius: var(--radius-md);
     box-shadow: 0 6px 16px rgba(0, 0, 0, 0.4);
     z-index: 2147483648;
     transition: opacity 0.3s ease-in-out;
@@ -1006,6 +1006,19 @@
     border: 1px solid rgba(255, 255, 255, 0.1);
     backdrop-filter: blur(8px);
   }
+
+  /* small button styles used inside scanner permission panel and torch button */
+  .btn-small {
+    padding: 6px 8px;
+    border-radius: var(--radius-sm);
+    font-size: 14px;
+    border: none;
+    background: white;
+    color: #111827;
+    cursor: pointer;
+  }
+  .btn-small.btn-alt { background: white; color: #111827; border: none; }
+  .btn-small.btn-outline { background: transparent; color: #fff; border: 1px solid #fff; }
 
   /* helper to make background non-interactive when modal is open */
   .scanner-inert {
@@ -1052,7 +1065,7 @@
           </select>
         {/if}
         {#if _torchAvailable}
-          <button type="button" aria-pressed={_torchOn} title={_torchOn ? 'Apagar linterna' : 'Encender linterna'} on:click={async () => { if (_torchOn) await disableTorch(); else await enableTorch(); }} style="margin-left:8px; padding:6px 8px; border-radius:6px; border:1px solid #d1d5db; background:white;">
+          <button type="button" aria-pressed={_torchOn} title={_torchOn ? 'Apagar linterna' : 'Encender linterna'} on:click={async () => { if (_torchOn) await disableTorch(); else await enableTorch(); }} class="btn-small" style="margin-left:8px;">
             {_torchOn ? '🔦 On' : '🔦 Off'}
           </button>
         {/if}
@@ -1067,8 +1080,8 @@
         <div class="permission-panel" role="alert">
           <div style="color:white; margin-bottom:8px;">{permissionMessage || 'Permiso de cámara denegado o cámara inactiva'}</div>
           <div style="display:flex; gap:8px;">
-            <button on:click={async () => { const ok = await requestCameraPermission(); if (ok) { permissionDenied = false; start(); } }} style="padding:8px 10px; border-radius:6px; background:white; color:#111827;">Reintentar permisos</button>
-            <button on:click={() => { location.reload(); }} style="padding:8px 10px; border-radius:6px; background:transparent; border:1px solid #fff; color:#fff;">Recargar página</button>
+            <button class="btn-small btn-alt" on:click={async () => { const ok = await requestCameraPermission(); if (ok) { permissionDenied = false; start(); } }}>Reintentar permisos</button>
+            <button class="btn-small btn-outline" on:click={() => { location.reload(); }}>Recargar página</button>
           </div>
         </div>
       {/if}

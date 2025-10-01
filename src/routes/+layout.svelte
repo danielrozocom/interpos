@@ -73,7 +73,7 @@
       if (target) {
         e.preventDefault();
         try {
-          target.focus();
+          try { target.focus({ preventScroll: true }); } catch(e) { target.focus(); }
           target.select();
         } catch (err) {
           // as a fallback, attempt document.execCommand (older browsers)
@@ -160,14 +160,14 @@
   .sidebar.collapsed { width: 72px; }
   .sidebar-top { display:flex; flex-direction:column; align-items:center; gap:0.25rem; padding-top:6px; padding-bottom:6px; position:relative; }
   /* Default collapse-btn styling (for any remaining uses inside sidebar) */
-  .collapse-btn { background:transparent; border:none; color:#fff; padding:0.35rem; cursor:pointer; width:44px; height:44px; display:inline-flex; align-items:center; justify-content:center; border-radius:8px; }
+  .collapse-btn { background:transparent; border:none; color:#fff; padding:0.35rem; cursor:pointer; width:44px; height:44px; display:inline-flex; align-items:center; justify-content:center; border-radius: var(--radius-md); }
   /* brand-title removed from current markup */
   /* Large brand icon shown only when sidebar is open — in normal flow above menu */
   .brand-icon { display:none; }
-  .brand-icon.large { width:80px; height:80px; object-fit:contain; border-radius:4px; display:block; margin:12px auto; box-shadow:none; border:none; }
+  .brand-icon.large { width:80px; height:80px; object-fit:contain; border-radius: var(--radius-sm); display:block; margin:12px auto; box-shadow:none; border:none; }
   .sidebar.collapsed .brand-icon.large { display:none; }
   .sidebar-nav { display:flex; flex-direction:column; gap:0.1rem; padding:0.5rem 0.5rem; padding-top:4px; }
-  .nav-link { display:flex; align-items:center; gap:0.75rem; padding:0.65rem 0.75rem; color:rgba(255,255,255,0.95); text-decoration:none; border-radius:0.45rem; }
+  .nav-link { display:flex; align-items:center; gap:0.75rem; padding:0.65rem 0.75rem; color:rgba(255,255,255,0.95); text-decoration:none; border-radius: var(--radius-md); }
   .nav-link.active, .nav-link:hover { background: rgba(255,255,255,0.06); }
   /* Make SVG icons block-level and normalize their box so centering is consistent */
   .nav-link svg { display:block; width:24px; height:24px; flex:0 0 24px; margin:0; }

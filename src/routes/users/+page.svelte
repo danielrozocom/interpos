@@ -268,7 +268,7 @@
             class="input-field input-with-icon pr-10"
           />
           {#if searchTerm}
-            <button type="button" class="absolute right-2 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-700" aria-label="Limpiar búsqueda" on:click={() => { searchTerm = ''; searchInput?.focus(); }}>
+            <button type="button" class="absolute right-2 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-700" aria-label="Limpiar búsqueda" on:click={() => { searchTerm = ''; try { searchInput?.focus({ preventScroll: true }); } catch(e) { searchInput?.focus(); } }}>
               <svg class="h-4 w-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
               </svg>
@@ -534,7 +534,7 @@
   .card {
     background: rgba(255, 255, 255, 0.95);
     backdrop-filter: blur(12px);
-    border-radius: 1.5rem;
+  border-radius: var(--radius-xl);
     box-shadow: 
       0 4px 24px -1px rgba(53, 82, 140, 0.1),
       0 2px 8px -1px rgba(53, 82, 140, 0.06);
@@ -557,7 +557,7 @@
     width: 100%;
     /* base padding: slightly reduced left padding to avoid too much empty space */
     padding: 0.75rem 1rem 0.75rem 2.25rem;
-    border-radius: 0.75rem;
+  border-radius: var(--radius-lg);
     border: 1px solid #e5e7eb;
     font-size: 0.875rem;
   /* transitions disabled */
@@ -604,7 +604,7 @@
     background: #35528C; /* solid color instead of gradient */
     color: white;
     border: none;
-    border-radius: 0.5rem;
+  border-radius: var(--radius-md);
     padding: 0.5rem 1rem;
     font-weight: 600;
     transition: none;
@@ -622,7 +622,7 @@
     background: white;
     color: #35528C;
     border: 2px solid #35528C;
-    border-radius: 0.5rem;
+  border-radius: var(--radius-md);
     padding: 0.5rem 1rem;
     font-weight: 600;
     transition: none;
@@ -639,7 +639,7 @@
 
   .btn-sm {
     padding: 0.375rem;
-    border-radius: 0.375rem;
+    border-radius: var(--radius-sm);
     font-size: 0.875rem;
   }
 
@@ -648,7 +648,7 @@
     padding: 0.45rem 0.5rem;
     min-width: 36px;
     min-height: 36px;
-    border-radius: 0.5rem;
+    border-radius: var(--radius-md);
     display: inline-flex;
     align-items: center;
     justify-content: center;
@@ -662,7 +662,7 @@
   /* Bigger, touch-friendly add button */
   .btn-add {
     padding: 0.75rem 1rem;
-    border-radius: 0.75rem;
+    border-radius: var(--radius-lg);
     font-size: 0.95rem;
     display: inline-flex;
     align-items: center;
@@ -681,7 +681,7 @@
       margin: 1rem;
       max-height: calc(100vh - 2rem);
       overflow: auto;
-      border-radius: 0.75rem;
+      border-radius: var(--radius-lg);
     }
     /* Larger icons on mobile for better touch targets (kept moderate) */
     .btn-primary svg,
@@ -784,7 +784,7 @@
     justify-content: center;
     /* vertical padding kept small; control horizontal width so all badges match */
     padding: 0.35rem 0.5rem;
-    border-radius: 9999px;
+  border-radius: var(--radius-full);
     font-size: 0.875rem;
     font-weight: 700;
     line-height: 1;
