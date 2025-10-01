@@ -5,6 +5,8 @@
   // UX config: set to true if header should be white (chosen by UX/UI)
   export let topbarLight = false;
   import { page } from '$app/stores';
+  // start closed by default per request
+  let productsOpen = false;
 
   // Close the slide menu on mobile when a nav link is clicked
   function handleNavClick() {
@@ -128,7 +130,35 @@
       <nav class="sidebar-nav" aria-label="Menú principal">
   <a href="/" on:click={handleNavClick} class="nav-link { $page.url.pathname === '/' ? 'active' : '' }"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9,22 9,12 15,12 15,22"/></svg> <span class="link-text">Inicio</span></a>
   <a href="/sell" on:click={handleNavClick} class="nav-link { $page.url.pathname === '/sell' ? 'active' : '' }"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="8" cy="21" r="1"/><circle cx="19" cy="21" r="1"/><path d="M2.05 2.05h2l2.66 12.42a2 2 0 0 0 2 1.58h9.78a2 2 0 0 0 1.95-1.57l1.65-7.43H5.12"/></svg> <span class="link-text">Vender</span></a>
-  <a href="/products" on:click={handleNavClick} class="nav-link { $page.url.pathname === '/products' ? 'active' : '' }"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/></svg> <span class="link-text">Productos</span></a>
+  <!-- Productos group: main text navigates, chevron toggles subitems -->
+  <div class="nav-group">
+    <div class="nav-group-header" style="display:flex; align-items:center; gap:0.5rem;">
+      <a href="/products" on:click={handleNavClick} class="nav-link { $page.url.pathname === '/products' ? 'active' : '' }">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/></svg>
+        <span class="link-text">Productos</span>
+      </a>
+      <button
+        class="chev-toggle collapse-btn"
+        aria-label={productsOpen ? 'Cerrar submenú Productos' : 'Abrir submenú Productos'}
+        aria-expanded={productsOpen}
+        aria-controls="products-sub"
+        on:click={() => productsOpen = !productsOpen}
+        on:keydown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); productsOpen = !productsOpen; } }}
+        title="Toggle Productos"
+      >
+        <!-- Right chevron icon by default; rotate when expanded to point down -->
+  <svg class="chev" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="9 6 15 12 9 18" /></svg>
+      </button>
+    </div>
+
+    <!-- Subitems for Productos (only Impuestos) -->
+    <div id="products-sub" class="nav-sub" aria-hidden={!productsOpen || menuOpen === false} style="--open: {productsOpen ? 1 : 0}">
+      <a href="/taxes" on:click={handleNavClick} class="nav-sub-link { $page.url.pathname === '/taxes' ? 'active' : '' }">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/></svg>
+        <span class="link-text">Impuestos</span>
+      </a>
+    </div>
+  </div>
   <a href="/customers" on:click={handleNavClick} class="nav-link { $page.url.pathname === '/customers' ? 'active' : '' }"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/></svg> <span class="link-text">Clientes</span></a>
   <a href="/recharge" on:click={handleNavClick} class="nav-link { $page.url.pathname === '/recharge' ? 'active' : '' }"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 5c-1.5 0-2.8 1.4-3 2-3.5-1.5-11-.3-11 5 0 1.8 0 3 2 4.5V20h4v-2h6v2h4v-4.5c2-1.5 2-2.7 2-4.5 0-5.3-7.5-6.5-11-5 0.3-1.7 1.3-3 3-3 1.6 0 2.8 1.2 3 3 .2 1.8-1 3-2.5 3-1.5 0-2.7-1.2-2.5-3 .2-1.8 1-3 2.5-3z"/><circle cx="7" cy="12" r="1"/><circle cx="17" cy="12" r="1"/><circle cx="12" cy="9" r="1"/></svg> <span class="link-text">Recargar</span></a>
   <a href="/history" on:click={handleNavClick} class="nav-link { $page.url.pathname === '/history' ? 'active' : '' }"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14,2 14,8 20,8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10,9 9,9 8,9"/></svg> <span class="link-text">Historial</span></a>
@@ -142,6 +172,7 @@
       <slot />
     </main>
   </div>
+  
 </div>
 <style>
   /* Topbar */
@@ -178,6 +209,11 @@
   .sidebar.collapsed .nav-link { justify-content: center; padding-left: 0.5rem; padding-right: 0.5rem; }
   /* Ensure the SVG sits centered inside its flex cell when collapsed */
   .sidebar.collapsed .nav-link svg { margin-left:auto; margin-right:auto; }
+  /* When collapsed, ensure group header (link + chevron) centers icons too */
+  .sidebar.collapsed .nav-group-header { justify-content: center; }
+  .sidebar.collapsed .nav-group-header .nav-link { justify-content: center; padding-left: 0.25rem; padding-right: 0.25rem; }
+  .sidebar.collapsed .chev-toggle { width:44px; height:44px; display:inline-flex; align-items:center; justify-content:center; padding:0.25rem; }
+  .sidebar.collapsed .chev-toggle .chev { margin:0; }
   .link-text { white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
   .sidebar.collapsed .link-text { display:none; }
   /* sidebar-footer removed from current markup */
@@ -206,4 +242,30 @@
   /* Keep the brand in normal flow and center it; padding prevents overlap with the hamburger */
   .topbar-brand { flex:1; text-align:center; margin-left:0; }
   }
+  /* Subnavigation items under main links */
+  .nav-sub { display:flex; flex-direction:column; padding-left:1.75rem; margin-top:0.15rem; }
+  .nav-sub-link { display:flex; align-items:center; gap:0.5rem; padding:0.35rem 0.75rem; color: rgba(255,255,255,0.9); text-decoration:none; border-radius: var(--radius-sm); }
+  .nav-sub-link svg { width:16px; height:16px; flex:0 0 16px; }
+  /* when sidebar is collapsed hide subitems and prevent layout shifts */
+  .sidebar.collapsed .nav-sub { display:none; }
+  /* Slight visual offset to emphasize hierarchy */
+  .nav-sub { transform: translateX(6px); }
+  /* Nav group styles */
+  .nav-group { display:flex; flex-direction:column; }
+  /* Chevron toggle for nav groups (use .chev-toggle on the button) */
+  .chev-toggle { background:transparent; border:none; color:inherit; cursor:pointer; display:inline-flex; align-items:center; justify-content:center; padding:0.25rem; width:40px; height:40px; border-radius: var(--radius-md); }
+  /* Keep the chevron visually consistent with other icons and centered by default */
+  .chev { transition: transform .18s ease, opacity .12s ease; opacity:1; transform: rotate(0deg); display:block; width:18px; height:18px; }
+  /* Rotate 90deg when expanded so -> becomes v (right to down) */
+  .chev-toggle[aria-expanded="true"] .chev { transform: rotate(90deg); }
+  /* Animated collapse/expand for subitems: use max-height transition and opacity */
+  .nav-sub { overflow:hidden; transition: max-height .22s ease, opacity .18s ease, transform .18s ease; max-height: 0; opacity: 0; }
+  .nav-sub[aria-hidden="false"] { max-height: 400px; opacity: 1; }
+  .nav-sub .nav-sub-link { padding-left: 0.5rem; }
+
+  /* Ensure chevron alignment when sidebar is collapsed: center header and keep chevron inline with icons */
+  /* When sidebar is collapsed, hide the chevron toggle so only the main icon is visible and centered */
+  .sidebar.collapsed .nav-group-header { justify-content: center; }
+  .sidebar.collapsed .chev-toggle { display: none; }
+  .sidebar.collapsed .chev { margin:0; }
 </style>

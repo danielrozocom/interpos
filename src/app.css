@@ -313,7 +313,19 @@ html.modal-open, body.modal-open {
   font-size: 16px; /* 16px = 1rem (depending on root), explicit px as requested */
 }
 
-.table-header { padding:1rem; text-align:center; font-weight:600; color:#374151; text-transform:uppercase; letter-spacing:0.05em; font-size:0.75rem; user-select:none }
+/* Products page specific sizing: ensure all table text inside products page is 16px */
+.products-page table,
+.products-page .table-cell,
+.products-page .table-header,
+.products-page .table-cell > div,
+.products-page .table-cell span,
+.products-page .table-cell .font-medium,
+.products-page .table-cell .text-sm,
+.products-page .table-cell .text-gray-600 {
+  font-size: 16px !important; /* explicit 16px per user's request */
+}
+
+.table-header { padding:1rem; text-align:center; font-weight:700; color:#35528C; text-transform:uppercase; letter-spacing:0.05em; font-size:15px; user-select:none }
 .table-header:hover { background: rgba(53,82,140,0.05) }
 .table-header > div { display:flex; align-items:center; justify-content:center; gap:0.5rem }
 .table-header.text-right > div { justify-content:flex-end }

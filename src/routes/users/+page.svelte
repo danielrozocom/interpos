@@ -724,36 +724,11 @@
     padding-left: 1rem;
   }
 
-  .table-header {
-    padding: 1rem;
-    text-align: center; /* center header text by default */
-    font-weight: 600;
-    color: #374151;
-    text-transform: uppercase;
-    letter-spacing: 0.05em;
-    font-size: 0.75rem;
-    user-select: none;
-  }
-
-  .table-header:hover {
-    background: rgba(53, 82, 140, 0.05);
-  }
-
-  /* Ensure header inner content (label + icon) is centered and spaced */
-  .table-header > div {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    gap: 0.5rem;
-  }
-
-  /* For headers that semantically should align right, keep cells intact but center header label */
-  .table-header.text-right > div {
-    justify-content: flex-end;
-  }
-  .table-header.text-left > div {
-    justify-content: flex-start;
-  }
+  /* Rely on global .table-header from src/app.css for size/color/weight; keep structural helpers */
+  .table-header:hover { background: rgba(53,82,140,0.05); }
+  .table-header > div { display:flex; align-items:center; justify-content:center; gap:0.5rem }
+  .table-header.text-right > div { justify-content:flex-end }
+  .table-header.text-left > div { justify-content:flex-start }
 
   .table-cell {
     padding: 1rem;

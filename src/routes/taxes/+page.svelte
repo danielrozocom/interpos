@@ -1,5 +1,6 @@
 <script lang="ts">
   import { onMount, onDestroy, tick } from 'svelte';
+  import ConfirmDialog from '$lib/ConfirmDialog.svelte';
   let taxes: any[] = [];
   let loading = true;
   let error = '';
@@ -25,8 +26,7 @@
   // confirmation dialogs
   let showConfirmDelete = false;
   let deleteTarget: any = null;
-  let showConfirmClose = false; // confirm discard changes
-  let hasUnsavedChanges = false;
+  // removed unsaved-changes confirmation flow per UX decision
   let _bodyScrollY = 0;
   let modalEl: HTMLElement | null = null;
   let headerHeight = 0;
@@ -63,7 +63,7 @@
       taxes = Array.isArray(data.taxes) ? data.taxes : [];
     } catch (e: any) {
       console.error('Error loading taxes', e);
-      error = e.message || 'Error al cargar tipos de impuestos';
+  error = e.message || 'Error al cargar impuestos';
       taxes = [];
     } finally { loading = false; }
   }
@@ -99,7 +99,6 @@
     saveErrors = [];
     saveSuccess = false;
     showModal = true;
-  hasUnsavedChanges = false;
     if (typeof window !== 'undefined' && typeof document !== 'undefined') {
       // store current scroll position and add modal-open class (defined in src/app.css)
       _bodyScrollY = window.scrollY || document.documentElement.scrollTop || 0;
@@ -111,12 +110,7 @@
   }
 
   function closeModal() {
-    // if there are unsaved changes, ask for confirmation
-    if (hasUnsavedChanges) {
-      showConfirmClose = true;
-      return;
-    }
-
+    // Close modal immediately (no unsaved-changes confirmation)
     showModal = false; saving = false; saveSuccess = false; saveErrors = [];
     if (typeof window !== 'undefined' && typeof document !== 'undefined') {
       try {
@@ -168,11 +162,10 @@
       const res = await fetch('/api/sheets/taxes/save', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
       if (!res.ok) {
         const data = await res.json().catch(() => null);
-        throw new Error(data?.error || 'Error guardando tipo de impuesto');
+  throw new Error(data?.error || 'Error guardando impuesto');
       }
       await fetchTaxes();
       saveSuccess = true;
-  hasUnsavedChanges = false;
       setTimeout(() => { closeModal(); }, 900);
     } catch (e: any) {
       console.error('Error saving tax', e);
@@ -196,7 +189,7 @@
       await fetchTaxes();
     } catch (e) {
       // show a simple alert for now (same behavior as before)
-      alert('No se pudo eliminar el tipo de impuesto');
+  alert('No se pudo eliminar el impuesto');
     } finally {
       showConfirmDelete = false;
       deleteTarget = null;
@@ -206,19 +199,6 @@
   function cancelDelete() {
     showConfirmDelete = false;
     deleteTarget = null;
-  }
-
-  function confirmCloseDiscard() {
-    showConfirmClose = false;
-    hasUnsavedChanges = false;
-    // perform actual close
-    showModal = false; saving = false; saveSuccess = false; saveErrors = [];
-    try { document.documentElement.classList.remove('modal-open'); document.body.classList.remove('modal-open'); } catch(e) {}
-    try { setTimeout(() => { window.scrollTo(0, _bodyScrollY || 0); }, 0); } catch(e) {}
-  }
-
-  function cancelCloseDiscard() {
-    showConfirmClose = false;
   }
 
   function updateModalLayout() {
@@ -253,7 +233,7 @@
 <div class="max-w-6xl mx-auto p-4">
   <div class="mb-8 text-center">
     <h1 class="text-4xl font-bold text-[#35528C] mb-1">Gestión de Impuestos</h1>
-    <p class="text-lg text-[#35528C]/80">Administra los tipos de impuestos usados en precios y facturación</p>
+  <p class="text-lg text-[#35528C]/80">Administra los impuestos usados en precios y facturación</p>
   </div>
 
   <div class="card glass-effect mb-6">
@@ -276,7 +256,7 @@
       <!-- Add button -->
       <div class="flex items-center gap-2 w-auto lg:w-auto mr-auto">
         <div class="flex items-center gap-3">
-          <button type="button" class="inline-flex items-center justify-center p-3 rounded-full" on:click={() => openModal(null)} title="Agregar tipo de impuesto" aria-label="Agregar tipo de impuesto" style="background-color: #35528C; color: white;">
+          <button type="button" class="inline-flex items-center justify-center p-3 rounded-full" on:click={() => openModal(null)} title="Agregar impuesto" aria-label="Agregar impuesto" style="background-color: #35528C; color: white;">
             <svg class="h-5 w-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" style="color: white"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" /></svg>
           </button>
 
@@ -290,7 +270,7 @@
       <div class="flex flex-col sm:flex-row items-center gap-2 w-full lg:w-auto">
         <div class="mx-auto text-center flex flex-col items-center gap-0 sm:gap-1 text-sm leading-tight">
           <div class="font-semibold text-[#35528C] text-sm">{taxes.length}</div>
-          <div class="text-gray-600 text-sm">Total tipos de impuestos</div>
+          <div class="text-gray-600 text-sm">Total impuestos</div>
         </div>
       </div>
     </div>
@@ -311,11 +291,11 @@
     {:else if sorted.length === 0}
       <div class="text-center py-12">
         <svg class="h-14 w-14 text-gray-400 mx-auto mb-4" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="6"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
-        <h3 class="text-lg font-medium text-gray-900 mb-2">No se encontraron tipos de impuestos</h3>
+  <h3 class="text-lg font-medium text-gray-900 mb-2">No se encontraron impuestos</h3>
         {#if searchTerm}
           <p class="text-gray-700 font-medium mb-1">No hay resultados para "{searchTerm}"</p>
         {:else}
-          <p class="text-gray-600">Aún no hay tipos de impuestos registrados.</p>
+          <p class="text-gray-600">Aún no hay impuestos registrados.</p>
         {/if}
       </div>
     {:else}
@@ -352,8 +332,8 @@
                     </button>
                     <button
                       type="button"
-                      title="Eliminar tipo"
-                      aria-label="Eliminar tipo"
+                      title="Eliminar impuesto"
+                      aria-label="Eliminar impuesto"
                       on:click={() => deleteTax(t)}
                       class="btn-sm inline-flex items-center justify-center p-2 rounded"
                       style="background-color: #35528C; color: white;"
@@ -377,7 +357,7 @@
       <div bind:this={modalEl} class="relative w-full max-w-xl bg-white rounded-lg shadow-lg modal-content" style="z-index:2001">
         <div class="p-6 flex flex-col" style="max-height: {modalMaxHeight}px">
           <div class="overflow-auto pr-2" style="max-height: {modalMaxHeight - 80}px">
-            <h3 class="text-lg font-semibold text-gray-900 mb-2">{editing ? 'Editar tipo de impuesto' : 'Nuevo tipo de impuesto'}</h3>
+            <h3 class="text-lg font-semibold text-gray-900 mb-2">{editing ? 'Editar impuesto' : 'Nuevo impuesto'}</h3>
 
             {#if saveSuccess}
               <div class="mb-2 p-3 bg-green-50 border border-green-200 rounded-lg">
@@ -395,27 +375,27 @@
             <div class="grid grid-cols-1 gap-4">
               <div>
                 <label for="tax-code" class="block text-sm font-medium text-gray-700">Código <span class="text-red-600">*</span></label>
-                <input id="tax-code" class="input-field mt-2 mb-3 w-full" required aria-required="true" type="text" bind:value={modalCode} on:input={() => { hasUnsavedChanges = true; }} />
+                <input id="tax-code" class="input-field mt-2 mb-3 w-full" required aria-required="true" type="text" bind:value={modalCode} />
               </div>
               <div>
                 <label for="tax-name" class="block text-sm font-medium text-gray-700">Nombre <span class="text-red-600">*</span></label>
-                <input id="tax-name" class="input-field mt-2 mb-3 w-full" required aria-required="true" type="text" bind:value={modalName} on:input={() => { hasUnsavedChanges = true; }} />
+                <input id="tax-name" class="input-field mt-2 mb-3 w-full" required aria-required="true" type="text" bind:value={modalName} />
               </div>
               <div>
                 <label for="tax-mode" class="block text-sm font-medium text-gray-700">Modo <span class="text-red-600">*</span></label>
-                <select id="tax-mode" bind:value={modalMode} class="input-field mt-2 mb-3 w-full" on:change={() => { hasUnsavedChanges = true; }}>
+                <select id="tax-mode" bind:value={modalMode} class="input-field mt-2 mb-3 w-full">
                   <option value="PERCENT">Porcentaje (%)</option>
                   <option value="AMOUNT">Monto fijo</option>
                 </select>
               </div>
               <div>
                 <label for="tax-value" class="block text-sm font-medium text-gray-700">Valor por defecto <span class="text-red-600">*</span></label>
-                <input id="tax-value" class="input-field mt-2 mb-3 w-full" required aria-required="true" type="number" inputmode="numeric" pattern="\d*(?:[\.,]\d+)?" bind:value={modalValueRaw} on:input={() => { hasUnsavedChanges = true; }} />
+                <input id="tax-value" class="input-field mt-2 mb-3 w-full" required aria-required="true" type="number" inputmode="numeric" pattern="\d*(?:[\.,]\d+)?" bind:value={modalValueRaw} />
                 <p class="text-sm text-gray-500 mt-1">{modalMode === 'PERCENT' ? 'Ingrese porcentaje como número entero (ej: 19)' : 'Ingrese monto entero (ej: 300)'}.</p>
               </div>
               <div>
                 <label for="tax-desc" class="block text-sm font-medium text-gray-700">Descripción (opcional)</label>
-                <textarea id="tax-desc" bind:value={modalDescription} class="input-field mt-2 mb-3 w-full" rows="3" on:input={() => { hasUnsavedChanges = true; }}></textarea>
+                <textarea id="tax-desc" bind:value={modalDescription} class="input-field mt-2 mb-3 w-full" rows="3"></textarea>
               </div>
             </div>
           </div>
@@ -440,67 +420,26 @@
   {/if}
 
   {#if showConfirmDelete}
-    <div class="fixed inset-0 flex items-center justify-center p-4" style="z-index:2100">
-      <div class="fixed inset-0 bg-black/30" aria-hidden="true"></div>
-      <div class="bg-white rounded-lg p-6 shadow-lg w-full max-w-md">
-        <h4 class="text-lg font-semibold mb-3">Confirmar eliminación</h4>
-        <p class="mb-4">¿Seguro que deseas eliminar <strong>{deleteTarget?.name}</strong> ({deleteTarget?.code})? Esta acción no se puede deshacer.</p>
-        <div class="flex justify-end gap-2">
-          <button class="btn-secondary" on:click={cancelDelete}>Cancelar</button>
-          <button class="btn-primary" on:click={confirmDelete}>Eliminar</button>
-        </div>
-      </div>
-    </div>
+    <ConfirmDialog bind:open={showConfirmDelete}
+      title="Confirmar eliminación"
+      itemName={`${deleteTarget?.name || ''}`}
+      itemLabel={`(${deleteTarget?.code || ''})`}
+      on:confirm={confirmDelete}
+      on:cancel={cancelDelete} />
   {/if}
 
-  {#if showConfirmClose}
-    <div class="fixed inset-0 flex items-center justify-center p-4" style="z-index:2100">
-      <div class="fixed inset-0 bg-black/30" aria-hidden="true"></div>
-      <div class="bg-white rounded-lg p-6 shadow-lg w-full max-w-md">
-        <h4 class="text-lg font-semibold mb-3">Cambios sin guardar</h4>
-        <p class="mb-4">Hay cambios sin guardar. ¿Deseas descartarlos y cerrar el formulario?</p>
-        <div class="flex justify-end gap-2">
-          <button class="btn-secondary" on:click={cancelCloseDiscard}>Volver</button>
-          <button class="btn-primary" on:click={confirmCloseDiscard}>Descartar y cerrar</button>
-        </div>
-      </div>
-    </div>
-  {/if}
+  <!-- Unsaved-changes confirmation removed per user request -->
 
 </div>
 
 <style>
   /* Table and action styles copied from customers page for visual consistency */
-  .table-header {
-    padding: 1rem;
-    text-align: center; /* center header text by default */
-    font-weight: 600;
-    color: #374151;
-    text-transform: uppercase;
-    letter-spacing: 0.05em;
-    font-size: 0.75rem;
-    user-select: none;
-  }
-
-  .table-header:hover {
-    background: rgba(53, 82, 140, 0.05);
-  }
-
-  /* Ensure header inner content (label + icon) is centered and spaced */
-  .table-header > div {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    gap: 0.5rem;
-  }
-
-  /* For headers that semantically should align right, keep cells intact but center header label */
-  .table-header.text-right > div {
-    justify-content: flex-end;
-  }
-  .table-header.text-left > div {
-    justify-content: flex-start;
-  }
+  /* Use global .table-header defined in src/app.css for size/color/weight.
+     Keep only per-page structural tweaks below if needed. */
+  .table-header:hover { background: rgba(53, 82, 140, 0.05); }
+  .table-header > div { display:flex; align-items:center; justify-content:center; gap:0.5rem; }
+  .table-header.text-right > div { justify-content:flex-end }
+  .table-header.text-left > div { justify-content:flex-start }
 
   .table-cell {
     padding: 1rem;

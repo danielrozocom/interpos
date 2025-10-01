@@ -1,7 +1,8 @@
 <script lang="ts">
   import { onMount, onDestroy, tick } from 'svelte';
   import { siteName } from '../../lib/config';
-  import Portal from '../../lib/Portal.svelte';
+  import Modal from '../../lib/Modal.svelte';
+  import ConfirmDialog from '../../lib/ConfirmDialog.svelte';
 
   // Types
   interface User {
@@ -106,7 +107,7 @@
   let saveSuccess = false;
   let saveErrors: string[] = [];
   let modalMode: 'create' | 'edit' = 'create';
-  let _bodyScrollY = 0;
+  let errorAlertEl: HTMLElement | null = null;
   let searchInput: HTMLInputElement | null = null;
   let modalIdInput: HTMLInputElement | null = null;
   let modalNameInput: HTMLInputElement | null = null;
@@ -133,22 +134,7 @@
     saveSuccess = false;
     saveErrors = [];
     
-    // Save scroll position BEFORE applying modal-open class
-    if (typeof window !== 'undefined' && typeof document !== 'undefined') {
-      _bodyScrollY = window.scrollY || document.documentElement.scrollTop || 0;
-      
-      // Apply scroll lock with proper body positioning to prevent jump
-      document.body.style.position = 'fixed';
-      document.body.style.top = `-${_bodyScrollY}px`;
-      document.body.style.width = '100%';
-      
-      try {
-        document.documentElement.classList.add('modal-open');
-        document.body.classList.add('modal-open');
-      } catch (e) {}
-    }
-
-    // show modal
+    // show modal (Modal component will handle scroll-lock/preserve)
     showUserModal = true;
 
     // focus the most relevant input after the modal is rendered
@@ -175,22 +161,6 @@
     savingUser = false;
     saveSuccess = false;
     saveErrors = [];
-    
-    // restore body scroll behavior and position
-    if (typeof window !== 'undefined' && typeof document !== 'undefined') {
-      try {
-        document.documentElement.classList.remove('modal-open');
-        document.body.classList.remove('modal-open');
-        
-        // Remove fixed positioning and restore scroll
-        document.body.style.position = '';
-        document.body.style.top = '';
-        document.body.style.width = '';
-        
-        // Restore scroll position
-        window.scrollTo(0, _bodyScrollY || 0);
-      } catch (e) {}
-    }
   }
 
   onDestroy(() => {
@@ -203,6 +173,28 @@
       document.body.style.width = '';
     }
   });
+
+  // Delete flow: open confirm dialog
+  function deleteUser(user: User) {
+    deletingUser = user;
+    showDeleteModal = true;
+  }
+
+  async function performDeleteConfirmed() {
+    const u = deletingUser;
+    deletingUser = null;
+    showDeleteModal = false;
+    if (!u) return;
+    try {
+      const res = await fetch('/api/sheets/users/delete', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: u.id })
+      });
+      if (!res.ok) throw new Error('Error al eliminar usuario');
+      await fetchUsers();
+    } catch (e) {
+      try { alert('No se pudo eliminar el usuario'); } catch(_) {}
+    }
+  }
 
   async function submitUser() {
     // Validation: both ID and Name are required
@@ -219,6 +211,9 @@
     }
 
     if (saveErrors.length > 0) {
+      // ensure the footer alert is visible
+      await tick();
+      try { errorAlertEl?.scrollIntoView({ behavior: 'smooth', block: 'center' }); } catch (e) {}
       return;
     }
 
@@ -260,11 +255,13 @@
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ ...payload, creating: editingUser ? false : true, originalId: editingUser ? editingUser.id : undefined }),
         });
-      if (!res.ok) {
+        if (!res.ok) {
         const errData = await res.json().catch(() => null);
         const serverMsg = errData?.error || 'Error guardando usuario';
         // push server message into errors array for display
         saveErrors = [serverMsg];
+        await tick();
+        try { errorAlertEl?.scrollIntoView({ behavior: 'smooth', block: 'center' }); } catch(e) {}
         throw new Error(serverMsg);
       }
 
@@ -519,72 +516,76 @@
 
 <!-- User modal (create / edit) -->
 {#if showUserModal}
-  <Portal>
-    <div class="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-40">
-      <div class="modal-content bg-white rounded-lg p-6 w-full max-w-md shadow-lg">
-          <h3 class="text-lg font-semibold mb-4">{editingUser ? 'Editar cliente' : 'Agregar cliente'}</h3>
-          
-          <!-- Visual feedback for modal mode -->
-    <label for="modalId" class="block text-sm text-gray-700">ID <span class="text-red-600">*</span></label>
-    <input id="modalId" bind:this={modalIdInput} class="input-field mt-2 mb-3" bind:value={modalId} placeholder="Ej: 12345" required inputmode="numeric" pattern="\d*" title="Solo números" on:input={(e) => { modalId = (e.target as HTMLInputElement).value.replace(/\D/g, ''); }} />
-    {#if false}
-      <!-- advisory removed per request -->
-      <div class="text-sm text-gray-500 mb-3">Si cambias el ID, debe ser numérico y no puede coincidir con otro usuario existente.</div>
-    {/if}
+  <Modal bind:open={showUserModal} title={editingUser ? 'Editar cliente' : 'Agregar cliente'}>
+    <div class="p-2">
+      <h3 class="sr-only">{editingUser ? 'Editar cliente' : 'Agregar cliente'}</h3>
 
-    <label for="modalName" class="block text-sm text-gray-700">Nombre <span class="text-red-600">*</span></label>
-    <input id="modalName" bind:this={modalNameInput} class="input-field mt-2 mb-2" bind:value={modalName} placeholder="Nombre del cliente" required />
+      <label for="modalId" class="block text-sm text-gray-700">ID <span class="text-red-600">*</span></label>
+      <input id="modalId" bind:this={modalIdInput} class="input-field mt-2 mb-3" bind:value={modalId} placeholder="Ej: 12345" required inputmode="numeric" pattern="\d*" title="Solo números" on:input={(e) => { modalId = (e.target as HTMLInputElement).value.replace(/\D/g, ''); }} />
 
-          {#if saveErrors && saveErrors.length > 0}
-            <div class="mb-2 p-3 bg-red-50 border border-red-200 rounded-lg">
-              <div class="flex items-center space-x-2 mb-2">
-                <svg class="w-5 h-5 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
-                </svg>
-                <span class="text-sm font-medium text-red-800">Errores encontrados:</span>
-              </div>
-              <ul class="list-disc list-inside text-sm text-red-700 ml-7">
-                {#each saveErrors as e}
-                  <li>{e}</li>
-                {/each}
-              </ul>
-            </div>
-          {/if}
+      <label for="modalName" class="block text-sm text-gray-700">Nombre <span class="text-red-600">*</span></label>
+      <input id="modalName" bind:this={modalNameInput} class="input-field mt-2 mb-2" bind:value={modalName} placeholder="Nombre del cliente" required />
 
-          {#if saveSuccess}
-            <div class="mb-2 p-3 bg-green-50 border border-green-200 rounded-lg">
-              <div class="flex items-center space-x-2">
-                <svg class="w-5 h-5 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
-                </svg>
-                <span class="text-sm font-medium text-green-800">
-                  {#if editingUser}
-                    Cliente actualizado correctamente
-                  {:else}
-                    Cliente creado correctamente
-                  {/if}
-                </span>
-              </div>
-            </div>
-          {:else}
-            <div class="flex justify-end gap-2">
-              <button class="btn-secondary" on:click={closeUserModal} disabled={savingUser}>Cancelar</button>
-              <button class="btn-primary" on:click|preventDefault={submitUser} disabled={savingUser}>
-                {#if savingUser}
-                  <svg class="h-4 w-4 animate-spin mr-2" viewBox="0 0 24 24">
-                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" fill="none"></circle>
-                    <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
-                  </svg>
-                  Guardando...
-                {:else}
-                  {editingUser ? 'Guardar' : 'Crear'}
-                {/if}
-              </button>
-            </div>
-          {/if}
-      </div>
     </div>
-  </Portal>
+    <svelte:fragment slot="footer">
+      {#if saveErrors && saveErrors.length > 0}
+        <div bind:this={errorAlertEl} class="mb-2 p-3 bg-red-50 border border-red-200 rounded-lg">
+          <div class="flex items-center space-x-2 mb-2">
+            <svg class="w-5 h-5 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+            </svg>
+            <span class="text-sm font-medium text-red-800">Errores encontrados:</span>
+          </div>
+          <ul class="list-disc list-inside text-sm text-red-700 ml-7">
+            {#each saveErrors as e}
+              <li>{e}</li>
+            {/each}
+          </ul>
+        </div>
+      {/if}
+
+      {#if saveSuccess}
+        <div bind:this={errorAlertEl} class="mb-2 p-3 bg-green-50 border border-green-200 rounded-lg">
+          <div class="flex items-center space-x-2">
+            <svg class="w-5 h-5 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
+            </svg>
+            <span class="text-sm font-medium text-green-800">
+              {#if editingUser}
+                Cliente actualizado correctamente
+              {:else}
+                Cliente creado correctamente
+              {/if}
+            </span>
+          </div>
+        </div>
+      {/if}
+
+      <div class="flex justify-end gap-2">
+        <button class="btn-secondary" on:click={closeUserModal} disabled={savingUser}>Cancelar</button>
+        <button class="btn-primary" on:click|preventDefault={submitUser} disabled={savingUser}>
+          {#if savingUser}
+            <svg class="h-4 w-4 animate-spin mr-2" viewBox="0 0 24 24">
+              <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" fill="none"></circle>
+              <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
+            </svg>
+            Guardando...
+          {:else}
+            {editingUser ? 'Guardar' : 'Crear'}
+          {/if}
+        </button>
+      </div>
+    </svelte:fragment>
+  </Modal>
+{/if}
+
+{#if showDeleteModal}
+  <ConfirmDialog bind:open={showDeleteModal}
+    title="Confirmar eliminación"
+    itemName={`${deletingUser?.name || ''}`}
+    itemLabel={`(${deletingUser?.id || ''})`}
+    on:confirm={performDeleteConfirmed}
+    on:cancel={() => { showDeleteModal = false; deletingUser = null; }} />
 {/if}
 
 <style>
@@ -805,36 +806,11 @@
     padding-left: 1rem;
   }
 
-  .table-header {
-    padding: 1rem;
-    text-align: center; /* center header text by default */
-    font-weight: 600;
-    color: #374151;
-    text-transform: uppercase;
-    letter-spacing: 0.05em;
-    font-size: 0.75rem;
-    user-select: none;
-  }
-
-  .table-header:hover {
-    background: rgba(53, 82, 140, 0.05);
-  }
-
-  /* Ensure header inner content (label + icon) is centered and spaced */
-  .table-header > div {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    gap: 0.5rem;
-  }
-
-  /* For headers that semantically should align right, keep cells intact but center header label */
-  .table-header.text-right > div {
-    justify-content: flex-end;
-  }
-  .table-header.text-left > div {
-    justify-content: flex-start;
-  }
+  /* Rely on global .table-header from src/app.css for size/color/weight; keep structural helpers */
+  .table-header:hover { background: rgba(53,82,140,0.05); }
+  .table-header > div { display:flex; align-items:center; justify-content:center; gap:0.5rem }
+  .table-header.text-right > div { justify-content:flex-end }
+  .table-header.text-left > div { justify-content:flex-start }
 
   .table-cell {
     padding: 1rem;

@@ -1,9 +1,12 @@
 <script lang="ts">
   import { createEventDispatcher, onDestroy, tick } from 'svelte';
+  import Portal from './Portal.svelte';
   export let open: boolean = false;
   export let title: string = '';
   export let closeOnBackdrop: boolean = true;
   export let trapFocus: boolean = true;
+  // per-instance z offset to allow stacked modals (confirmations) to appear above
+  export let zOffset: number = 0;
 
   const dispatch = createEventDispatcher();
   let _bodyScrollY = 0;
@@ -67,9 +70,15 @@
 </script>
 
 {#if open}
-  <div class="fixed inset-0 z-50 flex items-center justify-center p-4" on:keydown={onKeydown}>
-    <div class="fixed inset-0 bg-black/40" on:click={onBackdropClick} aria-hidden="true"></div>
-    <div bind:this={dialogEl} tabindex="-1" class="relative w-full {"max-w-3xl"} bg-white rounded-lg shadow-lg modal-content" role="dialog" aria-modal="true" aria-label={title}>
+  {@const BASE_Z = 9999}
+  {@const portalZ = BASE_Z + (zOffset || 0)}
+  {@const backdropZ = BASE_Z + (zOffset || 0)}
+  {@const dialogZ = BASE_Z + (zOffset || 0) + 10}
+
+  <Portal>
+    <div class="fixed inset-0 modal-portal flex items-center justify-center p-4" on:keydown={onKeydown} role="presentation" style={`z-index: ${portalZ}`}>
+      <div class="fixed inset-0 modal-backdrop" on:click={onBackdropClick} aria-hidden="true" style={`z-index: ${backdropZ}`}></div>
+      <div bind:this={dialogEl} tabindex="-1" class="relative w-full max-w-3xl bg-white rounded-lg shadow-lg modal-content" role="dialog" aria-modal="true" aria-label={title} style={`z-index: ${dialogZ}`}>
       <div class="p-6 flex flex-col">
         <div class="flex items-start justify-between mb-4">
           {#if title}
@@ -88,10 +97,20 @@
           <slot name="footer" />
         </div>
       </div>
+      </div>
     </div>
-  </div>
+  </Portal>
 {/if}
 
 <style>
-  .modal-content { border-radius: var(--radius-lg); }
+  /* z-index variables: keep modals on top of everything else in the app */
+  :root {
+    --modal-z-base: 9999;
+    --modal-backdrop-z: calc(var(--modal-z-base) + 0);
+    --modal-dialog-z: calc(var(--modal-z-base) + 10);
+  }
+
+  .modal-portal { z-index: var(--modal-z-base); position: fixed; inset: 0; }
+  .modal-backdrop { z-index: var(--modal-backdrop-z); background: rgba(0,0,0,0.4); }
+  .modal-content { border-radius: var(--radius-lg); z-index: var(--modal-dialog-z); }
 </style>

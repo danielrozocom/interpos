@@ -1,5 +1,7 @@
 <script lang="ts">
   import { onMount } from 'svelte';
+  import Modal from '$lib/Modal.svelte';
+  import ConfirmDialog from '$lib/ConfirmDialog.svelte';
   let products: any[] = [];
   let loading = true;
   let error = '';
@@ -22,9 +24,11 @@
   let saving = false;
   let saveErrors: string[] = [];
   let saveSuccess = false;
+  let showConfirmDelete = false;
+  let deleteTarget: any = null;
 
   // Scroll lock state
-  let _bodyScrollY = 0;
+  let errorAlertEl: HTMLElement | null = null;
 
   $: categories = Array.from(new Set(products.map(p => p.category).filter(Boolean)));
 
@@ -104,42 +108,27 @@
     saveErrors = [];
     saveSuccess = false;
     showModal = true;
-    // prevent background scrolling while modal is open by adding modal-open class (CSS handles overflow)
-    if (typeof window !== 'undefined' && typeof document !== 'undefined') {
-      _bodyScrollY = window.scrollY || document.documentElement.scrollTop || 0;
+    // focus inputs after render without causing scroll (Modal handles scroll lock)
+    tick().then(() => {
       try {
-        document.documentElement.classList.add('modal-open');
-        document.body.classList.add('modal-open');
-      } catch (e) {}
-      // focus inputs after render without causing scroll
-      tick().then(() => {
-        try {
-          if (modalNameInput && editingProduct) {
-            modalNameInput.focus({ preventScroll: true });
-          } else if (modalIdInput) {
-            modalIdInput.focus({ preventScroll: true });
-            modalIdInput.select?.();
-          }
-        } catch (e) {
-          try { modalNameInput?.focus(); } catch(_) {}
-          try { modalIdInput?.focus(); } catch(_) {}
+        if (modalNameInput && editingProduct) {
+          modalNameInput.focus({ preventScroll: true });
+        } else if (modalIdInput) {
+          modalIdInput.focus({ preventScroll: true });
+          modalIdInput.select?.();
         }
-      });
-    }
+      } catch (e) {
+        try { modalNameInput?.focus(); } catch(_) {}
+        try { modalIdInput?.focus(); } catch(_) {}
+      }
+    });
   }
 
   function closeModal() {
     showModal = false;
     saving = false;
     saveSuccess = false;
-    // restore body scrolling and scroll position
-    if (typeof window !== 'undefined' && typeof document !== 'undefined') {
-      try {
-        document.documentElement.classList.remove('modal-open');
-        document.body.classList.remove('modal-open');
-      } catch (e) {}
-      try { setTimeout(() => { window.scrollTo(0, _bodyScrollY || 0); }, 0); } catch (e) {}
-    }
+    // Modal component will restore scroll state
   }
 
   // Prevent modal from overlapping the fixed header:
@@ -205,7 +194,11 @@
     // Resolve category value (if selecting "Nueva categoría" use modalCategoryNew)
     const categoryFinal = modalCategory === '__new__' ? String(modalCategoryNew || '').trim() : String(modalCategory || '').trim();
     if (!categoryFinal) saveErrors.push('La categoría es obligatoria.');
-    if (saveErrors.length) return;
+    if (saveErrors.length) {
+      await tick();
+      try { errorAlertEl?.scrollIntoView({ behavior: 'smooth', block: 'center' }); } catch(e) {}
+      return;
+    }
 
     saving = true;
     try {
@@ -217,6 +210,9 @@
       });
       if (!res.ok) {
         const data = await res.json().catch(() => null);
+        saveErrors = [data?.error || 'Error guardando producto'];
+        await tick();
+        try { errorAlertEl?.scrollIntoView({ behavior: 'smooth', block: 'center' }); } catch(e) {}
         throw new Error(data?.error || 'Error guardando producto');
       }
       await fetchProducts();
@@ -233,8 +229,18 @@
     }
   }
 
-  async function deleteProduct(p: any) {
-    if (!confirm(`¿Eliminar producto ${p.name} (${p.id})?`)) return;
+  // Open confirmation dialog for deletion
+  function deleteProduct(p: any) {
+    deleteTarget = p;
+    showConfirmDelete = true;
+  }
+
+  // Called when user confirms deletion in ConfirmDialog
+  async function performDeleteConfirmed() {
+    const p = deleteTarget;
+    deleteTarget = null;
+    showConfirmDelete = false;
+    if (!p) return;
     try {
       const res = await fetch('/api/sheets/products/delete', {
         method: 'POST',
@@ -248,7 +254,8 @@
         deleteSuccess = '';
       }, 3000);
     } catch (e) {
-      alert('No se pudo eliminar el producto');
+      // keep UX consistent with other pages
+      try { alert('No se pudo eliminar el producto'); } catch(_) {}
     }
   }
 </script>
@@ -257,7 +264,7 @@
   <title>Productos | InterPOS</title>
 </svelte:head>
 
-<div class="max-w-6xl mx-auto p-4">
+<div class="products-page max-w-6xl mx-auto p-4">
   <div class="mb-8 text-center">
     <h1 class="text-4xl font-bold text-[#35528C] mb-1 font-sans s-xAzoHdC_kP8W">Gestión de Productos</h1>
     <p class="text-lg text-[#35528C]/80 font-sans max-w-3xl mx-auto s-xAzoHdC_kP8W">Administra el catálogo de productos disponibles para venta</p>
@@ -364,7 +371,7 @@
               </th>
               <th class="table-header cursor-pointer text-left" on:click={() => handleSort('category')}>
                 <div class="flex items-center justify-start">
-                  <span>Categoria</span>
+                  <span>Categoría</span>
                   <svg class="h-4 w-4 {sortBy === 'category' ? 'text-[#35528C]' : 'text-gray-400'} ml-2" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d={sortBy === 'category' && sortDirection === 'desc' ? 'M19 9l-7 7-7-7' : 'M5 15l7-7 7 7'} />
                   </svg>
@@ -384,9 +391,9 @@
           <tbody class="bg-white divide-y divide-gray-200">
             {#each sortedProducts as p, index (p.id)}
               <tr class="hover:bg-gray-50 transition-colors duration-150 {index % 2 === 0 ? 'bg-white' : 'bg-gray-50/50'}">
-                <td class="table-cell font-sans font-normal text-[#35528C] text-base">{p.id}</td>
+                <td class="table-cell id-cell font-sans font-normal text-[#35528C] text-base">{p.id}</td>
                 <td class="table-cell name-cell text-base"><div class="font-medium text-gray-900">{p.name}</div></td>
-                <td class="table-cell text-base"><div class="text-sm text-gray-600">{p.category || '—'}</div></td>
+                <td class="table-cell category-cell text-base"><div class="text-sm text-gray-600">{p.category || '—'}</div></td>
                 <td class="table-cell text-right text-base"><span class="font-bold product-price">${p.price?.toLocaleString ? p.price.toLocaleString('es-CO') : p.price}</span></td>
                 <td class="table-cell actions-cell">
                   <div class="flex items-center justify-center gap-2">
@@ -420,9 +427,9 @@
   </div>
 
   {#if showModal}
-    <div class="fixed inset-0 z-50 modal-overlay bg-black bg-opacity-40 flex items-center justify-center px-6" style="overflow:hidden; position:relative;" role="dialog" aria-modal="true">
-      <div bind:this={modalEl} class="modal-content bg-white rounded-lg p-6 w-full max-w-lg shadow-lg overflow-auto" style="max-height: {modalMaxHeight}px; border-radius: var(--radius-lg);">
-        <h3 class="text-lg font-semibold mb-4">{editingProduct ? 'Editar producto' : 'Agregar producto'}</h3>
+    <Modal bind:open={showModal} title={editingProduct ? 'Editar producto' : 'Agregar producto'}>
+      <div class="p-2">
+        <h3 class="sr-only">{editingProduct ? 'Editar producto' : 'Agregar producto'}</h3>
 
         <label for="modalId" class="block text-sm text-gray-700">ID <span class="text-red-600">*</span></label>
         <input id="modalId" bind:value={modalId} class="input-field mt-2 mb-3" required aria-required="true" type="number" inputmode="numeric" pattern="\d*" />
@@ -447,54 +454,67 @@
           {/if}
         </div>
 
-        {#if saveErrors && saveErrors.length > 0}
-    <div class="mb-2 p-3 bg-red-50 border border-red-200 rounded-lg" style="border-radius: var(--radius-lg);">
-            <div class="flex items-center space-x-2 mb-2">
-              <svg class="w-5 h-5 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
-              </svg>
-              <span class="text-sm font-medium text-red-800">Errores encontrados:</span>
-            </div>
-            <ul class="list-disc list-inside text-sm text-red-700 ml-7">
-              {#each saveErrors as e}
-                <li>{e}</li>
-              {/each}
-            </ul>
-          </div>
-        {/if}
+        <!-- moved alerts to footer slot for consistent placement and auto-scroll -->
 
-        {#if saveSuccess}
-          <div class="mb-2 p-3 bg-green-50 border border-green-200 rounded-lg" style="border-radius: var(--radius-lg);">
-            <div class="flex items-center space-x-2">
-              <svg class="w-5 h-5 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
-              </svg>
-              <span class="text-sm font-medium text-green-800">
-                {#if editingProduct}
-                  Producto actualizado correctamente
-                {:else}
-                  Producto creado correctamente
-                {/if}
-              </span>
-            </div>
-          </div>
-        {/if}
-
-        <div class="flex justify-end gap-2">
-          <button class="btn-secondary" on:click={closeModal} disabled={saving}>Cancelar</button>
-          <button class="btn-primary" on:click|preventDefault={submitProduct} disabled={saving}>
-            {#if saving}
-              <svg class="h-4 w-4 animate-spin mr-2" viewBox="0 0 24 24">
-                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" fill="none"></circle>
-                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
-              </svg>
-            {/if}
-            {saving ? 'Guardando...' : (editingProduct ? 'Guardar' : 'Crear')}
-          </button>
-        </div>
-      </div>
     </div>
+    <svelte:fragment slot="footer">
+      {#if saveErrors && saveErrors.length > 0}
+        <div bind:this={errorAlertEl} class="mb-2 p-3 bg-red-50 border border-red-200 rounded-lg" style="border-radius: var(--radius-lg);">
+          <div class="flex items-center space-x-2 mb-2">
+            <svg class="w-5 h-5 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+            </svg>
+            <span class="text-sm font-medium text-red-800">Errores encontrados:</span>
+          </div>
+          <ul class="list-disc list-inside text-sm text-red-700 ml-7">
+            {#each saveErrors as e}
+              <li>{e}</li>
+            {/each}
+          </ul>
+        </div>
+      {/if}
+
+      {#if saveSuccess}
+        <div bind:this={errorAlertEl} class="mb-2 p-3 bg-green-50 border border-green-200 rounded-lg" style="border-radius: var(--radius-lg);">
+          <div class="flex items-center space-x-2">
+            <svg class="w-5 h-5 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
+            </svg>
+            <span class="text-sm font-medium text-green-800">
+              {#if editingProduct}
+                Producto actualizado correctamente
+              {:else}
+                Producto creado correctamente
+              {/if}
+            </span>
+          </div>
+        </div>
+      {/if}
+
+      <div class="flex justify-end gap-2">
+        <button class="btn-secondary" on:click={closeModal} disabled={saving}>Cancelar</button>
+        <button class="btn-primary" on:click|preventDefault={submitProduct} disabled={saving}>
+          {#if saving}
+            <svg class="h-4 w-4 animate-spin mr-2" viewBox="0 0 24 24">
+              <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" fill="none"></circle>
+              <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
+            </svg>
+          {/if}
+          {saving ? 'Guardando...' : (editingProduct ? 'Guardar' : 'Crear')}
+        </button>
+      </div>
+    </svelte:fragment>
+  </Modal>
   {/if}
 </div>
 
 <!-- styles are provided globally in src/app.css (tokenized and Tailwind-processed). Local styles removed to avoid conflicts. -->
+ 
+ {#if showConfirmDelete}
+  <ConfirmDialog bind:open={showConfirmDelete}
+    title="Confirmar eliminación"
+    itemName={`${deleteTarget?.name || ''}`}
+    itemLabel={`(${deleteTarget?.id || ''})`}
+    on:confirm={performDeleteConfirmed}
+    on:cancel={() => { showConfirmDelete = false; deleteTarget = null; }} />
+ {/if}
