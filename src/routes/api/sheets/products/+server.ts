@@ -1,6 +1,14 @@
 import type { RequestHandler } from '@sveltejs/kit';
 import { sbServer } from '$lib/supabase';
 
+type Product = {
+  id: string;
+  category: string;
+  name: string;
+  price: number;
+  _raw?: any;
+};
+
 function parsePrice(priceStr: string | null | undefined): number {
   if (!priceStr) return 0;
   
@@ -41,7 +49,7 @@ export const GET: RequestHandler = async ({ url }) => {
       return new Response(JSON.stringify({ success: false, error: 'Error al consultar productos' }), { status: 500, headers: { 'Content-Type': 'application/json' } });
     }
     // Columns: ID, Category, Name, Price (Price is stored as text in the schema)
-    let products = (rows || []).map((row: any) => ({
+    let products: Product[] = (rows || []).map((row: any) => ({
       id: String(row.ID ?? ''),
       category: row.Category ?? '',
       name: row.Name ?? '',
@@ -51,8 +59,8 @@ export const GET: RequestHandler = async ({ url }) => {
 
     // Ajustar precios: detectar si la celda original usa decimales para representar miles
     // Ejemplo: '5.5' -> 5500. Pero un entero como '300' no debe convertirse a 300000.
-    products = products.map(product => {
-  const rawVal = (product as any)._raw ?? '';
+    products = products.map((product: Product) => {
+      const rawVal = (product as any)._raw ?? '';
   const rawClean = String(rawVal).replace(/[^^\d.,-]/g, '').replace(/\s/g, '');
       let parsedPrice = 0;
 
@@ -95,18 +103,18 @@ export const GET: RequestHandler = async ({ url }) => {
     const MIN_PRICE = 0;
     const MAX_PRICE = Number.POSITIVE_INFINITY;
     // Opcional: registrar cuántos productos se excluyen por precio inválido (no numérico o negativo)
-    const excludedCount = products.filter(p => typeof p.price !== 'number' || p.price < MIN_PRICE || p.price > MAX_PRICE).length;
+  const excludedCount = products.filter((p: Product) => typeof p.price !== 'number' || p.price < MIN_PRICE || p.price > MAX_PRICE).length;
     if (excludedCount > 0) {
       console.warn(`Excluyendo ${excludedCount} productos con precio inválido (no numérico o < ${MIN_PRICE})`);
     }
     // Filtrar productos fuera del rango para que la UI no los muestre
-    products = products.filter(p => typeof p.price === 'number' && p.price >= MIN_PRICE && p.price <= MAX_PRICE);
+  products = products.filter((p: Product) => typeof p.price === 'number' && p.price >= MIN_PRICE && p.price <= MAX_PRICE);
 
       // Filter products if search parameter is present
       const searchTerm = url.searchParams.get('search')?.toLowerCase();
       if (searchTerm) {
         // Primero intentar encontrar coincidencia exacta por ID
-        const exactIdMatch = products.filter(product => 
+        const exactIdMatch = products.filter((product: Product) => 
           product.id.toLowerCase() === searchTerm
         );
         
@@ -115,7 +123,7 @@ export const GET: RequestHandler = async ({ url }) => {
           products = exactIdMatch;
         } else {
           // Si no hay coincidencia exacta por ID, buscar en nombre
-          const nameMatches = products.filter(product => 
+          const nameMatches = products.filter((product: Product) => 
             product.name.toLowerCase().includes(searchTerm)
           );
           
@@ -124,7 +132,7 @@ export const GET: RequestHandler = async ({ url }) => {
             products = nameMatches;
           } else {
             // Si no hay coincidencias por nombre, buscar IDs que empiecen igual
-            products = products.filter(product => 
+            products = products.filter((product: Product) => 
               product.id.toLowerCase().startsWith(searchTerm)
             );
           }
