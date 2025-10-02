@@ -370,7 +370,11 @@
   /* Hamburger positioning: align horizontally with sidebar icons when sidebar is open/collapsed */
   /* nudge hamburger further left so it visually lines up with the sidebar icons */
   /* simplified hamburger placement: left aligned inside header and vertically centered */
-  header.topbar .topbar-hamburger { position:absolute; left:1.25rem; top:50%; transform:translateY(-50%); color:#ffffff; z-index:10; }
+    /* Align hamburger with the visual center of the sidebar icons
+      - when sidebar is open icons sit near 24px from the left (padding + icon center)
+      - when collapsed the icon column center is ~36px (half of 72px) */
+    header.topbar.sidebar-open .topbar-hamburger { position:absolute; left:12px; top:50%; transform:translateY(-50%); color:#ffffff; z-index:10; }
+    header.topbar:not(.sidebar-open) .topbar-hamburger { position:absolute; left:6px; top:50%; transform:translateY(-50%); color:#ffffff; z-index:10; }
   /* Light/topbar variant chosen by UX */
   .topbar.light { background: #ffffff; box-shadow: 0 1px 0 rgba(16,24,40,0.06); }
   .topbar.light .topbar-brand { color: #0f1724; }
