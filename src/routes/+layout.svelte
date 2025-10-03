@@ -239,44 +239,55 @@
             </button>
             
             {#if showUserDropdown}
-              <!-- Dropdown menu -->
-              <div class="user-dropdown" role="menu">
-                <div class="dropdown-header">
-                  <span class="dropdown-user-name">{ displayUser.user_metadata?.full_name || displayUser.name || displayUser.email }</span>
-                  <span class="dropdown-user-email">{ displayUser.email }</span>
+                <!-- Dropdown menu -->
+                <div class="user-dropdown" role="menu">
+                  <div class="dropdown-header">
+                    <div class="dropdown-identity">
+                      {#if displayUser.user_metadata?.avatar_url}
+                        <img src="{displayUser.user_metadata.avatar_url}" alt="Avatar" class="user-avatar dropdown-avatar" />
+                      {:else}
+                        <div class="user-avatar-placeholder dropdown-avatar">{(displayUser.user_metadata?.full_name || displayUser.name || displayUser.email)?.charAt(0) || '?'}</div>
+                      {/if}
+                      <div class="dropdown-identity-text">
+                        <span class="dropdown-user-name">{ displayUser.user_metadata?.full_name || displayUser.name || displayUser.email }</span>
+                        <span class="dropdown-user-email">{ displayUser.email }</span>
+                      </div>
+                    </div>
+                  </div>
+                  <hr class="dropdown-divider">
+                  <div class="dropdown-actions">
+                    <button 
+                      class="dropdown-item logout-btn"
+                      disabled={loggingOut}
+                      on:click={async () => {
+                        loggingOut = true;
+                        try {
+                          const response = await fetch('/api/auth/logout', {
+                            method: 'POST',
+                            headers: {
+                              'Content-Type': 'application/json',
+                            },
+                          });
+                          if (response.ok) {
+                            window.location.replace('/login');
+                          }
+                        } catch (error) {
+                          console.error('Error logging out:', error);
+                          // Fallback: redirect anyway
+                          window.location.replace('/login');
+                        }
+                      }}
+                      role="menuitem"
+                    >
+                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/>
+                        <polyline points="16,17 21,12 16,7"/>
+                        <line x1="21" y1="12" x2="9" y2="12"/>
+                      </svg>
+                      {loggingOut ? 'Cerrando sesión...' : 'Cerrar sesión'}
+                    </button>
+                  </div>
                 </div>
-                <hr class="dropdown-divider">
-                <button 
-                  class="dropdown-item logout-btn"
-                  disabled={loggingOut}
-                  on:click={async () => {
-                    loggingOut = true;
-                    try {
-                      const response = await fetch('/api/auth/logout', {
-                        method: 'POST',
-                        headers: {
-                          'Content-Type': 'application/json',
-                        },
-                      });
-                      if (response.ok) {
-                        window.location.replace('/login');
-                      }
-                    } catch (error) {
-                      console.error('Error logging out:', error);
-                      // Fallback: redirect anyway
-                      window.location.replace('/login');
-                    }
-                  }}
-                  role="menuitem"
-                >
-                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                    <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/>
-                    <polyline points="16,17 21,12 16,7"/>
-                    <line x1="21" y1="12" x2="9" y2="12"/>
-                  </svg>
-                  {loggingOut ? 'Cerrando sesión...' : 'Cerrar sesión'}
-                </button>
-              </div>
             {/if}
           </div>
         {:else}
@@ -515,7 +526,7 @@
   }
 
   /* Place the user menu at the top-right with a small margin so it doesn't touch the viewport edge */
-  .topbar .user-menu { position: absolute; right: 8px; top: 6px; }
+  .topbar .user-menu { position: absolute; right: 6px; top: 6px; }
   
   /* child width adjustments removed (not needed) */
   /* Subnavigation items under main links */
@@ -574,8 +585,8 @@
     display: flex; 
     align-items: center; 
     justify-content: center; 
-    font-weight: 600; 
-    font-size: 14px; 
+    font-weight: 700; 
+    font-size: 16px; 
     color: #fff; 
   }
   .user-name { color: #fff; font-weight: 500; }
@@ -590,15 +601,28 @@
     border: 1px solid #e5e7eb; 
     border-radius: 8px; 
     box-shadow: 0 10px 15px -3px rgba(0,0,0,0.1), 0 4px 6px -2px rgba(0,0,0,0.05); 
-    min-width: 200px; 
+    min-width: 280px; 
+    max-width: 420px; 
+    box-sizing: border-box;
     z-index: 1000; 
     margin-top: 0.5rem; 
+    padding-bottom: 0.5rem;
   }
   .dropdown-header {
     padding: 1rem;
     border-bottom: 1px solid #f3f4f6;
     background: #f9fafb;
   }
+  .dropdown-identity { display:flex; gap:0.75rem; align-items:center; }
+  /* Avatar container: circular, blue background for placeholders and masked images */
+  .dropdown-avatar { width:48px; height:48px; border-radius:50%; flex:0 0 48px; overflow:hidden; display:flex; align-items:center; justify-content:center; background:#35528C; border:1px solid rgba(255,255,255,0.06); box-shadow: 0 4px 10px rgba(2,6,23,0.03); }
+  .dropdown-avatar img { width:100%; height:100%; object-fit:cover; display:block; border-radius:50%; background:transparent; }
+  .dropdown-avatar .user-avatar-placeholder { font-weight:800; color:#ffffff; font-size:22px; line-height:1; }
+  .dropdown-identity-text { display:flex; flex-direction:column; min-width:0; }
+  .dropdown-user-name { font-weight:700; font-size:0.98rem; color:#0f1724; display:block; }
+  .dropdown-user-email { font-weight:500; font-size:0.85rem; color:#6b7280; display:block; margin-top:2px; }
+  .dropdown-user-name { white-space:normal; word-break:break-word; }
+  .dropdown-user-email { white-space:normal; word-break:break-word; }
   .dropdown-user-name {
     display: block;
     font-weight: 600;
@@ -617,7 +641,7 @@
     border-top: 1px solid #f3f4f6;
   }
   /* place user menu at the far right of the topbar */
-  .topbar .user-menu { position: absolute; right: 8px; top: 50%; transform: translateY(-50%); }
+  .topbar .user-menu { position: absolute; right: 6px; top: 50%; transform: translateY(-50%); }
   .dropdown-item { 
     display: flex; 
     align-items: center; 
@@ -634,6 +658,29 @@
   }
   .dropdown-item:hover { background: #f9fafb; }
   .dropdown-item svg { width: 16px; height: 16px; }
+  .dropdown-actions { display:flex; flex-direction:column; gap:0.5rem; padding:0.5rem 0.75rem; }
+  .dropdown-actions .dropdown-item { padding:0.65rem 0.75rem; border-radius:8px; }
+  .dropdown-item.logout-btn { background: #fff; }
   /* Removed debug pre styles (no longer used) */
   @keyframes spin { to { transform: rotate(360deg); } }
+  /* Keep dropdown visually consistent on mobile: avoid forcing full-width; reduce sizes only on very small screens */
+  @media (max-width: 480px) {
+    .user-dropdown { left: auto; right: 6px; min-width: 260px; max-width: 420px; width: auto; }
+    .dropdown-avatar { width:40px; height:40px; flex:0 0 40px; border-radius:50%; }
+    .dropdown-user-name { font-size:0.95rem; }
+    .dropdown-user-email { font-size:0.8rem; }
+  }
+  @media (max-width: 320px) {
+    /* For very small screens allow the dropdown to shrink but keep padding */
+    .user-dropdown { min-width: 200px; max-width: calc(100vw - 12px); right:6px; }
+  }
+
+  /* Desktop adjustments: move dropdown left and increase its width for better readability */
+  @media (min-width: 769px) {
+    .user-dropdown { left: auto; right: 6px; min-width: 340px; max-width: 520px; }
+  .dropdown-avatar { width:56px; height:56px; flex:0 0 56px; border-radius:50%; }
+  .dropdown-user-name { font-size:1.05rem; }
+  .dropdown-avatar .user-avatar-placeholder { font-size:30px; }
+    .dropdown-user-email { font-size:0.9rem; }
+  }
 </style>
