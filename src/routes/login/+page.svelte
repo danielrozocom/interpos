@@ -58,12 +58,14 @@
   /* Page background and centered card */
   /* reset body so no unexpected scroll margin */
   :global(html), :global(body) { height:100%; margin:0; }
-  /* prevent the browser page from scrolling for this route; allow internal scrolling */
+  /* prevent the browser page from scrolling for this route; allow internal scrolling inside the card */
   :global(body) { overflow:hidden; }
-  .login-page { display:flex; height:100vh; align-items:center; justify-content:center; overflow:auto; }
+  /* Use min-height so the page can be centered inside layouts that reserve a topbar height
+    and to avoid forcing full-viewport height when the topbar is present. Keep flex centering. */
+  .login-page { display:flex; min-height:calc(100vh - var(--topbar-h, 64px)); align-items:center; justify-content:center; overflow:auto; padding:1.5rem 0; }
   .card { background:linear-gradient(180deg,#ffffff,#fbfdff); padding:0; border-radius:16px; border:1px solid rgba(2,6,23,0.03); /* lighter border */
     /* softer, vertically-focused shadow */
-    box-shadow:0 12px 28px rgba(2,6,23,0.045); width:420px; max-width:95%; overflow:hidden; max-height:calc(100vh - 48px); position:relative; }
+    box-shadow:0 12px 28px rgba(2,6,23,0.045); width:420px; max-width:95%; overflow:hidden; max-height:calc(100vh - var(--topbar-h,64px) - 48px); position:relative; margin:0 auto; }
   .brand { background:#35528C; color:#fff; padding:0.9rem 1rem; text-align:center; }
   .brand h1 { font-size:2rem; font-weight:800; margin:0; letter-spacing:0.6px; }
   .card-body { padding:1.25rem 1.5rem; overflow:auto; max-height:calc(100vh - 160px); }

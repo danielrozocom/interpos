@@ -51,10 +51,25 @@
   // Close the slide menu on mobile when a nav link is clicked
   function handleNavClick() {
     try {
-      // If viewport is small, close the menu
+      // Only close sidebar if click is on a link (not chevron button)
       if (typeof window !== 'undefined') {
         const isMobile = window.matchMedia('(max-width: 767px)').matches;
-        if (isMobile) menuOpen = false;
+        // Use event from Svelte's on:click handler
+        // Svelte passes the event as the first argument
+        // We need to get the event from arguments
+        const event = arguments[0];
+        if (isMobile && event) {
+          // Check if the click target is an <a> inside .sidebar-nav
+          let el = event.target;
+          // Traverse up to find an <a>
+          while (el && el !== event.currentTarget) {
+            if (el.tagName === 'A') {
+              menuOpen = false;
+              break;
+            }
+            el = el.parentElement;
+          }
+        }
       }
     } catch (e) {
       // ignore
