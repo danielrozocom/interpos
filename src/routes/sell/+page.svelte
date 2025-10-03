@@ -214,6 +214,7 @@ let paymentMethod = 'saldo'; // 'saldo' or 'efectivo'
 let cashReceived = '';
 let cashChange = 0;
 let showCashModal = false;
+let showUserModal = false;
 
   // Load user balance
   async function loadUserBalance(showErrors = false) {
@@ -616,6 +617,15 @@ let showCashModal = false;
     error = '';
   }
 
+  // Handle user details modal
+  function openUserModal() {
+    showUserModal = true;
+  }
+
+  function closeUserModal() {
+    showUserModal = false;
+  }
+
   // Load products on mount
   onMount(() => {
     loadProducts();
@@ -925,7 +935,11 @@ let showCashModal = false;
     {/if}
         {#if userName}
           <div class="mt-2 flex flex-col gap-1">
-            <p class="text-sm md:text-base text-gray-600">Cliente: <span class="font-medium text-gray-900">{userName}</span></p>
+            <p class="text-sm md:text-base text-gray-600">
+              Cliente: 
+              <span class="font-medium text-gray-900 md:inline hidden">{userName}</span>
+              <button class="font-medium text-gray-900 md:hidden underline" on:click={openUserModal}>{userId}</button>
+            </p>
             <p class="text-sm md:text-base text-gray-600">Saldo: <span class="font-medium text-primary">${userBalance.toLocaleString('es-CO')}</span></p>
             {#if cartTotal > 0 && paymentMethod === 'saldo'}
               <p class="text-sm text-primary mt-1">Saldo tras la compra: <span class="font-bold text-primary">${(userBalance - cartTotal).toLocaleString('es-CO')}</span></p>
@@ -1357,6 +1371,39 @@ let showCashModal = false;
           class="flex-1 px-4 py-2 bg-primary text-white rounded-lg hover:bg-[#27406a] focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed"
         >
           {loading ? 'Procesando...' : 'Confirmar Pago'}
+        </button>
+      </div>
+    </div>
+  </div>
+{/if}
+
+<!-- User Details Modal -->
+{#if showUserModal}
+  <div class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[9999] p-4">
+    <div class="bg-white rounded-lg shadow-xl max-w-md w-full p-6">
+      <h3 class="text-xl font-bold text-gray-900 mb-4">👤 Detalles del Cliente</h3>
+      
+      <div class="space-y-3">
+        <div>
+          <p class="text-sm text-gray-600">ID del Cliente:</p>
+          <p class="text-lg font-medium text-gray-900">{userId}</p>
+        </div>
+        <div>
+          <p class="text-sm text-gray-600">Nombre:</p>
+          <p class="text-lg font-medium text-gray-900">{userName}</p>
+        </div>
+        <div>
+          <p class="text-sm text-gray-600">Saldo Actual:</p>
+          <p class="text-lg font-medium text-primary">${userBalance.toLocaleString('es-CO')}</p>
+        </div>
+      </div>
+      
+      <div class="mt-6 flex justify-end">
+        <button
+          on:click={closeUserModal}
+          class="px-4 py-2 bg-primary text-white rounded-lg hover:bg-[#27406a] focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2"
+        >
+          Cerrar
         </button>
       </div>
     </div>

@@ -6,6 +6,7 @@
   let showUserDropdown = false;
   // start closed by default per request
   let productsOpen = false;
+  let sellOpen = false;
   // UX config: set to true if header should be white (chosen by UX/UI)
   export let topbarLight = false;
   import { page } from '$app/stores';
@@ -170,7 +171,8 @@
           if (clientUser === null && $page.data.user === null &&
               String($page.url.pathname) !== '/login' &&
               String($page.url.pathname) !== '/auth/callback' &&
-              String($page.url.pathname) !== '/auth/implicit-callback') {
+              String($page.url.pathname) !== '/auth/implicit-callback' &&
+              String($page.url.pathname) !== '/check-balance') {
             console.log('[CLIENT] No authenticated user, redirecting to login');
             window.location.href = '/login';
           }
@@ -198,13 +200,13 @@
   {#if String($page.url.pathname) !== '/login'}
     <header class="topbar" class:light={topbarLight} class:sidebar-open={menuOpen}>
       <div class="topbar-inner">
-        <!-- Hamburger in header -->
-        {#if true}
+        <!-- Hamburger in header (hidden on check-balance) -->
+        {#if String($page.url.pathname) !== '/check-balance'}
           <button class="collapse-btn topbar-hamburger" aria-label="Alternar barra lateral" on:click={() => menuOpen = !menuOpen}>
             <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M4 6h16M4 12h16M4 18h16" stroke-linecap="round" stroke-linejoin="round"/></svg>
           </button>
         {/if}
-        {#if displayUser}
+        {#if displayUser && String($page.url.pathname) !== '/check-balance'}
           <div class="user-menu">
             <button 
               class="user-menu-btn"
@@ -219,11 +221,6 @@
                   {(displayUser.user_metadata?.full_name || displayUser.name || displayUser.email)?.charAt(0) || '?'}
                 </div>
               {/if}
-              <!-- Show full name on desktop and mobile -->
-              <span class="user-name text-sm">{ displayUser.user_metadata?.full_name || displayUser.name || displayUser.email }</span>
-              <svg class="dropdown-arrow" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <polyline points="6,9 12,15 18,9"/>
-              </svg>
             </button>
             
             {#if showUserDropdown}
@@ -275,7 +272,7 @@
           <!-- Login button removed - automatic redirect to /login when not authenticated -->
         {/if}
         <!-- Always show brand/title in the topbar -->
-        {#if true}
+        {#if String($page.url.pathname) === '/check-balance'}
           <span class="topbar-brand">InterPOS</span>
         {:else}
           <a href="/" class="topbar-brand" aria-label="Ir a inicio">InterPOS</a>
@@ -284,8 +281,8 @@
     </header>
   {/if}
   <div class="flex">
-  <!-- Sidebar (hidden on /login) -->
-  {#if String($page.url.pathname) !== '/login'}
+  <!-- Sidebar (hidden on /login and /check-balance) -->
+  {#if String($page.url.pathname) !== '/login' && String($page.url.pathname) !== '/check-balance'}
     <aside class="sidebar" class:collapsed={menuOpen === false} data-open={menuOpen} aria-label="Navegación principal">
       <div class="sidebar-top">
         {#if menuOpen}
@@ -330,7 +327,7 @@
               on:click={() => productsOpen = !productsOpen}
             >
               <svg class="chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <polyline points="9,18 15,12 9,6"/>
+                <polyline points="9,6 15,12 9,18"/>
               </svg>
             </button>
           </div>
@@ -404,7 +401,7 @@
   {/if}
 
     <!-- Main content area -->
-  <main class="main-content flex-1 px-4 sm:px-6 lg:px-8" class:login-full={$page.url.pathname === '/login'}>
+  <main class="main-content flex-1 px-4 sm:px-6 lg:px-8" class:login-full={$page.url.pathname === '/login'} class:centered={$page.url.pathname === '/check-balance'}>
       <slot />
     </main>
   </div>
@@ -418,6 +415,9 @@
   .topbar-inner { position:relative; max-width: 1120px; margin: 0 auto; padding: 0 1rem; display:flex; align-items:center; height:var(--topbar-h); gap:0.5rem; }
   /* center the brand absolutely so it's always visually centered regardless of left/right content */
   .topbar-brand { position:absolute; left:50%; top:50%; transform:translate(-50%,-50%); font-weight:800; color:#ffffff; text-decoration:none; font-size:1.25rem; pointer-events:auto; }
+
+  /* Title stays centered horizontally so it visually matches the design. */
+  .topbar-brand { left:50%; transform:translate(-50%,-50%); }
   /* legacy topbar favicon removed; kept in markup historically (no styles needed) */
   /* Topbar-specific hamburger positioned to align with sidebar nav icons horizontally */
   /* We'll compute its horizontal center from --sidebar-width so it lines up whether the sidebar is open or collapsed */
@@ -427,8 +427,10 @@
     /* Align hamburger with the visual center of the sidebar icons
       - when sidebar is open icons sit near 24px from the left (padding + icon center)
       - when collapsed the icon column center is ~36px (half of 72px) */
-    header.topbar.sidebar-open .topbar-hamburger { position:absolute; left:12px; top:50%; transform:translateY(-50%); color:#ffffff; z-index:10; }
-    header.topbar:not(.sidebar-open) .topbar-hamburger { position:absolute; left:6px; top:50%; transform:translateY(-50%); color:#ffffff; z-index:10; }
+  /* Align hamburger with actual icon center: 0.5rem (sidebar padding) + 0.75rem (link padding) + 12px(icon half) ≈ 32px */
+  header.topbar.sidebar-open .topbar-hamburger { position:absolute; left:32px; top:50%; transform:translateY(-50%); color:#ffffff; z-index:10; }
+  /* When collapsed the icon column center is ~36px (half of 72px) */
+  header.topbar:not(.sidebar-open) .topbar-hamburger { position:absolute; left:36px; top:50%; transform:translateY(-50%); color:#ffffff; z-index:10; }
   /* Light/topbar variant chosen by UX */
   .topbar.light { background: #ffffff; box-shadow: 0 1px 0 rgba(16,24,40,0.06); }
   .topbar.light .topbar-brand { color: #0f1724; }
@@ -458,9 +460,11 @@
   .sidebar.collapsed .nav-link svg { margin-left:auto; margin-right:auto; }
   /* When collapsed, ensure group header (link + chevron) centers icons too */
   .sidebar.collapsed .nav-group-header { justify-content: center; }
-  .sidebar.collapsed .nav-group-header .nav-link { justify-content: center; padding-left: 0.25rem; padding-right: 0.25rem; }
-  .sidebar.collapsed .chev-toggle { width:44px; height:44px; display:inline-flex; align-items:center; justify-content:center; padding:0.25rem; }
-  .sidebar.collapsed .chev-toggle .chev { margin:0; }
+  .sidebar.collapsed .nav-group-header .nav-link { justify-content: center; padding-left: 0.25rem; padding-right: 0.25rem; margin-right: 0; }
+  /* When collapsed hide the chevron toggle so grouped links look identical to single links */
+  .sidebar.collapsed .chev-toggle { display:none; }
+  /* Ensure group header links use the same centering and padding as regular links when collapsed */
+  .sidebar.collapsed .nav-group-header .nav-link { justify-content: center; padding-left: 0.5rem; padding-right: 0.5rem; margin-right: 0; }
   .link-text { white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
   .sidebar.collapsed .link-text { display:none; }
   /* sidebar-footer removed from current markup */
@@ -470,6 +474,7 @@
   .sidebar.collapsed ~ .main-content { margin-left:72px; }
   /* When showing the dedicated login page we want the main content to be full-bleed */
   .main-content.login-full { margin-left: 0 !important; padding-top: 0 !important; min-height: 100vh !important; display:flex; align-items:center; justify-content:center; }
+  .main-content.centered { margin-left: 0 !important; display:flex; align-items:center; justify-content:center; min-height: calc(100vh - var(--topbar-h)); }
 
   /* Add bottom padding so content/footer area isn't flush to the viewport bottom */
   :root { --site-footer-gap: 3rem; }
@@ -488,11 +493,14 @@
     .sidebar.collapsed ~ .main-content { margin-left:0 !important; }
   /* Mobile: center brand text and keep hamburger on the left without overlap */
   .topbar-inner { padding-left: 0; padding-right: 0; }
-  /* On mobile make hamburger static in flow */
-  .topbar-hamburger { position: static; }
+  /* On mobile make hamburger static in flow but keep predictable left padding */
+  .topbar-hamburger { position: static; margin-left:8px; }
   /* Keep the brand in normal flow and center it; padding prevents overlap with the hamburger */
   .topbar-brand { flex:1; text-align:center; margin-left:0; }
   }
+
+  /* Place the user menu at the top-right with a small margin so it doesn't touch the viewport edge */
+  .topbar .user-menu { position: absolute; right: 8px; top: 6px; }
   
   /* child width adjustments removed (not needed) */
   /* Subnavigation items under main links */
@@ -505,12 +513,16 @@
   .nav-sub { transform: translateX(6px); }
   /* Nav group styles */
   .nav-group { display:flex; flex-direction:column; }
-  .nav-group-header { display:flex; align-items:center; justify-content:space-between; width:100%; }
-  .nav-group-header .nav-link { flex:1; justify-content:flex-start; }
+  .nav-group-header { display:flex; align-items:center; justify-content:flex-start; width:100%; position:relative; }
+  /* Let the product link stretch so its active background matches other items. Reserve space
+     on the right so the chev-toggle (absolutely positioned) doesn't overlap the text. */
+  .nav-group-header .nav-link { flex: 1 1 auto; justify-content:flex-start; margin-right: 2.25rem; }
   /* Chevron toggle for nav groups (use .chev-toggle on the button) */
-  .chev-toggle { background:transparent; border:none; color:inherit; cursor:pointer; display:inline-flex; align-items:center; justify-content:center; padding:0.25rem; width:40px; height:40px; border-radius: var(--radius-md); }
+  /* Make the chevron toggle use the same visual box as the nav icons so it lines up
+    across different screens. Use 24x24 to match .nav-link svg and keep minimal padding. */
+  .chev-toggle { background:transparent; border:none; color:inherit; cursor:pointer; display:inline-flex; align-items:center; justify-content:center; padding:0; width:24px; height:24px; flex:0 0 24px; margin-left:0; position: absolute; right: 0.5rem; top: 50%; transform: translateY(-50%); z-index:5; }
   /* Keep the chevron visually consistent with other icons and centered by default */
-  .chev { transition: transform .18s ease, opacity .12s ease; opacity:1; transform: rotate(0deg); display:block; width:18px; height:18px; }
+  .chev { transition: transform .18s ease, opacity .12s ease; opacity:1; transform: rotate(0deg); display:block; width:24px; height:24px; }
   /* Rotate 90deg when expanded so -> becomes v (right to down) */
   .chev-toggle[aria-expanded="true"] .chev { transform: rotate(90deg); }
   /* Animated collapse/expand for subitems: use max-height transition and opacity */
@@ -590,7 +602,7 @@
     border-top: 1px solid #f3f4f6;
   }
   /* place user menu at the far right of the topbar */
-  .topbar .user-menu { position: absolute; right: 1rem; top: 50%; transform: translateY(-50%); }
+  .topbar .user-menu { position: absolute; right: 8px; top: 50%; transform: translateY(-50%); }
   .dropdown-item { 
     display: flex; 
     align-items: center; 

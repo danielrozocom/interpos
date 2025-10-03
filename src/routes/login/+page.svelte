@@ -68,7 +68,7 @@
   .brand h1 { font-size:2rem; font-weight:800; margin:0; letter-spacing:0.6px; }
   .card-body { padding:1.25rem 1.5rem; overflow:auto; max-height:calc(100vh - 160px); }
   /* Use a responsive size so 'Login' stays legible on small screens while remaining balanced on desktop */
-  .card h2 { font-size:clamp(1.25rem, 4.5vw, 2rem); font-weight:800; margin:0.5rem 0 1rem 0; text-align:center; color:#374151; }
+  .card h2 { font-size:clamp(2rem, 4.5vw, 2rem); font-weight:800; margin:0.5rem 0 1rem 0; text-align:center; color:#374151; }
   .card p { margin-bottom:1.5rem; text-align:center; }
   /* Logo: top logo inside the card under the brand */
   .top-logo { display:block; margin:0.5rem auto 1.6rem auto; width:120px; height:auto; max-height:120px; border-radius:10px; background:transparent; padding:0; box-shadow:none; }
