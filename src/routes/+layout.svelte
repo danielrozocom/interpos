@@ -214,13 +214,13 @@
   <!-- Persistent top bar (hidden on /login) -->
   {#if String($page.url.pathname) !== '/login'}
     <header class="topbar" class:light={topbarLight} class:sidebar-open={menuOpen}>
+      <!-- Hamburger in header (hidden on check-balance) placed as direct child so header padding doesn't offset it -->
+      {#if String($page.url.pathname) !== '/check-balance'}
+        <button class="collapse-btn topbar-hamburger" aria-label="Alternar barra lateral" on:click={() => menuOpen = !menuOpen}>
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M4 6h16M4 12h16M4 18h16" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        </button>
+      {/if}
       <div class="topbar-inner">
-        <!-- Hamburger in header (hidden on check-balance) -->
-        {#if String($page.url.pathname) !== '/check-balance'}
-          <button class="collapse-btn topbar-hamburger" aria-label="Alternar barra lateral" on:click={() => menuOpen = !menuOpen}>
-            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M4 6h16M4 12h16M4 18h16" stroke-linecap="round" stroke-linejoin="round"/></svg>
-          </button>
-        {/if}
         {#if displayUser && String($page.url.pathname) !== '/check-balance'}
           <div class="user-menu">
             <button 
@@ -454,9 +454,15 @@
       - when sidebar is open icons sit near 24px from the left (padding + icon center)
       - when collapsed the icon column center is ~36px (half of 72px) */
   /* Align hamburger with actual icon center: 0.5rem (sidebar padding) + 0.75rem (link padding) + 12px(icon half) ≈ 32px */
-  header.topbar.sidebar-open .topbar-hamburger { position:absolute; left:32px; top:50%; transform:translateY(-50%); color:#ffffff; z-index:10; }
-  /* When collapsed the icon column center is ~36px (half of 72px) */
-  header.topbar:not(.sidebar-open) .topbar-hamburger { position:absolute; left:36px; top:50%; transform:translateY(-50%); color:#ffffff; z-index:10; }
+  /* Align hamburger horizontally with the sidebar icon column. Use calculation instead of magic numbers. */
+  /* When sidebar is open: left = sidebar padding (0.5rem ~ 8px) + link left padding (0.75rem ~ 12px) + icon half (12px) => approx 32px */
+  /* Nudge slightly left for tighter visual alignment */
+  /* Extra small left nudge for pixel-perfect alignment */
+  header.topbar.sidebar-open .topbar-hamburger { position:fixed; left: calc(var(--sidebar-padding) + var(--link-padding) + var(--icon-half) - 6px); top: calc(var(--topbar-h) / 2); transform: translateY(-50%); color:#ffffff; z-index:1100; }
+  /* When collapsed: center inside the collapsed width (72px / 2) minus icon half (12px) */
+  /* Small left nudge when collapsed as well */
+  /* Small left nudge when collapsed as well (extra -2px) */
+  header.topbar:not(.sidebar-open) .topbar-hamburger { position:fixed; left: calc(var(--sidebar-collapsed-width) / 2 - var(--icon-half) - 4px); top: calc(var(--topbar-h) / 2); transform: translateY(-50%); color:#ffffff; z-index:1100; }
   /* Light/topbar variant chosen by UX */
   .topbar.light { background: #ffffff; box-shadow: 0 1px 0 rgba(16,24,40,0.06); }
   .topbar.light .topbar-brand { color: #0f1724; }
@@ -503,7 +509,7 @@
   .main-content.centered { margin-left: 0 !important; display:flex; align-items:center; justify-content:center; min-height: calc(100vh - var(--topbar-h)); }
 
   /* Add bottom padding so content/footer area isn't flush to the viewport bottom */
-  :root { --site-footer-gap: 3rem; }
+  :root { --site-footer-gap: 3rem; --sidebar-padding: 8px; --link-padding: 12px; --icon-half: 12px; --sidebar-width: 220px; --sidebar-collapsed-width: 72px; }
   .main-content { padding-bottom: var(--site-footer-gap); }
 
   /* Responsive: transform sidebar to top drawer on small screens */
@@ -519,14 +525,14 @@
     .sidebar.collapsed ~ .main-content { margin-left:0 !important; }
   /* Mobile: center brand text and keep hamburger on the left without overlap */
   .topbar-inner { padding-left: 0; padding-right: 0; }
-  /* On mobile make hamburger static in flow but keep predictable left padding */
-  .topbar-hamburger { position: static; margin-left:8px; }
+  /* On mobile make hamburger static in flow but keep predictable left padding (nudge left) */
+  .topbar-hamburger { position: static; margin-left:6px; }
   /* Keep the brand in normal flow and center it; padding prevents overlap with the hamburger */
   .topbar-brand { flex:1; text-align:center; margin-left:0; }
   }
 
-  /* Place the user menu at the top-right with a small margin so it doesn't touch the viewport edge */
-  .topbar .user-menu { position: absolute; right: 6px; top: 6px; }
+  /* Place the user menu fixed at the top-right so it remains aligned even if header padding changes */
+  .topbar .user-menu { position: fixed; right: 12px; top: calc(var(--topbar-h) / 2); transform: translateY(-50%); z-index:1200; }
   
   /* child width adjustments removed (not needed) */
   /* Subnavigation items under main links */
@@ -595,30 +601,31 @@
   
   .user-dropdown { 
     position: absolute; 
-    top: 100%; 
+    top: calc(100% + 2px);
     right: 0; 
     background: #fff; 
     border: 1px solid #e5e7eb; 
     border-radius: 8px; 
     box-shadow: 0 10px 15px -3px rgba(0,0,0,0.1), 0 4px 6px -2px rgba(0,0,0,0.05); 
-    min-width: 280px; 
-    max-width: 420px; 
+    min-width: 320px; 
+    max-width: 520px; 
     box-sizing: border-box;
-    z-index: 1000; 
+    z-index: 1200; 
     margin-top: 0.5rem; 
     padding-bottom: 0.5rem;
   }
   .dropdown-header {
-    padding: 1rem;
+    padding: 0.75rem 0.9rem;
     border-bottom: 1px solid #f3f4f6;
     background: #f9fafb;
   }
-  .dropdown-identity { display:flex; gap:0.75rem; align-items:center; }
+  /* Reduce gap so name/email sit closer to avatar */
+  .dropdown-identity { display:flex; gap:0.5rem; align-items:center; }
   /* Avatar container: circular, blue background for placeholders and masked images */
   .dropdown-avatar { width:48px; height:48px; border-radius:50%; flex:0 0 48px; overflow:hidden; display:flex; align-items:center; justify-content:center; background:#35528C; border:1px solid rgba(255,255,255,0.06); box-shadow: 0 4px 10px rgba(2,6,23,0.03); }
   .dropdown-avatar img { width:100%; height:100%; object-fit:cover; display:block; border-radius:50%; background:transparent; }
   .dropdown-avatar .user-avatar-placeholder { font-weight:800; color:#ffffff; font-size:22px; line-height:1; }
-  .dropdown-identity-text { display:flex; flex-direction:column; min-width:0; }
+  .dropdown-identity-text { display:flex; flex-direction:column; min-width:0; margin-right: 0.25rem; }
   .dropdown-user-name { font-weight:700; font-size:0.98rem; color:#0f1724; display:block; }
   .dropdown-user-email { font-weight:500; font-size:0.85rem; color:#6b7280; display:block; margin-top:2px; }
   .dropdown-user-name { white-space:normal; word-break:break-word; }
@@ -640,8 +647,8 @@
     border: 0;
     border-top: 1px solid #f3f4f6;
   }
-  /* place user menu at the far right of the topbar */
-  .topbar .user-menu { position: absolute; right: 6px; top: 50%; transform: translateY(-50%); }
+  /* place user menu at the far right of the topbar (handled by .topbar .user-menu fixed rule above) */
+  /* (duplicate absolute rule removed to avoid overriding the fixed positioning) */
   .dropdown-item { 
     display: flex; 
     align-items: center; 
@@ -665,7 +672,7 @@
   @keyframes spin { to { transform: rotate(360deg); } }
   /* Keep dropdown visually consistent on mobile: avoid forcing full-width; reduce sizes only on very small screens */
   @media (max-width: 480px) {
-    .user-dropdown { left: auto; right: 6px; min-width: 260px; max-width: 420px; width: auto; }
+    .user-dropdown { left: auto; right: 12px; min-width: 300px; max-width: 540px; width: auto; }
     .dropdown-avatar { width:40px; height:40px; flex:0 0 40px; border-radius:50%; }
     .dropdown-user-name { font-size:0.95rem; }
     .dropdown-user-email { font-size:0.8rem; }
@@ -677,10 +684,10 @@
 
   /* Desktop adjustments: move dropdown left and increase its width for better readability */
   @media (min-width: 769px) {
-    .user-dropdown { left: auto; right: 6px; min-width: 340px; max-width: 520px; }
-  .dropdown-avatar { width:56px; height:56px; flex:0 0 56px; border-radius:50%; }
-  .dropdown-user-name { font-size:1.05rem; }
-  .dropdown-avatar .user-avatar-placeholder { font-size:30px; }
+    .user-dropdown { left: auto; right: 16px; min-width: 380px; max-width: 620px; }
+    .dropdown-avatar { width:56px; height:56px; flex:0 0 56px; border-radius:50%; }
+    .dropdown-user-name { font-size:1.05rem; }
+    .dropdown-avatar .user-avatar-placeholder { font-size:30px; }
     .dropdown-user-email { font-size:0.9rem; }
   }
 </style>
