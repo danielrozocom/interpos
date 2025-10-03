@@ -1,6 +1,7 @@
 <script lang="ts">
   // Minimal layout for login page: don't render the global sidebar/topbar
-  export let data: any;
+  // `data` is not used in this layout; declare as const to avoid Svelte "unused export" warning
+  export const data: any = undefined;
 </script>
 
 <style>

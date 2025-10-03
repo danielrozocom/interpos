@@ -31,6 +31,7 @@ export const GET: RequestHandler = async ({ url, cookies }) => {
         const { access_token, refresh_token } = data.session;
         
         // Set cookies with proper options for production
+        console.log('[CALLBACK] Setting cookies for user:', data.user?.email);
         cookies.set('sb-access-token', access_token, {
           path: '/',
           httpOnly: true,
@@ -46,6 +47,7 @@ export const GET: RequestHandler = async ({ url, cookies }) => {
           secure: process.env.NODE_ENV === 'production',
           maxAge: 60 * 60 * 24 * 30 // 30 days
         });
+        console.log('[CALLBACK] Cookies set successfully');
 
         console.log('✓ OAuth callback successful, session created for user:', data.user?.email);
         

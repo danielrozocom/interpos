@@ -1,6 +1,7 @@
 <script lang="ts">
   import { onMount } from 'svelte';
   import { goto } from '$app/navigation';
+  import { invalidateAll } from '$app/navigation';
   import { supabase } from '$lib/supabaseClient';
 
   onMount(async () => {
@@ -33,10 +34,10 @@
         }
 
         console.log('✓ Implicit OAuth successful, server stored cookies');
-        // Clear the hash from the URL
-        window.history.replaceState(null, '', window.location.pathname);
-        // Redirect to home
-        goto('/');
+        // Invalidate all data to force refresh of user state
+        await invalidateAll();
+        // Clear the hash from the URL and redirect to home
+        goto('/', { replaceState: true });
       } catch (err) {
         console.error('Unexpected error in implicit callback:', err);
         goto('/login?error=implicit_error');
@@ -48,9 +49,8 @@
   });
 </script>
 
-<div class="min-h-screen flex items-center justify-center">
+<div class="min-h-screen flex items-center justify-center" aria-hidden="true">
   <div class="text-center">
-    <div class="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
-    <p>Completando autenticación...</p>
+    <!-- Spinner removed as requested -->
   </div>
 </div>

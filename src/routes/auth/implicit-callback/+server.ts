@@ -2,11 +2,8 @@ import { redirect } from '@sveltejs/kit';
 import type { RequestHandler } from '@sveltejs/kit';
 
 export const GET: RequestHandler = async ({ url }) => {
-  const next = url.searchParams.get('next') ?? '/';
-
-  // For implicit flow, redirect to a client-side page that can handle the hash
-  // The hash contains the access_token, refresh_token, etc.
-  throw redirect(303, `${next}#implicit-auth`);
+  // Just load the page - the client-side code will handle the hash
+  return new Response(null, { status: 200 });
 };
 
 // Accept a POST from the client-side implicit callback handler containing the
@@ -24,6 +21,7 @@ export const POST: RequestHandler = async ({ request, cookies }) => {
 
     // Mirror the same cookie options used in the PKCE callback
     const secure = process.env.NODE_ENV === 'production';
+    console.log('[IMPLICIT] Setting cookies for implicit flow');
 
     cookies.set('sb-access-token', access_token, {
       path: '/',
@@ -40,6 +38,7 @@ export const POST: RequestHandler = async ({ request, cookies }) => {
       secure,
       maxAge: 60 * 60 * 24 * 30 // 30 days
     });
+    console.log('[IMPLICIT] Cookies set successfully');
 
     return new Response(JSON.stringify({ ok: true }), { status: 200, headers: { 'Content-Type': 'application/json' } });
   } catch (err) {

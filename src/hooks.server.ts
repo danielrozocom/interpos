@@ -1,15 +1,11 @@
 import type { Handle } from '@sveltejs/kit';
 import { sequence } from '@sveltejs/kit/hooks';
-// Import handleAuth lazily to avoid initialization errors when env vars are missing.
-let handleAuth: any = null;
-try {
-  // require at runtime so we can guard on env vars
-  // eslint-disable-next-line @typescript-eslint/no-var-requires
-  handleAuth = require('@supabase/auth-helpers-sveltekit').handleAuth;
-} catch (e) {
-  // module may be missing in some environments; we'll handle that gracefully below
-  handleAuth = null;
-}
+import dotenv from 'dotenv';
+import path from 'path';
+
+// Load environment variables
+dotenv.config({ path: path.resolve(process.cwd(), '.env') });
+dotenv.config({ path: path.resolve(process.cwd(), '.env.local') });
 
 // Centralized error handler for server-side errors
 export const handleError = async ({ error, event }: { error: unknown; event: any }) => {
@@ -20,65 +16,34 @@ export const handleError = async ({ error, event }: { error: unknown; event: any
   };
 };
 
-// Use the auth helper to handle the auth routes (callback, logout, etc.)
-// and then populate event.locals with a lightweight getSession helper and user
-// so rest of the app can read the session in server load functions.
+// Simplified handle without handleAuth dependency
 const _composedHandle = sequence(
-  // auth handler - mounts routes like /auth/callback used by Supabase
-  // Only use the handler if we successfully imported it and the expected
-  // environment variables are present. If not, use a noop handler so requests
-  // don't fail with initialization errors.
-  (function () {
-    const SUPABASE_URL = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL || process.env.SUPABASE_UR || '';
-    const SUPABASE_KEY = process.env.SUPABASE_ANON_KEY || process.env.VITE_SUPABASE_ANON_KEY || process.env.SUPABASE_SERVICE_ROLE_KEY || '';
-    // Log every request to /auth/callback for debugging
-    return async function handleWithLogging({ event, resolve }: any) {
-      if (event.url.pathname.startsWith('/auth/callback')) {
-        console.log('[DEBUG] /auth/callback hit:', event.url.pathname, 'method:', event.request.method);
-      }
-      if (handleAuth && SUPABASE_URL && SUPABASE_KEY) {
-        try {
-          // Log before running handleAuth
-          if (event.url.pathname.startsWith('/auth/callback')) {
-            console.log('[DEBUG] Running handleAuth for /auth/callback');
-          }
-          return await handleAuth()(event, resolve);
-        } catch (e) {
-          console.warn('handleAuth initialization failed, continuing without it', e);
-          return await resolve(event);
-        }
-      }
-      if (!handleAuth) console.warn('handleAuth not available; skipping Supabase auth middleware');
-      else console.warn('Supabase env vars missing; skipping Supabase auth middleware');
-      return await resolve(event);
-    }
-  })(),
 
   // after the auth handler runs, attempt to populate event.locals.user by calling
   // any getSession helper the auth middleware may have installed. Use `any` casts
   // to avoid strict Locals typing issues in this repo.
   async ({ event, resolve }) => {
-    // Instead of relying on getSession from auth-helpers (deprecated),
-    // read the session from cookies that our /auth/callback endpoint sets
+    // Read and validate session from cookies
     try {
       const accessToken = event.cookies.get('sb-access-token');
-      const refreshToken = event.cookies.get('sb-refresh-token');
+      console.log('[DEBUG] Found access token:', !!accessToken);
       
-      if (accessToken && refreshToken) {
-        // Verify the session using the access token
+      if (accessToken) {
         const { createClient } = await import('@supabase/supabase-js');
         const supabase = createClient(
           process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL || '',
           process.env.SUPABASE_ANON_KEY || process.env.VITE_SUPABASE_ANON_KEY || ''
         );
-        
+
         const { data: { user }, error } = await supabase.auth.getUser(accessToken);
-        
+        console.log('[DEBUG] getUser result:', { hasUser: !!user, error: error?.message });
+
         if (!error && user) {
           (event.locals as any).user = user;
+          console.log('[DEBUG] User authenticated:', user.email);
         } else {
+          console.log('[DEBUG] Access token invalid, clearing session');
           (event.locals as any).user = null;
-          // Clear invalid cookies
           event.cookies.delete('sb-access-token', { path: '/' });
           event.cookies.delete('sb-refresh-token', { path: '/' });
         }

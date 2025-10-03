@@ -10,8 +10,42 @@
   export let topbarLight = false;
   import { page } from '$app/stores';
   // Client-side fallback user when SSR didn't populate page.data.user
-  let clientUser: any = null;
+  // `clientUser === undefined` means "still checking"; `null` means checked and no user
+  let clientUser: any = undefined;
+  let authChecked = false; // true when we've attempted to resolve client-side auth
+  let loggingOut = false;
+
   $: displayUser = $page.data.user ?? clientUser;
+  $: showLoginButton = authChecked && clientUser === null && $page.data.user === null;
+
+  // Re-check auth when page changes (useful after login redirect)
+  $: if ($page.url.pathname && typeof window !== 'undefined' && authChecked) {
+    checkAuthState();
+  }
+
+  // Function to check authentication state
+  async function checkAuthState() {
+    try {
+      console.log('[CLIENT] Re-checking auth state for page:', $page.url.pathname);
+      const res = await fetch('/api/auth/me');
+      if (res.ok) {
+        const json = await res.json();
+        const newUser = json?.user || null;
+        if (newUser !== clientUser) {
+          console.log('[CLIENT] Auth state changed:', !!newUser, newUser?.email);
+          clientUser = newUser;
+        }
+      } else if (clientUser !== null) {
+        console.log('[CLIENT] Auth check failed, clearing user');
+        clientUser = null;
+      }
+    } catch (e) {
+      console.log('[CLIENT] Auth check error:', String(e));
+      if (clientUser !== null) {
+        clientUser = null;
+      }
+    }
+  }
 
   // Close the slide menu on mobile when a nav link is clicked
   function handleNavClick() {
@@ -106,18 +140,40 @@
       };
       
       document.addEventListener('click', clickOutsideHandler);
-      // If SSR didn't supply a user, try fetching it from the server via cookies
+      // Check auth state - try SSR first, then client fetch
       (async () => {
         try {
-          if (!$page.data.user) {
-            const res = await fetch('/api/auth/me');
-            if (res.ok) {
-              const json = await res.json();
-              if (json?.user) clientUser = json.user;
-            }
+          if ($page.data.user) {
+            // SSR already provided the user
+            clientUser = $page.data.user;
+            authChecked = true;
+            console.log('[CLIENT] Using SSR user:', $page.data.user.email);
+            return;
+          }
+
+          console.log('[CLIENT] No SSR user, fetching from /api/auth/me');
+          const res = await fetch('/api/auth/me');
+          if (res.ok) {
+            const json = await res.json();
+            clientUser = json?.user || null;
+            console.log('[CLIENT] Client fetch result:', !!clientUser, clientUser?.email);
+          } else {
+            clientUser = null;
+            console.log('[CLIENT] Fetch failed:', res.status);
           }
         } catch (e) {
-          // ignore
+          console.log('[CLIENT] Fetch error:', String(e));
+          clientUser = null;
+        } finally {
+          authChecked = true;
+          // Redirect to login if no user and not on login/auth pages
+          if (clientUser === null && $page.data.user === null &&
+              String($page.url.pathname) !== '/login' &&
+              String($page.url.pathname) !== '/auth/callback' &&
+              String($page.url.pathname) !== '/auth/implicit-callback') {
+            console.log('[CLIENT] No authenticated user, redirecting to login');
+            window.location.href = '/login';
+          }
         }
       })();
     }
@@ -142,19 +198,13 @@
   {#if String($page.url.pathname) !== '/login'}
     <header class="topbar" class:light={topbarLight} class:sidebar-open={menuOpen}>
       <div class="topbar-inner">
-        <!-- Hamburger in header (hidden on check-balance) -->
-        {#if String($page.url.pathname) !== '/check-balance'}
+        <!-- Hamburger in header -->
+        {#if true}
           <button class="collapse-btn topbar-hamburger" aria-label="Alternar barra lateral" on:click={() => menuOpen = !menuOpen}>
             <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M4 6h16M4 12h16M4 18h16" stroke-linecap="round" stroke-linejoin="round"/></svg>
           </button>
         {/if}
-        <!-- Always show brand/title in the topbar (including check-balance) -->
-        {#if String($page.url.pathname) === '/check-balance'}
-          <span class="topbar-brand">InterPOS</span>
-        {:else}
-          <a href="/" class="topbar-brand" aria-label="Ir a inicio">InterPOS</a>
-        {/if}
-        {#if displayUser && String($page.url.pathname) !== '/check-balance'}
+        {#if displayUser}
           <div class="user-menu">
             <button 
               class="user-menu-btn"
@@ -169,6 +219,7 @@
                   {(displayUser.user_metadata?.full_name || displayUser.name || displayUser.email)?.charAt(0) || '?'}
                 </div>
               {/if}
+              <!-- Show full name on desktop and mobile -->
               <span class="user-name text-sm">{ displayUser.user_metadata?.full_name || displayUser.name || displayUser.email }</span>
               <svg class="dropdown-arrow" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                 <polyline points="6,9 12,15 18,9"/>
@@ -178,10 +229,16 @@
             {#if showUserDropdown}
               <!-- Dropdown menu -->
               <div class="user-dropdown" role="menu">
+                <div class="dropdown-header">
+                  <span class="dropdown-user-name">{ displayUser.user_metadata?.full_name || displayUser.name || displayUser.email }</span>
+                  <span class="dropdown-user-email">{ displayUser.email }</span>
+                </div>
+                <hr class="dropdown-divider">
                 <button 
                   class="dropdown-item logout-btn"
+                  disabled={loggingOut}
                   on:click={async () => {
-                    showUserDropdown = false;
+                    loggingOut = true;
                     try {
                       const response = await fetch('/api/auth/logout', {
                         method: 'POST',
@@ -205,25 +262,30 @@
                     <polyline points="16,17 21,12 16,7"/>
                     <line x1="21" y1="12" x2="9" y2="12"/>
                   </svg>
-                  Cerrar sesión
+                  {loggingOut ? 'Cerrando sesión...' : 'Cerrar sesión'}
                 </button>
               </div>
             {/if}
           </div>
         {:else}
-          {#if String($page.url.pathname) !== '/check-balance'}
-            <!-- Not signed in: show login button at the right -->
-            <div class="right-login">
-              <a href="/login" class="btn-login" aria-label="Iniciar sesión">Iniciar sesión</a>
-            </div>
+          {#if !authChecked || (authChecked && displayUser)}
+            <!-- Auth is initializing or we have a user: reserve space to avoid flash/shift -->
+            <div style="width:120px; height:40px;" aria-hidden="true"></div>
           {/if}
+          <!-- Login button removed - automatic redirect to /login when not authenticated -->
+        {/if}
+        <!-- Always show brand/title in the topbar -->
+        {#if true}
+          <span class="topbar-brand">InterPOS</span>
+        {:else}
+          <a href="/" class="topbar-brand" aria-label="Ir a inicio">InterPOS</a>
         {/if}
       </div>
     </header>
   {/if}
   <div class="flex">
-  <!-- Sidebar (hidden on /login and on /check-balance which uses header-only UI) -->
-  {#if String($page.url.pathname) !== '/login' && String($page.url.pathname) !== '/check-balance'}
+  <!-- Sidebar (hidden on /login) -->
+  {#if String($page.url.pathname) !== '/login'}
     <aside class="sidebar" class:collapsed={menuOpen === false} data-open={menuOpen} aria-label="Navegación principal">
       <div class="sidebar-top">
         {#if menuOpen}
@@ -320,14 +382,6 @@
           <span class="link-text">Historial</span>
         </a>
         
-  <a href="/check-balance" class="nav-link" class:active={String($page.url.pathname) === '/check-balance'}>
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <rect x="2" y="5" width="20" height="14" rx="2" ry="2"/>
-            <line x1="2" y1="10" x2="22" y2="10"/>
-          </svg>
-          <span class="link-text">Consultar saldo</span>
-        </a>
-        
         <a href="/reports" class="nav-link" class:active={$page.url.pathname === '/reports'}>
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
             <line x1="18" y1="20" x2="18" y2="10"/>
@@ -350,7 +404,7 @@
   {/if}
 
     <!-- Main content area -->
-  <main class="main-content flex-1 px-4 sm:px-6 lg:px-8" class:login-full={$page.url.pathname === '/login'} class:check-center={String($page.url.pathname) === '/check-balance'}>
+  <main class="main-content flex-1 px-4 sm:px-6 lg:px-8" class:login-full={$page.url.pathname === '/login'}>
       <slot />
     </main>
   </div>
@@ -434,20 +488,10 @@
     .sidebar.collapsed ~ .main-content { margin-left:0 !important; }
   /* Mobile: center brand text and keep hamburger on the left without overlap */
   .topbar-inner { padding-left: 0; padding-right: 0; }
-  /* On mobile keep the hamburger within the header center for smaller viewports */
-  header.topbar .topbar-hamburger { top:50%; transform:translateY(-50%); }
+  /* On mobile make hamburger static in flow */
+  .topbar-hamburger { position: static; }
   /* Keep the brand in normal flow and center it; padding prevents overlap with the hamburger */
   .topbar-brand { flex:1; text-align:center; margin-left:0; }
-  }
-  /* Center the main content on check-balance (no left sidebar space) */
-  .main-content.check-center {
-    margin-left: 0 !important;
-    margin-right: 0 !important;
-    padding-left: 0 !important;
-    padding-right: 0 !important;
-    display: block;
-    width: 100%;
-    min-height: calc(100vh - var(--topbar-h));
   }
   
   /* child width adjustments removed (not needed) */
@@ -519,15 +563,34 @@
     border: 1px solid #e5e7eb; 
     border-radius: 8px; 
     box-shadow: 0 10px 15px -3px rgba(0,0,0,0.1), 0 4px 6px -2px rgba(0,0,0,0.05); 
-    min-width: 160px; 
+    min-width: 200px; 
     z-index: 1000; 
     margin-top: 0.5rem; 
   }
+  .dropdown-header {
+    padding: 1rem;
+    border-bottom: 1px solid #f3f4f6;
+    background: #f9fafb;
+  }
+  .dropdown-user-name {
+    display: block;
+    font-weight: 600;
+    font-size: 0.875rem;
+    color: #111827;
+    margin-bottom: 0.25rem;
+  }
+  .dropdown-user-email {
+    display: block;
+    font-size: 0.75rem;
+    color: #6b7280;
+  }
+  .dropdown-divider {
+    margin: 0;
+    border: 0;
+    border-top: 1px solid #f3f4f6;
+  }
   /* place user menu at the far right of the topbar */
   .topbar .user-menu { position: absolute; right: 1rem; top: 50%; transform: translateY(-50%); }
-  /* login button uses same right alignment */
-  .topbar .right-login { position: absolute; right: 1rem; top: 50%; transform: translateY(-50%); }
-  .topbar .right-login .btn-login { color:#fff; text-decoration:none; font-weight:600; padding:0.5rem 0.75rem; border-radius:6px; background:rgba(255,255,255,0.05); }
   .dropdown-item { 
     display: flex; 
     align-items: center; 
@@ -545,4 +608,5 @@
   .dropdown-item:hover { background: #f9fafb; }
   .dropdown-item svg { width: 16px; height: 16px; }
   /* Removed debug pre styles (no longer used) */
+  @keyframes spin { to { transform: rotate(360deg); } }
 </style>

@@ -28,9 +28,14 @@
 let userSuggestions: any[] = [];
 let activeSuggestionIndex = -1;
 let userIdInput: HTMLInputElement | null = null;
+let cashInput: HTMLInputElement | null = null;
 
 $: if (userSuggestions.length > 0 && !userName && (!userId || userId.trim() === '')) {
   // Mostrar sugerencias: no auto-completamos el campo para evitar llamadas implícitas al servidor.
+}
+
+$: if (showCashModal && cashInput) {
+  tick().then(() => cashInput?.focus());
 }
 
 // Nota: ya no limpiamos automáticamente `userSuggestions` cuando existe `userName`.
@@ -206,7 +211,7 @@ onMount(() => {
 
 // Payment method variables
 let paymentMethod = 'saldo'; // 'saldo' or 'efectivo'
-let cashReceived = 0;
+let cashReceived = '';
 let cashChange = 0;
 let showCashModal = false;
 
@@ -585,7 +590,7 @@ let showCashModal = false;
   // Handle cash payment modal
   function openCashModal() {
     if (paymentMethod === 'efectivo') {
-      cashReceived = 0;
+      cashReceived = '';
       cashChange = 0;
       showCashModal = true;
     } else {
@@ -594,18 +599,19 @@ let showCashModal = false;
   }
 
   function processCashPayment() {
-    if (cashReceived < cartTotal) {
-      error = `Efectivo insuficiente. Se necesitan $${cartTotal.toLocaleString('es-CO')} y se recibieron $${cashReceived.toLocaleString('es-CO')}`;
+    const received = parseFloat(cashReceived) || 0;
+    if (received < cartTotal) {
+      error = `Efectivo insuficiente. Se necesitan $${cartTotal.toLocaleString('es-CO')} y se recibieron $${received.toLocaleString('es-CO')}`;
       return;
     }
-    cashChange = cashReceived - cartTotal;
+    cashChange = received - cartTotal;
     showCashModal = false;
     handlePayment();
   }
 
   function closeCashModal() {
     showCashModal = false;
-    cashReceived = 0;
+    cashReceived = '';
     cashChange = 0;
     error = '';
   }
@@ -893,6 +899,7 @@ let showCashModal = false;
             spellcheck="false"
             aria-label="ID de Cliente"
             bind:this={userIdInput}
+            autofocus
           />
           <button
             type="button"
@@ -1290,7 +1297,7 @@ let showCashModal = false;
 
 <!-- Cash Payment Modal -->
 {#if showCashModal}
-  <div class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+  <div class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[9999] p-4">
     <div class="bg-white rounded-lg shadow-xl max-w-md w-full p-6">
       <h3 class="text-xl font-bold text-gray-900 mb-4">💵 Pago en Efectivo</h3>
       
@@ -1309,22 +1316,23 @@ let showCashModal = false;
           bind:value={cashReceived}
           min="0"
           step="100"
-          class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent text-lg"
-          placeholder="0"
+          class="w-full px-3 py-2 border border-primary rounded-lg focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent text-lg"
+          placeholder="Ingrese el monto"
+          bind:this={cashInput}
         />
       </div>
       
-      {#if cashReceived > 0}
+      {#if parseFloat(cashReceived) > 0}
         <div class="mb-4 p-3 bg-gray-50 rounded-lg">
           <div class="flex justify-between items-center">
             <span class="text-gray-600">Cambio:</span>
-            <span class="text-lg font-bold {cashReceived >= cartTotal ? 'text-green-600' : 'text-red-600'}">
-              ${Math.max(0, cashReceived - cartTotal).toLocaleString('es-CO')}
+            <span class="text-lg font-bold {parseFloat(cashReceived) >= cartTotal ? 'text-green-600' : 'text-red-600'}">
+              ${Math.max(0, parseFloat(cashReceived) - cartTotal).toLocaleString('es-CO')}
             </span>
           </div>
-          {#if cashReceived < cartTotal}
+          {#if parseFloat(cashReceived) < cartTotal}
             <p class="text-red-600 text-sm mt-1">
-              Faltan ${(cartTotal - cashReceived).toLocaleString('es-CO')}
+              Faltan ${(cartTotal - parseFloat(cashReceived)).toLocaleString('es-CO')}
             </p>
           {/if}
         </div>
@@ -1345,7 +1353,7 @@ let showCashModal = false;
         </button>
         <button
           on:click={processCashPayment}
-          disabled={cashReceived < cartTotal || loading}
+          disabled={parseFloat(cashReceived) < cartTotal || loading}
           class="flex-1 px-4 py-2 bg-primary text-white rounded-lg hover:bg-[#27406a] focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed"
         >
           {loading ? 'Procesando...' : 'Confirmar Pago'}
